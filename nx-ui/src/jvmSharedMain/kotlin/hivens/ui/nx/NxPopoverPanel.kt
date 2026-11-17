@@ -6,12 +6,15 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -32,14 +35,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.layers.AnchoredLayer
+import hivens.ui.layers.LayerHost
+import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 import hivens.ui.surface.SurfaceKind
 
 /**
@@ -221,6 +230,48 @@ fun NxPanelGroup(
                 style = MaterialTheme.typography.labelSmall,
                 color = NxInk.quiet,
             )
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxPopoverPanelDarkPreview() = OpenPopover(dark = true)
+
+@Preview
+@Composable
+private fun NxPopoverPanelLightPreview() = OpenPopover(dark = false)
+
+/**
+ * The panel open on its trigger in a [LayerHost] that draws it in place. It unfolds when it
+ * opens, so a static frame of the IDE may catch the start of that and the off-screen test
+ * the end of it.
+ */
+@Composable
+private fun OpenPopover(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        LayerHost(rememberWindowLayers(), Modifier.size(360.dp, 400.dp).background(NxColor.page)) {
+            Box(Modifier.align(Alignment.TopEnd).padding(12.dp)) {
+                NxIconButton(NxIcon.Tune, "View options", onClick = {})
+                NxPopoverPanel(
+                    expanded         = true,
+                    onDismissRequest = {},
+                    title            = "View",
+                    footer           = { NxButton("Reset", onClick = {}, style = NxButtonStyle.Tertiary, compact = true) },
+                ) {
+                    NxPanelGroup("Sort by") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            NxChoiceChip("Name", selected = true, onToggle = {})
+                            NxChoiceChip("Played", selected = false, onToggle = {})
+                            NxChoiceChip("Size", selected = false, onToggle = {})
+                        }
+                    }
+                    NxPanelGroup("Show", hint = "Hidden packs stay installed") {
+                        NxToggle("Hidden packs", checked = false, onCheckedChange = {})
+                    }
+                    NxSlider("Card size", value = 0.5f, range = 0f..1f, valueText = "Medium", onValueChange = {}, compact = true)
+                }
+            }
         }
     }
 }

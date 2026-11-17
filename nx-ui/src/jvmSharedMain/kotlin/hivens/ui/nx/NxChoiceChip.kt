@@ -3,7 +3,10 @@ package hivens.ui.nx
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -11,8 +14,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Spacing
 
@@ -58,5 +65,28 @@ fun NxChoiceChip(
                 )
                 .padding(horizontal = Spacing.s10, vertical = Spacing.s6),
         )
+    }
+}
+
+@Preview
+@Composable
+private fun NxChoiceChipDarkPreview() = ChoiceChipStates(dark = true)
+
+@Preview
+@Composable
+private fun NxChoiceChipLightPreview() = ChoiceChipStates(dark = false)
+
+@Composable
+private fun ChoiceChipStates(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            NxChoiceChip("Regex", selected = true, onToggle = {})
+            NxChoiceChip("Bold", selected = false, onToggle = {})
+            NxChoiceChip("Locked on", selected = true, enabled = false, onToggle = {})
+            NxChoiceChip("Locked off", selected = false, enabled = false, onToggle = {})
+        }
     }
 }

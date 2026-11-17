@@ -6,9 +6,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.foundation.background
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
@@ -29,7 +32,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.pointer.PointerEventType
@@ -40,13 +45,19 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupPositionProvider
+import hivens.ui.effects.pixelArtBackground
 import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.AnchoredLayer
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
@@ -415,5 +426,50 @@ private class BelowAnchorStartAligned(
             (anchorBounds.top - popupContentSize.height - gapPx).coerceAtLeast(0)
         }
         return IntOffset(x, y)
+    }
+}
+
+@Preview
+@Composable
+private fun NxTooltipDarkPreview() = TooltipContents(dark = true)
+
+@Preview
+@Composable
+private fun NxTooltipLightPreview() = TooltipContents(dark = false)
+
+/**
+ * The four contents on the plane a tooltip draws them on. A tooltip itself only appears
+ * under a hovering pointer, which a static frame has none of.
+ */
+@Composable
+private fun TooltipContents(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            TooltipPlane(NxTooltipBehaviour.Label) { NxTooltipLabel("Open folder") }
+            TooltipPlane(NxTooltipBehaviour.Label) { NxTooltipGlyphLabel(NxIcon.Info, "Signed in through the mirror") }
+            TooltipPlane(NxTooltipBehaviour.Explain) {
+                NxTooltipTitled("Duplicate", "Copies the pack with its worlds and settings.", shortcut = "Ctrl+D")
+            }
+            TooltipPlane(NxTooltipBehaviour.Preview) {
+                NxTooltipPreview(caption = "Generated art") {
+                    Box(
+                        Modifier
+                            .size(160.dp, 90.dp)
+                            .clip(MaterialTheme.shapes.small)
+                            .pixelArtBackground("tooltip", Color(0xFF3B6EA8), Color(0xFFB8608E)),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TooltipPlane(behaviour: NxTooltipBehaviour, content: @Composable () -> Unit) {
+    NxSurface(kind = SurfaceKind.Popup, shape = MaterialTheme.shapes.extraSmall) {
+        Box(Modifier.widthIn(max = behaviour.maxWidth).padding(behaviour.contentPadding)) { content() }
     }
 }

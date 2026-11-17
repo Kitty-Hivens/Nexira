@@ -1,12 +1,22 @@
 package hivens.ui.theme
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import hivens.nx.ui.generated.resources.Res
 import hivens.nx.ui.generated.resources.dejavu_sans
 import hivens.nx.ui.generated.resources.jetbrains_mono_bold
@@ -159,6 +169,41 @@ fun nexiraTypography(sans: FontFamily = nexiraSansFamily()): Typography {
                 labelMedium    = labelMedium.copy(fontFamily = sans),
                 labelSmall     = labelSmall.copy(fontFamily = sans),
             )
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NexiraTypographyDarkPreview() = TypeScale(dark = true)
+
+@Preview
+@Composable
+private fun NexiraTypographyLightPreview() = TypeScale(dark = false)
+
+@Composable
+private fun TypeScale(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        val type = MaterialTheme.typography
+        Column(
+            modifier            = Modifier.width(560.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            for ((role, style) in listOf(
+                "Headline small" to type.headlineSmall,
+                "Title large" to type.titleLarge,
+                "Title medium" to type.titleMedium,
+                "Title small" to type.titleSmall,
+                "Body large" to type.bodyLarge,
+                "Body medium" to type.bodyMedium,
+                "Body small" to type.bodySmall,
+                "Label large" to type.labelLarge,
+                "Label medium" to type.labelMedium,
+                "Label small" to type.labelSmall,
+            )) {
+                Text("$role, the quick brown fox", style = style, color = NxInk.main)
+            }
+            Text("Mono 0123456789 #3B6EA8", style = type.bodyMedium.copy(fontFamily = LocalMonoFamily.current), color = NxInk.main)
         }
     }
 }

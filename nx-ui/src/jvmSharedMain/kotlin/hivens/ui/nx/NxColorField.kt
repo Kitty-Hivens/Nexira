@@ -5,10 +5,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -23,10 +25,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 
 /**
  * Parse a hex string into a [Color] or null. Accepts `#RRGGBB` / `#AARRGGBB`
@@ -100,6 +105,29 @@ fun NxColorField(
                     .clickable { text = ""; onClear() }
                     .padding(horizontal = Spacing.s8, vertical = Spacing.s4),
             )
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxColorFieldDarkPreview() = ColorFields(dark = true)
+
+@Preview
+@Composable
+private fun NxColorFieldLightPreview() = ColorFields(dark = false)
+
+@Composable
+private fun ColorFields(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(320.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            NxColorField(hex = "#3B6EA8", onValueChange = {})
+            NxColorField(hex = "#803B6EA8", onValueChange = {}, onClear = {}, clearLabel = "Reset")
+            NxColorField(hex = "#12345", onValueChange = {})
+            NxColorField(hex = null, onValueChange = {})
         }
     }
 }

@@ -1,8 +1,13 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.TextFieldBuffer
@@ -27,10 +32,14 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Spacing
 
 /**
@@ -280,3 +289,31 @@ internal class FieldEcho {
 
 /** How many frames a caller that has not answered an edit gets before the edit counts as refused. */
 private const val ANSWER_FRAMES = 8
+
+@Preview
+@Composable
+private fun NxFieldDarkPreview() = FieldStates(dark = true)
+
+@Preview
+@Composable
+private fun NxFieldLightPreview() = FieldStates(dark = false)
+
+@Composable
+private fun FieldStates(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(360.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            NxField(value = "Survival world", onValueChange = {}, placeholder = "World name")
+            NxField(value = "", onValueChange = {}, placeholder = "Search packs")
+            NxField(
+                value         = "First line\nSecond line",
+                onValueChange = {},
+                placeholder   = "Notes",
+                singleLine    = false,
+                modifier      = Modifier.fillMaxWidth().height(80.dp),
+            )
+        }
+    }
+}

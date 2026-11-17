@@ -5,8 +5,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -15,13 +19,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 
 /**
  * One state of an [NxCycleToggle]: the glyph that stands for it and the name it
@@ -114,6 +122,34 @@ fun NxCycleToggle(
                 weight             = if (active) 500 else 400,
                 size               = glyphSize,
             )
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxCycleToggleDarkPreview() = CycleToggleStates(dark = true)
+
+@Preview
+@Composable
+private fun NxCycleToggleLightPreview() = CycleToggleStates(dark = false)
+
+@Composable
+private fun CycleToggleStates(dark: Boolean) {
+    val repeat = listOf(
+        NxCycleState(NxIcon.Repeat, "Repeat off"),
+        NxCycleState(NxIcon.Repeat, "Repeat all"),
+        NxCycleState(NxIcon.RepeatOne, "Repeat one"),
+    )
+    NxTheme(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(360.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+        ) {
+            for (index in repeat.indices) NxCycleToggle(repeat, index, onCycle = {})
+            NxCycleToggle(repeat, 1, onCycle = {}, enabled = false)
+            NxCycleToggle(repeat, 2, onCycle = {}, size = 44.dp, glyphSize = 24.dp)
         }
     }
 }

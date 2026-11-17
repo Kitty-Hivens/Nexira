@@ -1,6 +1,16 @@
 package hivens.ui.effects
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -9,13 +19,21 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import hivens.ui.customization.LocalCustomization
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalScheme
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.floor
@@ -217,3 +235,30 @@ private const val MIN_ADVANCE_MS = 33L
 
 /** A ceiling on motes per field: a frame at this count is one cheap pass, a full window at Rich is under it. */
 internal const val MAX_MOTES = 700
+
+@Preview
+@Composable
+private fun NxParticleFieldDarkPreview() = ParticleFields(dark = true)
+
+@Preview
+@Composable
+private fun NxParticleFieldLightPreview() = ParticleFields(dark = false)
+
+@Composable
+private fun ParticleFields(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(680.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            for ((field, density) in ParticleField.entries.zip(ParticleDensity.entries + ParticleDensity.Rich)) {
+                NxSurface(SurfaceKind.Card, Modifier.size(150.dp, 120.dp).clip(MaterialTheme.shapes.medium)) {
+                    NxParticleField(field, Modifier.fillMaxSize(), density = density)
+                    Box(Modifier.padding(8.dp)) {
+                        Text("${field.name}, ${density.name}", style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
+                    }
+                }
+            }
+        }
+    }
+}

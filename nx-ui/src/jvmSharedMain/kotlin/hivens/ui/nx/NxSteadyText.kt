@@ -1,7 +1,15 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -13,6 +21,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 
 /**
  * A label whose box does not change size with the state it is drawn in.
@@ -71,5 +85,30 @@ fun NxSteadyText(
             textAlign  = textAlign,
             modifier   = Modifier.align(align),
         )
+    }
+}
+
+@Preview
+@Composable
+private fun NxSteadyTextDarkPreview() = SteadyTexts(dark = true)
+
+@Preview
+@Composable
+private fun NxSteadyTextLightPreview() = SteadyTexts(dark = false)
+
+@Composable
+private fun SteadyTexts(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(320.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            val boxed = Modifier.border(1.dp, NxInk.line).padding(horizontal = 6.dp, vertical = 2.dp)
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NxSteadyText("Overview", FontWeight.Normal, boxed, MaterialTheme.typography.titleSmall, NxInk.quiet)
+                NxSteadyText("Overview", FontWeight.Bold, boxed, MaterialTheme.typography.titleSmall, NxInk.main)
+            }
+            NxSteadyText("Left aligned in a list", FontWeight.Normal, boxed, color = NxInk.main, align = Alignment.CenterStart)
+        }
     }
 }

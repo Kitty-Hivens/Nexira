@@ -1,5 +1,6 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -21,14 +22,18 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Status
 import hivens.ui.surface.SurfaceKind
 
 /**
@@ -83,6 +88,35 @@ fun NxNavRow(
                 }
             }
             Symbol(trailing, null, tint = NxInk.quiet)
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxNavRowDarkPreview() = NavRows(dark = true)
+
+@Preview
+@Composable
+private fun NxNavRowLightPreview() = NavRows(dark = false)
+
+@Composable
+private fun NavRows(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            NxNavRow(NxIcon.Palette, "Appearance", onClick = {}, subtitle = "Theme, wallpaper and motion")
+            NxNavRow(NxIcon.Storage, "Storage", onClick = {})
+            NxNavRow(
+                icon     = NxIcon.BugReport,
+                title    = "Report a problem",
+                onClick  = {},
+                subtitle = "Opens the issue tracker in the browser",
+                trailing = NxIcon.OpenInNew,
+                iconTint = NxColor.status(Status.Warning),
+            )
         }
     }
 }

@@ -3,22 +3,31 @@ package hivens.ui.nx
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
+import hivens.ui.theme.Status
 
 /**
  * The toggle primitive. Its track and thumb are sized here; colours come from
@@ -88,3 +97,30 @@ private val trackHeight = 24.dp
 private val thumbSize = 18.dp
 private val trackCorner = 12.dp
 private val thumbCorner = 9.dp
+
+@Preview
+@Composable
+private fun NxSwitchDarkPreview() = SwitchStates(dark = true)
+
+@Preview
+@Composable
+private fun NxSwitchLightPreview() = SwitchStates(dark = false)
+
+@Composable
+private fun SwitchStates(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(280.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            for (enabled in listOf(true, false)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    NxSwitch(checked = true, onCheckedChange = {}, enabled = enabled)
+                    NxSwitch(checked = false, onCheckedChange = {}, enabled = enabled)
+                    NxSwitch(checked = true, onCheckedChange = {}, enabled = enabled, accent = NxColor.status(Status.Error))
+                    NxSwitch(checked = true, onCheckedChange = null, enabled = enabled)
+                }
+            }
+        }
+    }
+}

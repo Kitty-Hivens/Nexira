@@ -1,12 +1,20 @@
 package hivens.ui.surface
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
@@ -19,10 +27,16 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawOutline
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hivens.ui.effects.pixelArtBackground
 import hivens.ui.theme.Backdrop
 import hivens.ui.theme.LocalPlane
 import hivens.ui.theme.LocalScheme
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Plane
 import hivens.ui.theme.bevelHairline
 
@@ -194,3 +208,61 @@ fun NxCard(
 
 /** How far glass blurs what is behind it when it names no radius. */
 private const val DEFAULT_BLUR_DP = 18f
+
+@Preview
+@Composable
+private fun NxSurfaceDarkPreview() = SurfaceKinds(dark = true)
+
+@Preview
+@Composable
+private fun NxSurfaceLightPreview() = SurfaceKinds(dark = false)
+
+@Composable
+private fun SurfaceKinds(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(640.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            NxSurface(SurfaceKind.Panel) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    SurfaceLabel("Panel on the page")
+                    NxCard {
+                        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            SurfaceLabel("Card in the panel")
+                            NxSurface(SurfaceKind.Field, shape = MaterialTheme.shapes.small) {
+                                Box(Modifier.padding(10.dp)) { SurfaceLabel("Field in the card") }
+                            }
+                        }
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                for (kind in listOf(SurfaceKind.Popup, SurfaceKind.Dialog, SurfaceKind.Notice, SurfaceKind.Chrome)) {
+                    NxSurface(kind, Modifier.size(132.dp, 64.dp)) { Box(Modifier.padding(10.dp)) { SurfaceLabel(kind.name) } }
+                }
+            }
+            Row(
+                modifier              = Modifier
+                    .clip(MaterialTheme.shapes.medium)
+                    .pixelArtBackground("surface", Color(0xFF3B6EA8), Color(0xFFB8608E))
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
+                NxSurface(SurfaceKind.Chrome, Modifier.size(132.dp, 64.dp)) { Box(Modifier.padding(10.dp)) { SurfaceLabel("Solid chrome") } }
+                NxSurface(SurfaceKind.Chrome, Modifier.size(132.dp, 64.dp), opacity = 0.5f) { Box(Modifier.padding(10.dp)) { SurfaceLabel("Glass chrome") } }
+                NxSurface(SurfaceKind.Card, Modifier.size(132.dp, 64.dp), borderColor = NxColor.lead(), borderWidthDp = 2f) {
+                    Box(Modifier.padding(10.dp)) { SurfaceLabel("Own border") }
+                }
+                NxSurface(SurfaceKind.Card, Modifier.size(132.dp, 64.dp), fillColor = Color(0xFF2E6B4F), borderWidthDp = 0f, shadowDp = 8f) {
+                    Box(Modifier.padding(10.dp)) { Text("Own fill", style = MaterialTheme.typography.labelMedium, color = Color.White) }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SurfaceLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.labelMedium, color = NxInk.main)
+}

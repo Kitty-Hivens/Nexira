@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,10 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status
 
@@ -86,6 +90,28 @@ fun NxDiffRow(
         }
         if (trailing != null) {
             Text(trailing, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxDiffRowDarkPreview() = DiffRowKinds(dark = true)
+
+@Preview
+@Composable
+private fun NxDiffRowLightPreview() = DiffRowKinds(dark = false)
+
+@Composable
+private fun DiffRowKinds(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(Modifier.width(420.dp).background(NxColor.page).padding(16.dp)) {
+            NxDiffRow(NxDiffRowKind.Added, "Sodium", subtitle = "0.6.0 for Fabric", trailing = "1.2 MB")
+            NxDiffRow(NxDiffRowKind.Removed, "OptiFine", subtitle = "Replaced by Sodium", trailing = "-4.8 MB")
+            NxDiffRow(NxDiffRowKind.Updated, "Lithium", subtitle = "0.12.1 to 0.13.0")
+            NxDiffRow(NxDiffRowKind.Added, "Iris Shaders", trailing = "3.1 MB") {
+                Box(Modifier.size(24.dp).clip(RoundedCornerShape(6.dp))) { InitialsAvatar("Iris Shaders", NxColor.hashed("Iris")) }
+            }
         }
     }
 }

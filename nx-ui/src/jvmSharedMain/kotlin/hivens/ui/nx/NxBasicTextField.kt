@@ -1,17 +1,33 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.InputTransformation
 import androidx.compose.foundation.text.input.KeyboardActionHandler
 import androidx.compose.foundation.text.input.TextFieldDecorator
 import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 
 /**
  * A text field for the screens that draw their own frame around it: [value] in, [onValueChange]
@@ -50,4 +66,41 @@ fun NxBasicTextField(
         cursorBrush         = cursorBrush,
         decorator           = TextFieldDecorator { inner -> decorationBox(inner) },
     )
+}
+
+@Preview
+@Composable
+private fun NxBasicTextFieldDarkPreview() = BasicTextFields(dark = true)
+
+@Preview
+@Composable
+private fun NxBasicTextFieldLightPreview() = BasicTextFields(dark = false)
+
+@Composable
+private fun BasicTextFields(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(320.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            for ((value, enabled) in listOf("Typed text" to true, "" to true, "Read only" to false)) {
+                val style = MaterialTheme.typography.bodyMedium.copy(color = if (enabled) NxInk.main else NxInk.off)
+                NxBasicTextField(
+                    value         = value,
+                    onValueChange = {},
+                    enabled       = enabled,
+                    singleLine    = true,
+                    textStyle     = style,
+                    cursorBrush   = SolidColor(NxColor.lead()),
+                    modifier      = Modifier.fillMaxWidth(),
+                    decorationBox = { inner ->
+                        Box(Modifier.border(1.dp, NxInk.line, MaterialTheme.shapes.small).padding(10.dp)) {
+                            if (value.isEmpty()) Text("Own frame, empty", style = style.copy(color = NxInk.quiet))
+                            inner()
+                        }
+                    },
+                )
+            }
+        }
+    }
 }

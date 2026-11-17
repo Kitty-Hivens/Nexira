@@ -1,12 +1,31 @@
 package hivens.ui.surface
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxTheme
 import androidx.graphics.shapes.CornerRounding
 import androidx.graphics.shapes.RoundedPolygon
 import androidx.graphics.shapes.star
@@ -167,5 +186,43 @@ data class ChamferedRectShape(
         }
         val polygon = RoundedPolygon(vertices = flat, perVertexRounding = List(pts.size) { corner })
         return Outline.Generic(polygon.toPath())
+    }
+}
+
+@Preview
+@Composable
+private fun PolygonShapeDarkPreview() = SurfaceShapes(dark = true)
+
+@Preview
+@Composable
+private fun PolygonShapeLightPreview() = SurfaceShapes(dark = false)
+
+@Composable
+private fun SurfaceShapes(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(520.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                ShapeSample(SmoothedRectShape(24f, 24f, 24f, 24f, smoothing = 0f), 72.dp, 72.dp)
+                ShapeSample(SmoothedRectShape(24f, 24f, 24f, 24f, smoothing = 1f), 72.dp, 72.dp)
+                ShapeSample(SmoothedRectShape(32f, 4f, 32f, 4f, smoothing = 0.6f), 72.dp, 72.dp)
+                ShapeSample(PolygonShape(points = 5, innerRadius = 0.5f, rounding = 0.1f, smoothing = 0f), 72.dp, 72.dp)
+                ShapeSample(PolygonShape(points = 6, innerRadius = 1f, rounding = 0.15f, smoothing = 0.5f), 72.dp, 72.dp)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                ShapeSample(ChamferedRectShape(12f, 12f), 140.dp, 40.dp, "Hexagon")
+                ShapeSample(ChamferedRectShape(0f, 14f, roundingDp = 4f), 140.dp, 40.dp, "Tag")
+                ShapeSample(ChamferedRectShape(10f, 10f, axis = ChamferAxis.Vertical), 40.dp, 90.dp)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ShapeSample(shape: Shape, width: Dp, height: Dp, label: String? = null) {
+    Box(Modifier.size(width, height).background(NxColor.lead(), shape), contentAlignment = Alignment.Center) {
+        if (label != null) Text(label, style = MaterialTheme.typography.labelMedium, color = NxColor.on(NxColor.lead()))
     }
 }

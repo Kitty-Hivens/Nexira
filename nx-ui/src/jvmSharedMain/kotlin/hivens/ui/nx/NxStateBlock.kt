@@ -1,8 +1,12 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -13,11 +17,16 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 
 /**
  * A pane with nothing in it, saying why.
@@ -66,6 +75,31 @@ fun NxStateBlock(
                 modifier = Modifier.widthIn(max = 480.dp),
             )
             action?.invoke()
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxStateBlockDarkPreview() = StateBlocks(dark = true)
+
+@Preview
+@Composable
+private fun NxStateBlockLightPreview() = StateBlocks(dark = false)
+
+@Composable
+private fun StateBlocks(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
+        ) {
+            val fill = Modifier.fillMaxWidth()
+            NxStateBlock("Nothing here", "Packs you install show up in this list.", fill, icon = NxIcon.Inventory2)
+            NxStateBlock("No results", "Try a shorter search.", fill)
+            NxStateBlock("Offline", "The catalogue needs a connection.", fill, icon = NxIcon.WifiOff, spacing = 8.dp) {
+                NxButton("Try again", onClick = {}, style = NxButtonStyle.Secondary)
+            }
         }
     }
 }

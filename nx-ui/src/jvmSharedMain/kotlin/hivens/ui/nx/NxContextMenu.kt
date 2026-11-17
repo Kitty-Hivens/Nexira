@@ -12,6 +12,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -53,6 +54,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -68,10 +70,12 @@ import hivens.ui.layers.AnchoredLayer
 import hivens.ui.layers.layerTrigger
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.Spacing
 import kotlin.math.roundToInt
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Status
 import hivens.ui.surface.SurfaceKind
 
@@ -558,4 +562,49 @@ private val ACTIVATION_KEYS = setOf(Key.Enter, Key.NumPadEnter, Key.Spacebar, Ke
 private fun anchorOrigin(anchorX: Int, popupX: Int, popupWidth: Int, growsDown: Boolean): TransformOrigin {
     val fx = if (popupWidth == 0) 0.5f else ((anchorX - popupX).toFloat() / popupWidth).coerceIn(0f, 1f)
     return TransformOrigin(fx, if (growsDown) 0f else 1f)
+}
+
+@Preview
+@Composable
+private fun NxContextMenuDarkPreview() = OpenMenus(dark = true)
+
+@Preview
+@Composable
+private fun NxContextMenuLightPreview() = OpenMenus(dark = false)
+
+/**
+ * The menu as it stands once open, drawn through its own surface: the popup that hangs it
+ * off a trigger and unfolds it only exists in a window, and a static frame would catch the
+ * first frame of the unfold.
+ */
+@Composable
+private fun OpenMenus(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(560.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            NxMenuSurface(Modifier, 0.dp, MENU_MAX_WIDTH, MENU_MAX_HEIGHT, footer = null) {
+                NxMenuSection("Pack")
+                NxMenuItem("Open folder", icon = NxIcon.FolderOpen, onClick = {})
+                NxMenuItem("Duplicate", icon = NxIcon.ContentCopy, hint = "Ctrl+D", onClick = {})
+                NxMenuItem("Pinned", icon = NxIcon.Star, selected = true, onClick = {})
+                NxMenuItem("Highlighted", icon = NxIcon.Tune, highlighted = true, onClick = {})
+                NxMenuItem("Unavailable", icon = NxIcon.Upload, enabled = false, onClick = {})
+                NxMenuDivider()
+                NxMenuItem("Delete", icon = NxIcon.Delete, destructive = true, onClick = {})
+            }
+            NxMenuSurface(
+                modifier  = Modifier,
+                minWidth  = 180.dp,
+                maxWidth  = MENU_MAX_WIDTH,
+                maxHeight = MENU_MAX_HEIGHT,
+                footer    = { NxMenuItem("Show snapshots", mark = NxMenuMark.None, onClick = {}) },
+            ) {
+                NxMenuItem("1.21.4", selected = true, onClick = {})
+                NxMenuItem("1.21.3", onClick = {})
+                NxMenuItem("A label long enough to reach the width cap and ellipsize", onClick = {})
+            }
+        }
+    }
 }

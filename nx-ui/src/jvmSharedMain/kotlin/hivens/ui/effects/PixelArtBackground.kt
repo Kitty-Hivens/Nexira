@@ -1,14 +1,28 @@
 package hivens.ui.effects
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxTheme
 import kotlin.math.ceil
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -81,4 +95,30 @@ private fun unit(seed: Int, x: Int, y: Int): Float {
     h *= -1640531527
     h = h xor (h ushr 16)
     return ((h ushr 8) and 0xFFFF) / 65535f
+}
+
+@Preview
+@Composable
+private fun PixelArtBackgroundDarkPreview() = PixelArtCards(dark = true)
+
+@Preview
+@Composable
+private fun PixelArtBackgroundLightPreview() = PixelArtCards(dark = false)
+
+@Composable
+private fun PixelArtCards(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(560.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            for ((seed, pair) in listOf(
+                "alpha" to (Color(0xFF3B6EA8) to Color(0xFFB8608E)),
+                "beta" to (Color(0xFF2E6B4F) to Color(0xFFE0B341)),
+                "gamma" to (NxColor.lead() to NxColor.hashed("gamma")),
+            )) {
+                Box(Modifier.size(160.dp, 96.dp).clip(MaterialTheme.shapes.medium).pixelArtBackground(seed, pair.first, pair.second))
+            }
+        }
+    }
 }

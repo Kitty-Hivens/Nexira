@@ -1,20 +1,31 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 
 /**
  * Leading icon + label for one vertical-nav entry, selected styling
@@ -38,4 +49,33 @@ fun NxNavRowContent(icon: IconKey, label: String, isSelected: Boolean) {
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
     )
+}
+
+@Preview
+@Composable
+private fun NxNavRowContentDarkPreview() = NavRowContents(dark = true)
+
+@Preview
+@Composable
+private fun NxNavRowContentLightPreview() = NavRowContents(dark = false)
+
+@Composable
+private fun NavRowContents(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(Modifier.width(240.dp).background(NxColor.page).padding(8.dp)) {
+            for ((icon, label) in listOf(NxIcon.Home to "Home", NxIcon.Inventory2 to "Library", NxIcon.Settings to "Settings")) {
+                val selected = label == "Library"
+                Row(
+                    modifier          = Modifier
+                        .fillMaxWidth()
+                        .clip(MaterialTheme.shapes.small)
+                        .background(if (selected) NxColor.wash(NxColor.lead(), 0.12f) else NxColor.page)
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    NxNavRowContent(icon, label, isSelected = selected)
+                }
+            }
+        }
+    }
 }

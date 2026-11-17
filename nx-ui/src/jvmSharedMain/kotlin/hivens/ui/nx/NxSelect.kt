@@ -2,12 +2,14 @@ package hivens.ui.nx
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,6 +48,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
@@ -53,9 +56,11 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 import hivens.ui.surface.SurfaceKind
 
 /**
@@ -305,5 +310,45 @@ private suspend fun LazyListState.revealItem(index: Int) {
     when {
         overshootTop > 0    -> animateScrollBy(-overshootTop.toFloat())
         overshootBottom > 0 -> animateScrollBy(overshootBottom.toFloat())
+    }
+}
+
+@Preview
+@Composable
+private fun NxSelectDarkPreview() = Selects(dark = true)
+
+@Preview
+@Composable
+private fun NxSelectLightPreview() = Selects(dark = false)
+
+/** Closed triggers in their states, and beside them the list as it stands once open, drawn as the menu's preview draws its body. */
+@Composable
+private fun Selects(dark: Boolean) {
+    val sorts = listOf("Name", "Last played", "Size")
+    NxTheme(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(560.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(Modifier.width(240.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                NxSelect(sorts, selected = "Name", onSelect = {}, label = { it })
+                NxSelect(sorts, selected = "Size", onSelect = {}, label = { it }, prefix = "Sort by")
+                NxSelect(sorts, selected = "Last played", onSelect = {}, label = { it }, icon = { NxIcon.History })
+                NxSelect(sorts, selected = null, onSelect = {}, label = { it }, placeholder = "Pick one")
+                NxSelect(sorts, selected = "Name", onSelect = {}, label = { it }, enabled = false)
+            }
+            SelectList(
+                options   = sorts,
+                selected  = "Last played",
+                label     = { it },
+                icon      = { if (it == "Last played") NxIcon.History else null },
+                hint      = { if (it == "Size") "Slow" else null },
+                width     = 240.dp,
+                maxHeight = 320.dp,
+                footer    = null,
+                onPick    = {},
+                onDismiss = {},
+            )
+        }
     }
 }

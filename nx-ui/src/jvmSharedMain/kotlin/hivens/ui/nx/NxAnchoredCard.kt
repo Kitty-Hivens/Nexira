@@ -1,23 +1,33 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 import kotlin.math.roundToInt
 
 /**
@@ -87,3 +97,35 @@ private fun CardSurface(modifier: Modifier, width: Dp, content: @Composable Colu
 private val CARD_WIDTH = 380.dp
 
 private val CARD_GAP = 4.dp
+
+@Preview
+@Composable
+private fun NxAnchoredCardDarkPreview() = OpenCard(dark = true)
+
+@Preview
+@Composable
+private fun NxAnchoredCardLightPreview() = OpenCard(dark = false)
+
+/** The card as it stands once open, drawn through its own surface, for the reason the menu's preview gives. */
+@Composable
+private fun OpenCard(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(Modifier.width(420.dp).background(NxColor.page).padding(16.dp)) {
+            CardSurface(Modifier, CARD_WIDTH) {
+                Text("Shared folder", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = NxInk.main)
+                Text(
+                    "Every pack reads its screenshots from this folder. Moving it moves them for all packs at once.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = NxInk.quiet,
+                )
+                Row(
+                    modifier              = Modifier.align(Alignment.End),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    NxButton("Keep", onClick = {}, style = NxButtonStyle.Tertiary, compact = true)
+                    NxButton("Move", onClick = {}, compact = true)
+                }
+            }
+        }
+    }
+}

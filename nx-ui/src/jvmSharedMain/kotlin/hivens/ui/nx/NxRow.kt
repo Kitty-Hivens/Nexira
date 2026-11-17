@@ -2,6 +2,7 @@ package hivens.ui.nx
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -31,15 +32,22 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
 import hivens.ui.customization.LocalCustomization
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 
 /**
  * A generic in-plane settings row: optional [icon] + [title] (+ [subtitle]) on the
@@ -188,5 +196,39 @@ private fun Modifier.bleedHorizontally(amount: Dp): Modifier = layout { measurab
     val placeable = measurable.measure(constraints.copy(maxWidth = maxWidth))
     layout((placeable.width - extra).coerceAtLeast(0), placeable.height) {
         placeable.place(-amount.roundToPx(), 0)
+    }
+}
+
+@Preview
+@Composable
+private fun NxRowDarkPreview() = RowForms(dark = true)
+
+@Preview
+@Composable
+private fun NxRowLightPreview() = RowForms(dark = false)
+
+@Composable
+private fun RowForms(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(Modifier.width(440.dp).background(NxColor.page).padding(16.dp)) {
+            NxSurface(SurfaceKind.Panel, Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    NxRow("Plain row")
+                    NxRow("With icon", icon = NxIcon.Memory, subtitle = "A line of detail under the title") {
+                        NxSwitch(checked = true, onCheckedChange = {})
+                    }
+                    NxRow("Clickable", icon = NxIcon.Folder, onClick = {}) {
+                        Symbol(NxIcon.ChevronRight, null, tint = NxInk.quiet)
+                    }
+                    NxRow("Highlighted", icon = NxIcon.Folder, onClick = {}, highlighted = true)
+                    NxRow("Compact", icon = NxIcon.Tune, compact = true) {
+                        NxSwitch(checked = false, onCheckedChange = {})
+                    }
+                    NxRow("Pinned label", compact = true, labelWidth = 120.dp) {
+                        NxField(value = "1920", onValueChange = {}, placeholder = "Width")
+                    }
+                }
+            }
+        }
     }
 }
