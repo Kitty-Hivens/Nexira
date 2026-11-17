@@ -93,6 +93,7 @@ import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.ui.widgets.themepicker.ThemeSelectionSource
 import hivens.ui.widgets.themepicker.sampleThemeSelection
+import hivens.widget.api.BringIn
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.FactoryFailures
@@ -304,16 +305,34 @@ fun uiCoreModule(
     }
     single<WidgetRegistry> { get<WidgetModules>().registry }
 
+    // The compiled modules that are in: the ones the document names, read once, and the ones
+    // brought in since.
+    single { ModulesIn(modulesNamedBy(get<LayoutGraphRepository>().value()) { DefaultLayout.modules(get()) }) }
+
     // What the modules brought in contribute of the kinds the compiled modules take: the
-    // compiled modules the document names and the jars switched on, as the jars change.
-    // The modules the host trusts read it through their host view, the catalogue module
-    // its sources. The document's list is read once, as it is for the keys.
+    // compiled modules in and the jars switched on, as either changes. The modules the host
+    // trusts read it through their host view, the catalogue module its sources.
     single<TakenContributions> {
         hostTakenContributions(
-            named    = modulesNamedBy(get<LayoutGraphRepository>().value()) { DefaultLayout.modules(get()) },
+            brought  = get<ModulesIn>().ids,
             compiled = compiled,
             jars     = get<WidgetModules>().state,
             scope    = get(),
+        )
+    }
+
+    // How a module the host trusts brings in a compiled module the document does not name.
+    // One of the host's own services, so no jar reaches it. The levels it tells to read the
+    // new keys are the app level's, there by the time any module runs.
+    single<BringIn> {
+        val koin: Scope = this
+        val words: HostWords = get()
+        HostBringIn(
+            keys     = get(),
+            compiled = compiled,
+            modules  = get(),
+            app      = { koin.getOrNull<WidgetScope>() },
+            nameOf   = { moduleId, key -> words.strings(moduleId).text(key) },
         )
     }
 
@@ -381,7 +400,7 @@ fun uiCoreModule(
         val words: HostWords = get()
         moduleKeys(
             keys     = keys,
-            named    = modulesNamedBy(get<LayoutGraphRepository>().value()) { DefaultLayout.modules(get()) },
+            named    = get<ModulesIn>().ids.value,
             compiled = compiled,
             jars     = jarKeysOf(modules),
             onCrash  = modules::switchOffAfterCrash,
@@ -805,18 +824,31 @@ internal fun moduleKeys(
 ) {
     val carried = compiled.map { it.id }.toSet() + jars.map { it.moduleId }
     (named - carried).forEach { moduleKeysLog.warn("The interface names the module '{}', which this launcher does not carry", it) }
-    compiled.filter { it.id in named }.forEach { module ->
-        val owner = ModuleOwner(module.id) { nameOf(module.id, module.name) }
-        module.contributions.filterIsInstance<KeyContribution>().forEach { contribution ->
-            val result = registerModuleKeys(module.id, contribution, keys.sources, keys.commands, keys.services, trusted = true)
-            settle(keys, module.id, owner, result) { /* a compiled module cannot be switched off */ }
-        }
-    }
+    compiled.filter { it.id in named }.forEach { module -> compiledModuleKeys(keys, module, nameOf) }
     jars.forEach { jar ->
         val result = registerModuleKeys(jar.moduleId, jar.current, keys.sources, keys.commands, keys.services, trusted = false)
         settle(keys, jar.moduleId, ModuleOwner(jar.moduleId) { nameOf(jar.moduleId, jar.name) }, result) { cause -> onCrash(jar.moduleId, cause) }
         if (result is ModuleKeysResult.Registered) {
             synchronized(keys) { keys.jars[jar.moduleId + "/" + jar.contributionId] = result.ids to jar }
+        }
+    }
+}
+
+/**
+ * Registers into [keys] the keys of the compiled [module], trusted with the host's own services, each key
+ * contribution on its own, and answers what came of each. The one way a compiled module's keys go in,
+ * whether the document names it ([moduleKeys]) or it is brought in later ([HostBringIn]), so both go
+ * through the same checks.
+ */
+internal fun compiledModuleKeys(
+    keys: HostKeys,
+    module: CompiledModule,
+    nameOf: (moduleId: String, key: String) -> String,
+): List<ModuleKeysResult> {
+    val owner = ModuleOwner(module.id) { nameOf(module.id, module.name) }
+    return module.contributions.filterIsInstance<KeyContribution>().map { contribution ->
+        registerModuleKeys(module.id, contribution, keys.sources, keys.commands, keys.services, trusted = true).also { result ->
+            settle(keys, module.id, owner, result) { /* a compiled module cannot be switched off */ }
         }
     }
 }

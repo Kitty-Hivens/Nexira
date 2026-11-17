@@ -7,6 +7,7 @@ import hivens.look.manager.api.LookApi
 import hivens.look.manager.api.LookContext
 import hivens.look.manager.api.LookProvider
 import hivens.widget.api.HostApi
+import hivens.widget.api.LevelServices
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.TakenContribution
 import hivens.widget.api.TakenContributions
@@ -18,6 +19,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 /** Axes, providers and packs come and go with the modules that bring them. */
 class ContributionsTest {
@@ -77,6 +79,34 @@ class ContributionsTest {
         jars.value = taken(jar, module = "someone.jar")
         choice.value = choice(overrides = mapOf("shade" to "jar"))
         assertEquals(Shade("shade/jar"), answer(), "a jar switched on brings its provider too")
+        manager.close()
+    }
+
+    @Test
+    fun `a module brought in during a pass hands the manager no new list, so no further pass follows from it`() {
+        val own = TestProvider("shade", "own")
+        val compiled = taken(TestAxis("shade"), own, TestPack(LookApi.DEFAULT_PACK, mapOf("shade" to "own")), module = "test.own")
+        // The host hands its whole list over anew whenever it changes, every entry a new object.
+        val all = MutableStateFlow(taken(TestProvider("motion", "jar"), module = "someone.jar"))
+        val host = object : TakenContributions {
+            override val all: StateFlow<List<TakenContribution<ModuleContribution>>> = all
+            override val compiledIn: List<TakenContribution<ModuleContribution>> = compiled
+        }
+        val scope = eagerScope()
+        val looked = lookTaken(host, scope)
+        val before = looked.value
+        var broughtIn = 0
+        // What bringing a compiled module in does to the host's list, as the manager opens its provider.
+        val servicesOf = { moduleId: String ->
+            broughtIn++
+            all.value = (compiled + all.value).map { TakenContribution(it.moduleId, it.item) }
+            ModuleServices(moduleId) as LevelServices
+        }
+        val manager = LookManager(MutableStateFlow(choice()), looked, servicesOf, scope, setOf("test.own"), Dispatchers.Unconfined, Dispatchers.Unconfined)
+        assertEquals(Shade("shade/own"), manager.answers.value.single().value)
+        assertSame(before, looked.value, "the manager's list stays the very same, so it wakes no pass")
+        assertEquals(1, broughtIn)
+        assertEquals(1, own.opened)
         manager.close()
     }
 

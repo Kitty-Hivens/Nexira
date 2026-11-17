@@ -196,7 +196,8 @@ private fun <P> scopedCommand(key: CommandKey<P>): WidgetCommand<P>? {
  * provided, or what the registry or a factory supplies. An id nothing declares is
  * missing everywhere.
  *
- * Recomposes the caller when an owner provides or withdraws one of them.
+ * Recomposes the caller when an owner provides or withdraws one of them, and when
+ * the host brings in a module that answers one.
  */
 @Composable
 fun missingNeeds(needs: List<String>): List<String> {
@@ -205,6 +206,7 @@ fun missingNeeds(needs: List<String>): List<String> {
     val sources = LocalOverlay.current
     val commands = LocalCommandOverlay.current
     return needs.filterNot { id ->
+        scope.watch(id)
         val declaration = scope.declarationOf(id) ?: return@filterNot false
         val level = scope.nearest(declaration.level) ?: return@filterNot false
         val overlay = if (declaration.kind == KeyKind.Source) sources else commands

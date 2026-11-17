@@ -8,6 +8,7 @@ import hivens.ui.settings.SettingsDomainFiles
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.modules.hostTakenContributions
 import hivens.ui.widgets.modules.hostTakenWords
+import hivens.widget.api.BringIn
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.HostFiles
@@ -63,12 +64,25 @@ internal class ModuleAppLevel(
         moduleKeys(keys, named, compiled, jars = emptyList())
     }
 
+    /** The app's source registry, which the host provides at its composition root. */
+    val registry: WidgetDataRegistry get() = keys.sources
+
+    /** The app's command registry, which the host provides at its composition root. */
+    val commands: WidgetCommandRegistry get() = keys.commands
+
+    /** The compiled modules in: the ones [named] names, and the ones brought in since. */
+    val modulesIn = ModulesIn(named)
+
+    /** How a trusted module brings in one of [compiled] that [named] leaves out, as the launcher's Koin makes it. */
+    val bringIn = HostBringIn(keys, compiled, modulesIn, app = { app })
+
     private val host = FixedHost(
         mapOf(
             HostFiles::class to files,
             SettingsStores::class to settings,
             TakenWords::class to (words ?: hostTakenWords(compiled, jars, scope)),
-            TakenContributions::class to hostTakenContributions(named, compiled, jars, scope),
+            TakenContributions::class to hostTakenContributions(modulesIn.ids, compiled, jars, scope),
+            BringIn::class to bringIn,
         ),
     )
 

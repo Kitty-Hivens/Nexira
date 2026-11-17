@@ -16,6 +16,7 @@ import hivens.look.manager.api.LookState
 import hivens.widget.api.BootAnswers
 import hivens.widget.api.BootContext
 import hivens.widget.api.BootValues
+import hivens.widget.api.BringIn
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.HostApi
 import hivens.widget.api.KeyContribution
@@ -38,16 +39,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
 
 /**
  * The look manager as the application carries it: compiled in, and brought in by a document that names
  * [LookApi.ID]. A document names the manager and no axis, provider or pack: those are data the manager
  * takes from every module compiled in, brought in or not, and from every jar switched on, and of them it
- * opens only the providers the person's choice needs.
+ * opens only the providers the person's choice needs. Once the host is up it brings in the compiled
+ * module of each provider it opens, so a document that names only the manager still has the keys,
+ * services and settings of the modules whose look is drawn.
  *
  * It answers [LookKeys] at the app level, over its settings domain `look`, and the same keys before the
  * boot, worked out from the same file and the same modules, so the window the launcher boots in opens in
@@ -89,29 +91,51 @@ object LookKeysContribution : KeyContribution {
 
 /**
  * The manager for the app, over its settings domain and what the modules brought in carry of the look.
- * A provider is opened with the services its own module sees, the way the catalogue opens a source.
+ * A provider is opened with the services its own module sees, the way the catalogue opens a source, and
+ * a provider of a compiled module the document does not name has its module brought in first, so its
+ * keys, services and settings are there. One whose module the host does not bring in is passed over.
  */
 private fun moduleManager(context: ServiceContext): LookManager {
     val taken = context.hostServices.find<TakenContributions>()
+    val compiled = taken?.compiledIn.orEmpty().mapTo(HashSet()) { it.moduleId }
+    val bringIn = context.hostServices.find<BringIn>()
     return LookManager(
         choice     = context.services.get<SettingsStores>().of(LookSettingsDomain).value,
         taken      = taken?.let { lookTaken(it, context.coroutineScope) } ?: MutableStateFlow(emptyList()),
-        servicesOf = context::servicesOf,
+        servicesOf = { moduleId ->
+            check(moduleId !in compiled || bringIn?.bringIn(moduleId) != false) { "the host did not bring in module '$moduleId'" }
+            context.servicesOf(moduleId)
+        },
         scope      = context.coroutineScope,
-        compiled   = taken?.compiledIn.orEmpty().mapTo(HashSet()) { it.moduleId },
+        compiled   = compiled,
     )
 }
 
 /**
  * What [taken] carries that the manager reads, as it changes: what every module compiled in carries,
  * brought in or not, then what the jars switched on carry, in the order they load.
+ *
+ * A new list only where a contribution came or went. The host hands its list over anew when a compiled
+ * module is brought in, which the manager does in the middle of a pass, and a list that changed only
+ * there would start another pass for nothing.
  */
 internal fun lookTaken(taken: TakenContributions, scope: CoroutineScope): StateFlow<List<TakenContribution<ModuleContribution>>> {
     val compiled = taken.compiledIn
     val compiledIds = compiled.mapTo(HashSet()) { it.moduleId }
     fun of(all: List<TakenContribution<ModuleContribution>>) = compiled + all.filter { it.moduleId !in compiledIds }
-    return taken.all.map(::of).stateIn(scope, SharingStarted.Eagerly, of(taken.all.value))
+    val out = MutableStateFlow(of(taken.all.value))
+    scope.launch {
+        taken.all.collect { now ->
+            val next = of(now)
+            if (!sameContributions(out.value, next)) out.value = next
+        }
+    }
+    return out.asStateFlow()
 }
+
+/** Whether [a] and [b] hold the same contributions of the same modules in the same order. */
+private fun sameContributions(a: List<TakenContribution<ModuleContribution>>, b: List<TakenContribution<ModuleContribution>>): Boolean =
+    a.size == b.size && a.indices.all { a[it].moduleId == b[it].moduleId && a[it].item === b[it].item }
 
 /**
  * The look the boot window is drawn in: the manager's answers over the same choice and the same modules

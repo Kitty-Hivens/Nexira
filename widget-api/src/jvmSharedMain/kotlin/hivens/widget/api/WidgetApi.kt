@@ -36,7 +36,10 @@ package hivens.widget.api
  *    compiled in carry of the kinds they take as well ([BootContext.services]), for the look
  *    manager to open the window the launcher boots in with the providers the choice names,
  *    and another compiled module's view of that context ([BootContext.ofModule]), the twin of
- *    [ServiceContext.servicesOf], to run that module's code with that module's settings.
+ *    [ServiceContext.servicesOf], to run that module's code with that module's settings. Once
+ *    the host is up, a trusted module brings in a compiled module the document does not name
+ *    ([BringIn]), a host service, and a key registered while the levels live is read again by
+ *    whoever found it missing.
  *    A module compiled in ships its words as files the way a jar does and reads them with
  *    [ModuleStrings.resources], in the languages the launcher ships
  *    ([ModuleStrings.SHIPPED_LANGUAGES]), through the reader the loader uses for a jar's

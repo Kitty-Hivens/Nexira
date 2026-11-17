@@ -169,8 +169,9 @@ val LocalWidgetServiceRegistry: ProvidableCompositionLocal<WidgetServiceRegistry
 
 // App-provided reactive data sources widgets bind to via rememberSource(key).
 // Provided once by the host at its composition root, like the service registry
-// above. Static: the source set is fixed at startup, and the reactivity is inside
-// each source's StateFlow, not the registry membership.
+// above. Static: the registry is one object for the app. The reactivity is inside
+// each source's StateFlow, and a key registered later, a module brought in, reaches
+// the readers that found it missing through their level (WidgetScope.forgetMade).
 val LocalWidgetDataRegistry: ProvidableCompositionLocal<WidgetDataRegistry> =
     staticCompositionLocalOf {
         error("LocalWidgetDataRegistry not provided: the host provides its WidgetDataRegistry at the composition root")
@@ -187,8 +188,8 @@ val LocalScope: ProvidableCompositionLocal<WidgetScope?> = staticCompositionLoca
 
 // App-provided commands widgets fire via rememberCommand(key) / rememberAction(key),
 // the write counterpart of LocalWidgetDataRegistry. Provided once by the host at
-// its composition root. Static for the same reason: the command set is fixed at
-// startup.
+// its composition root. Static for the same reason: the registry is one object for
+// the app, and a command registered later reaches its readers through their level.
 val LocalWidgetCommandRegistry: ProvidableCompositionLocal<WidgetCommandRegistry> =
     staticCompositionLocalOf {
         error("LocalWidgetCommandRegistry not provided: the host provides its WidgetCommandRegistry at the composition root")

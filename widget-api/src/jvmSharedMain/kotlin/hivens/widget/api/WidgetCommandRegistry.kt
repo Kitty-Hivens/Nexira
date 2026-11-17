@@ -4,6 +4,7 @@ import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.WidgetCommand
 import org.slf4j.LoggerFactory
+import java.util.concurrent.ConcurrentHashMap
 
 private val log = LoggerFactory.getLogger("hivens.widget.api.WidgetCommandRegistry")
 
@@ -12,9 +13,10 @@ typealias CommandFactory<P> = (LevelContext) -> WidgetCommand<P>
 
 // App-provided commands widgets fire (the write counterpart of WidgetDataRegistry,
 // and of the QML "call a service method"). Same shape and contract as the read
-// side: app commands are app-static, registered once at startup, so this is a plain
-// map and a missing or duplicate id is a wiring bug that fails loudly rather than
-// a normal null state (unlike WidgetServiceRegistry, whose providers churn).
+// side: app commands are app-static, registered at startup or when the host brings
+// in a module, so a missing or duplicate id is a wiring bug that fails loudly rather
+// than a normal null state (unlike WidgetServiceRegistry, whose providers churn). The
+// maps are concurrent for the reason WidgetDataRegistry's are.
 //
 // A command below the app level has an answer per level, the way a source does:
 // a factory each level runs for itself, or a declaration that the level's owner
@@ -27,11 +29,11 @@ typealias CommandFactory<P> = (LevelContext) -> WidgetCommand<P>
 // shipping unsafe and unused now.
 class WidgetCommandRegistry {
 
-    private val commands = HashMap<String, WidgetCommand<*>>()
+    private val commands: MutableMap<String, WidgetCommand<*>> = ConcurrentHashMap()
 
-    private val factories = HashMap<String, Factory<*>>()
+    private val factories: MutableMap<String, Factory<*>> = ConcurrentHashMap()
 
-    private val declared = HashMap<String, ScopeLevel>()
+    private val declared: MutableMap<String, ScopeLevel> = ConcurrentHashMap()
 
     private class Factory<P>(val level: ScopeLevel, val make: CommandFactory<P>)
 

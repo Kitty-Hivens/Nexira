@@ -32,6 +32,10 @@ public final class hivens/widget/api/BootValues$Companion {
 	public final fun of (Lkotlin/jvm/functions/Function1;)Lhivens/widget/api/BootValues;
 }
 
+public abstract interface class hivens/widget/api/BringIn {
+	public abstract fun bringIn (Ljava/lang/String;)Z
+}
+
 public abstract interface class hivens/widget/api/CompiledModule {
 	public fun getApiPackages ()Ljava/util/Map;
 	public fun getBoot ()Lhivens/widget/api/BootAnswers;

@@ -71,8 +71,9 @@ class TakenContributionsHostTest {
             override val label = "other"
         }
         val jars = MutableStateFlow(snapshot(Contributed("jar", "Jar", fromJar), Contributed("jar", "Jar", other)))
+        val brought = MutableStateFlow(setOf(CatalogueModule.id, "test.shelf"))
         val taken = hostTakenContributions(
-            named = setOf(CatalogueModule.id, "test.shelf"),
+            brought = brought,
             compiled = listOf(CatalogueModule, Compiled("test.shelf", listOf(Keys, shelf)), Compiled("test.attic", listOf(attic))),
             jars = jars,
             scope = scope,
@@ -92,5 +93,9 @@ class TakenContributionsHostTest {
         jars.value = snapshot()
         val after = runBlocking { withTimeout(5.seconds) { taken.all.first { it.size == 1 } } }
         assertEquals(listOf(shelf), after.map { it.item }, "a jar switched off takes its source with it")
+
+        brought.value = brought.value + "test.attic"
+        val broughtIn = runBlocking { withTimeout(5.seconds) { taken.all.first { it.size == 2 } } }
+        assertEquals(listOf(shelf, attic), broughtIn.map { it.item }, "a module brought in later hands its source over in the build's order")
     }
 }

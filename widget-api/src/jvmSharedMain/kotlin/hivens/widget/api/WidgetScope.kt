@@ -287,8 +287,9 @@ class WidgetScope private constructor(
         if (closed) return null
         (slotOf(key.id).value as WidgetDataSource<T>?)?.let { return it }
         if (level == ScopeLevel.App) registry.find(key)?.let { return it }
-        val factory = registry.factoryFor(key) ?: return null
+        // Read before the factory is looked up, so a reader that finds none reads again once one is registered.
         val _ = revisionOf(key.id).value
+        val factory = registry.factoryFor(key) ?: return null
         synchronized(lock) {
             if (closed) return null
             made[key.id]?.let { return it as WidgetDataSource<T> }
@@ -385,8 +386,8 @@ class WidgetScope private constructor(
         if (closed) return null
         (commandSlotOf(key.id).value as WidgetCommand<P>?)?.let { return it }
         if (level == ScopeLevel.App) commands.find(key)?.let { return it }
-        val factory = commands.factoryFor(key) ?: return null
         val _ = revisionOf(COMMAND_MARK + key.id).value
+        val factory = commands.factoryFor(key) ?: return null
         val marked = COMMAND_MARK + key.id
         synchronized(lock) {
             if (closed) return null
@@ -433,7 +434,8 @@ class WidgetScope private constructor(
      *
      * For the host when the code behind a factory changed under a live tree: a module
      * loaded again, whose old sources would otherwise go on running code of a class
-     * loader that is closed.
+     * loader that is closed. And when a factory was registered under a live tree, a
+     * module brought in, so a reader that found the key missing reads it again.
      */
     @HostApi
     fun forgetMade(ids: Set<String>) {
@@ -461,6 +463,15 @@ class WidgetScope private constructor(
 
     /** The level's clock in nanoseconds, for the tests that step it past [RETRY_INTERVAL_MS]. */
     internal var clock: () -> Long = System::nanoTime
+
+    /**
+     * Reads how often what was made for [id], as a source or a command, was dropped here, as snapshot
+     * state, so a composable that asked whether [id] is answered asks again after [forgetMade].
+     */
+    internal fun watch(id: String) {
+        val _ = revisionOf(id).value
+        val _ = revisionOf(COMMAND_MARK + id).value
+    }
 
     /** Where [id] lives and what answers it, as the registries of this tree have it. Sources first. */
     fun declarationOf(id: String): KeyDeclaration? = registry.declarationOf(id) ?: commands.declarationOf(id)

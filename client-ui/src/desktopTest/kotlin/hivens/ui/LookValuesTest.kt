@@ -4,6 +4,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
+import hivens.config.Storage
 import hivens.i18n.I18nModule
 import hivens.i18n.api.I18nApi
 import hivens.i18n.api.I18nKeys
@@ -58,6 +59,8 @@ import kotlinx.serialization.Serializable
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.io.path.createDirectories
+import kotlin.io.path.writeText
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -276,9 +279,10 @@ class LookValuesTest {
     /**
      * A provider that answers the tint its own module's settings hold, before the boot from its module's
      * boot context and after it from its module's store as it changes, and notes under "boot" and "live"
-     * whether it could read the look manager's settings as well.
+     * whether it could read the look manager's settings as well. [opens] counts how often it opened once
+     * the host was up.
      */
-    private class OwnTint(private val tried: MutableMap<String, Boolean>) : LookProvider<Tint> {
+    private class OwnTint(private val tried: MutableMap<String, Boolean>, private val opens: AtomicInteger) : LookProvider<Tint> {
         override val label = "own"
         override val contract = ApiVersion(1, 0)
         override val axis = TintAxis.id
@@ -289,6 +293,7 @@ class LookValuesTest {
                 tried["boot"] = runCatching { boot.settings(LookSettingsDomain) }.isSuccess
                 return LookAnswers.of(Tint(boot.settings(TintDomain).name))
             }
+            opens.incrementAndGet()
             val stores = context.services.get<SettingsStores>()
             tried["live"] = runCatching { stores.of(LookSettingsDomain) }.isSuccess
             val store = stores.of(TintDomain)
@@ -297,12 +302,12 @@ class LookValuesTest {
     }
 
     /** A compiled look module with settings of its own, which its provider answers from. */
-    private inner class OwnTintModule(tried: MutableMap<String, Boolean>) : CompiledModule {
+    private inner class OwnTintModule(tried: MutableMap<String, Boolean>, opens: AtomicInteger = AtomicInteger()) : CompiledModule {
         override val id = "test.look.own"
         override val name = id
         override val contributions: List<ModuleContribution> = listOf(
             TintAxis,
-            OwnTint(tried),
+            OwnTint(tried, opens),
             object : LookPack {
                 override val id = "own"
                 override val label = id
@@ -350,6 +355,32 @@ class LookValuesTest {
             assertEquals("dawn", eventually("dawn") { drawnTint(shell.value(LookKeys.Provide)) }, "and follows the module's settings as they change")
         }
         assertEquals(mapOf("boot" to false, "live" to false), tried, "the manager's settings are not the provider's to read")
+    }
+
+    @Test
+    fun `a provider of a module the document does not name has its module brought in, opens once and answers`() {
+        dir.resolve(Storage.SETTINGS_DIR).createDirectories().resolve("tint.json").writeText("""{"schema":1,"value":{"name":"dusk"}}""")
+        val tried = HashMap<String, Boolean>()
+        val opens = AtomicInteger()
+        val module = OwnTintModule(tried, opens)
+        val compiled = listOf(LookManagerModule, module)
+        val named = setOf(LookApi.ID)
+        ModuleAppLevel(dir, compiled, scope, named = named).use { shell ->
+            shell.fire(LookKeys.UpdateSettings, SettingsChange { LookChoice.build { pack = "own" } })
+        }
+        val atBoot = drawnTint(ShellLookValues.Look.atBoot(bootValues(dir, compiled = compiled, named = named)))
+        assertEquals("dusk", atBoot, "before the boot it reads its own files, its module brought in or not")
+        ModuleAppLevel(dir, compiled, scope, named = named).use { shell ->
+            assertEquals("own", eventually("own") { shell.value(LookKeys.State).axis(TintAxis.id)?.family })
+            assertEquals(named + module.id, shell.modulesIn.ids.value, "the manager brought its module in")
+            assertEquals(atBoot, drawnTint(shell.value(LookKeys.Provide)))
+
+            shell.fire(tintUpdate, SettingsChange { TintSettings("dawn") })
+            assertEquals("dawn", eventually("dawn") { drawnTint(shell.value(LookKeys.Provide)) }, "its own command is in, and its answers follow")
+            Thread.sleep(300)
+            assertEquals(1, opens.get(), "bringing its module in started no round of opening it again")
+        }
+        assertEquals(mapOf("boot" to false, "live" to false), tried)
     }
 
     @Test

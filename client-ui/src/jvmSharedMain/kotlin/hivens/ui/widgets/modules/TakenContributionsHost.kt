@@ -9,30 +9,31 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 
 /**
  * What the modules brought in contribute of the kinds [compiled] take, as the host hands it
- * to the modules it trusts: the contributions of every compiled module in [named], in the
- * build's order, then those of every jar [jars] carries, in the order they loaded.
+ * to the modules it trusts: the contributions of every compiled module in [brought], the
+ * ones the document names and the ones brought in since, in the build's order, then those
+ * of every jar [jars] carries, in the order they loaded.
  *
  * A compiled module's key contributions are the host's own business and never in it, and
  * neither is anything of a kind no compiled module takes. What every compiled module
- * carries, named or not, is handed over beside it as [TakenContributions.compiledIn].
+ * carries, brought in or not, is handed over beside it as [TakenContributions.compiledIn].
  */
 internal fun hostTakenContributions(
-    named: Set<String>,
+    brought: StateFlow<Set<String>>,
     compiled: List<CompiledModule>,
     jars: StateFlow<WidgetModules.Snapshot>,
     scope: CoroutineScope,
 ): TakenContributions {
     val kinds = takenKinds(compiled)
     val everyCompiled = compiledTaken(compiled, kinds)
-    val fromCompiled = everyCompiled.filter { it.moduleId in named }
-    fun all(snapshot: WidgetModules.Snapshot): List<TakenContribution<ModuleContribution>> =
-        fromCompiled + snapshot.contributions.filter { item -> kinds.any { it.isInstance(item.item) } }.map { TakenContribution(it.moduleId, it.item) }
-    val flow = jars.map(::all).stateIn(scope, SharingStarted.Eagerly, all(jars.value))
+    fun all(snapshot: WidgetModules.Snapshot, ids: Set<String>): List<TakenContribution<ModuleContribution>> =
+        everyCompiled.filter { it.moduleId in ids } +
+            snapshot.contributions.filter { item -> kinds.any { it.isInstance(item.item) } }.map { TakenContribution(it.moduleId, it.item) }
+    val flow = combine(jars, brought, ::all).stateIn(scope, SharingStarted.Eagerly, all(jars.value, brought.value))
     return object : TakenContributions {
         override val all: StateFlow<List<TakenContribution<ModuleContribution>>> = flow
         override val compiledIn: List<TakenContribution<ModuleContribution>> = everyCompiled

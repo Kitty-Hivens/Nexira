@@ -3,6 +3,7 @@ package hivens.widget.api
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 import hivens.widget.model.WidgetDataSource
+import java.util.concurrent.ConcurrentHashMap
 
 // App-provided reactive data sources widgets bind to (the read counterpart of
 // the QML "bind to a service property"). Separate from WidgetServiceRegistry:
@@ -12,8 +13,10 @@ import hivens.widget.model.WidgetDataSource
 // wiring bug that fails loudly rather than a normal null state.
 //
 // Reactivity lives in each source's StateFlow, surfaced by rememberSource ->
-// collectAsState; the map itself never changes after startup, so no snapshot
-// state is needed here.
+// collectAsState. The maps change after startup only when the host brings in a
+// module while the levels live (BringIn), from whatever thread asked, so they are
+// concurrent maps, and a level whose reader found a key missing is told to read it
+// again (WidgetScope.forgetMade). The host makes one registration at a time.
 //
 // It is also the one place that says which sources exist at all. A source that
 // lives below the app level cannot be a value here, there is one per window or per
@@ -22,13 +25,13 @@ import hivens.widget.model.WidgetDataSource
 // level's owner provides.
 class WidgetDataRegistry {
 
-    private val sources = HashMap<String, WidgetDataSource<*>>()
+    private val sources: MutableMap<String, WidgetDataSource<*>> = ConcurrentHashMap()
 
-    private val factories = HashMap<String, Factory<*>>()
+    private val factories: MutableMap<String, Factory<*>> = ConcurrentHashMap()
 
-    private val declared = HashMap<String, ScopeLevel>()
+    private val declared: MutableMap<String, ScopeLevel> = ConcurrentHashMap()
 
-    private val samples = HashMap<String, () -> Any?>()
+    private val samples: MutableMap<String, () -> Any?> = ConcurrentHashMap()
 
     private class Factory<T>(val level: ScopeLevel, val make: SourceFactory<T>)
 
