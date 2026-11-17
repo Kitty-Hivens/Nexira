@@ -9,19 +9,23 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.Spacing
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxTheme
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status
 
@@ -94,6 +98,30 @@ fun NxCalloutBanner(
                     tint               = NxInk.quiet,
                     iconSize           = 16.dp,
                 )
+            }
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxCalloutBannerDarkPreview() = CalloutBannerTones(dark = true)
+
+@Preview
+@Composable
+private fun NxCalloutBannerLightPreview() = CalloutBannerTones(dark = false)
+
+@Composable
+private fun CalloutBannerTones(dark: Boolean) {
+    NxTheme(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            NxCalloutBanner(title = "Info", body = "A standing condition the reader should know about.")
+            NxCalloutBanner(title = "Warning", body = "Something may go wrong.", tone = NxCalloutTone.Warning, onDismiss = {})
+            NxCalloutBanner(body = "An error with no title.", tone = NxCalloutTone.Error) {
+                NxButton("Retry", onClick = {})
             }
         }
     }

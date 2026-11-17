@@ -59,6 +59,8 @@ kotlin {
                 implementation(libs.compose.material3)
                 implementation(libs.compose.ui)
                 implementation(libs.compose.components.resources)
+                // The @Preview annotation the IDE draws components from. Annotation only.
+                implementation(libs.compose.ui.tooling.preview)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.material.color.utilities)
@@ -111,6 +113,12 @@ val listSharedClasses = tasks.register("listSharedClasses") {
     }
 }
 kotlin.sourceSets.getByName("desktopMain").resources.srcDir(files(sharedClassListDir).builtBy(listSharedClasses))
+
+// What the IDE draws a @Preview with on the Android side. On this module's own runtime class
+// path only, so it reaches neither the published artifact nor the app.
+dependencies {
+    "androidRuntimeClasspath"(libs.compose.ui.tooling)
+}
 
 compose.resources {
     publicResClass = true
