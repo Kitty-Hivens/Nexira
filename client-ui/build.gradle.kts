@@ -171,8 +171,8 @@ kotlin {
                 // nothing of either but their CompiledModule.
                 implementation(project(":i18n-api"))
                 implementation(project(":i18n"))
-                implementation(project(":themes-api"))
-                implementation(project(":themes"))
+                implementation(project(":look:colour-nx-api"))
+                implementation(project(":look:colour-nx"))
                 // The look manager, the same way: its API for the one key the shell reads the
                 // look through, the module compiled in.
                 implementation(project(":look:manager-api"))

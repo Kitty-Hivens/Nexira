@@ -200,6 +200,20 @@ class LookValuesTest {
         }
     }
 
+    @Test
+    fun `colour is answered by the themes module's nx provider, which the manager brings in though the document names only the manager`() {
+        ModuleAppLevel(dir, CompiledModules, scope, named = setOf(LookApi.ID)).use { shell ->
+            assertEquals("nx", eventually("nx") { shell.value(LookKeys.State).axis(Colour.id)?.family })
+            assertTrue(ThemesApi.ID in shell.modulesIn.ids.value, "the manager brought the themes module in")
+            val celestia = Themes.default.dark.inks[0]
+            assertEquals(celestia, eventually(celestia) { shell.value(LookKeys.Answers).of(Colour).inkMain })
+
+            shell.fire(ThemesKeys.Choose, Themes.Lotus.id)
+            val lotus = Themes.Lotus.dark.inks[0]
+            assertEquals(lotus, eventually(lotus) { shell.value(LookKeys.Answers).of(Colour).inkMain }, "and follows the theme chosen through the module's own command")
+        }
+    }
+
     /** A data class of answers, an axis of them, one provider and a pack naming it, as a compiled look module would carry them. */
     private data class Tint(val name: String)
 

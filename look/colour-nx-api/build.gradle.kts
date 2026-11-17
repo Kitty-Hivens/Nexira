@@ -12,7 +12,7 @@ plugins {
 // to change it: the themes module's keys and settings, the theme a module brings, and the
 // inputs the host feeds the choice of dark and light with. A theme itself is the design
 // system's, so its type comes from :nx-ui, and the widget kernel carries the keys. The
-// module that answers is :themes.
+// module that answers is :look:colour-nx.
 kotlin {
     // KMP modules don't apply the `java` plugin, so the root's toolchain pin skips
     // them. Set here, org.gradle.jvm.version matches the JDK 27 modules.

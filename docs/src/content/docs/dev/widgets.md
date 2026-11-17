@@ -105,15 +105,15 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 "Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.themes=1.0, nexira.packs=2.0, nexira.accounts=1.0, nexira.catalogue=1.0",
 ```
 
-| API id                | Artifact            | Package                   | What it is for                                                     |
-|-----------------------|---------------------|---------------------------|--------------------------------------------------------------------|
-| `nexira.i18n`         | `:i18n-api`         | `hivens.i18n.api`         | Looking words up, the language in use, the language setting        |
-| `nexira.themes`       | `:themes-api`       | `hivens.themes.api`       | The theme in use, the choice, and bringing a theme                 |
-| `nexira.packs`        | `:packs-api`        | `hivens.packs.api`        | Listing, launching, installing and updating packs                  |
-| `nexira.accounts`     | `:accounts-api`     | `hivens.accounts.api`     | Who is signed in, the stored accounts, signing in and out          |
-| `nexira.catalogue`    | `:catalogue-api`    | `hivens.catalogue.api`    | Searching, installing a project, and bringing a source             |
-| `nexira.look.manager` | `:look:manager-api` | `hivens.look.manager.api` | Bringing an axis of the look, a provider or a pack, and the choice |
-| `nexira.look.colour`  | `:look:colour-api`  | `hivens.look.colour.api`  | Asking colour by role, and answering the colour axis               |
+| API id                | Artifact              | Package                   | What it is for                                                     |
+|-----------------------|-----------------------|---------------------------|--------------------------------------------------------------------|
+| `nexira.i18n`         | `:i18n-api`           | `hivens.i18n.api`         | Looking words up, the language in use, the language setting        |
+| `nexira.themes`       | `:look:colour-nx-api` | `hivens.themes.api`       | The theme in use, the choice, and bringing a theme                 |
+| `nexira.packs`        | `:packs-api`          | `hivens.packs.api`        | Listing, launching, installing and updating packs                  |
+| `nexira.accounts`     | `:accounts-api`       | `hivens.accounts.api`     | Who is signed in, the stored accounts, signing in and out          |
+| `nexira.catalogue`    | `:catalogue-api`      | `hivens.catalogue.api`    | Searching, installing a project, and bringing a source             |
+| `nexira.look.manager` | `:look:manager-api`   | `hivens.look.manager.api` | Bringing an axis of the look, a provider or a pack, and the choice |
+| `nexira.look.colour`  | `:look:colour-api`    | `hivens.look.colour.api`  | Asking colour by role, and answering the colour axis               |
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
 
@@ -205,7 +205,7 @@ The launcher applies changes one at a time and writes the file whole. Where the 
 
 ## Themes
 
-A theme is drawn by the design system, `nx-ui`, and kept and chosen by the themes module. To bring one, name `nexira.themes` in the manifest, compile against `:themes-api`, and implement `ThemeContribution`:
+A theme is drawn by the design system, `nx-ui`, and kept and chosen by the themes module. To bring one, name `nexira.themes` in the manifest, compile against `:look:colour-nx-api`, and implement `ThemeContribution`:
 
 ```kotlin
 class Dusk : ThemeContribution {

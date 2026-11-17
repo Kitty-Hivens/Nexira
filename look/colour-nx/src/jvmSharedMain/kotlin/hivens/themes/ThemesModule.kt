@@ -51,6 +51,9 @@ import org.slf4j.LoggerFactory
  * the host's data directory, and takes the themes other modules bring as the kind of contribution
  * its API declares. The window the launcher boots in is drawn before that, and asks [boot] for the
  * theme and the scheme, worked out from the same files the way the manager opens on them.
+ *
+ * It is also the nx provider of the look's colour axis ([NxColourProvider]): the look manager opens it
+ * from the module's contributions, and brings the module in where the document does not name it.
  */
 object ThemesModule : CompiledModule {
     override val id: String = ThemesApi.ID
@@ -61,7 +64,7 @@ object ThemesModule : CompiledModule {
     // The API's own object lives in the API artifact's package, so the package is read off it.
     override val apiPackages: Map<String, Set<String>> = mapOf(ThemesApi.ID to setOf(ThemesApi::class.java.name.substringBeforeLast('.')))
     override val contributionKinds: List<Class<out ModuleContribution>> = listOf(ThemeContribution::class.java)
-    override val contributions: List<ModuleContribution> = listOf(ThemesKeysContribution)
+    override val contributions: List<ModuleContribution> = listOf(ThemesKeysContribution, NxColourProvider)
     override val boot: BootAnswers = BootAnswers(::bootAnswer)
 
     private const val NAME = "themes.name"
@@ -165,12 +168,19 @@ private fun wordsOrKeys(context: ServiceContext): Translations = try {
 
 private val log = LoggerFactory.getLogger("hivens.themes.Module")
 
+/**
+ * The theme and the scheme a window drawn before the host is up opens on: what the manager opens on,
+ * from the module's own settings and theme file, read and not kept. The boot answer and the colour
+ * provider's boot answers are both made of it.
+ */
+internal fun bootOpening(context: BootContext): ThemeOpening = ThemeManager.opening(
+    settings = context.settings(ThemesSettingsDomain),
+    stored   = ThemeLibraryFile(context.dataDir) { _, _ -> }.load(),
+)
+
 /** The theme and the scheme the boot window is drawn in: what the manager opens on, from the same files. */
 private fun bootAnswer(context: BootContext): BootValues {
-    val opening = ThemeManager.opening(
-        settings = context.settings(ThemesSettingsDomain),
-        stored   = ThemeLibraryFile(context.dataDir) { _, _ -> }.load(),
-    )
+    val opening = bootOpening(context)
     return BootValues.of {
         put(ThemesKeys.Active, opening.theme)
         put(ThemesKeys.Dark, opening.dark)

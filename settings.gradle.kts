@@ -187,13 +187,6 @@ include(":source-modrinth")
 // the module answers its words before the host is up as well.
 include(":i18n-api")
 include(":i18n")
-// The themes module: the themes that ship, the one made from the wallpaper, the ones modules
-// bring and the person's own, which is in use and what decides dark and light, and where the
-// choice is kept. Drawing stays in nx-ui, which is handed the theme to draw. Like the language
-// module, it answers the theme before the host is up, since the boot window is drawn in the
-// person's theme.
-include(":themes-api")
-include(":themes")
 // The look: a manager that picks one provider per axis of the look from the person's choice
 // and hands their answers to the composition, knowing no axis itself. The axes, their providers
 // and the packs naming them are modules of their own under look/, built by the nexira.look
@@ -202,5 +195,13 @@ include(":look:manager-api")
 include(":look:manager")
 include(":look:colour-api")
 include(":look:packs")
+// The nx colour provider, which is the themes module: the themes that ship, the one made from the
+// wallpaper, the ones modules bring and the person's own, which is in use and what decides dark and
+// light, and where the choice is kept. Its module id, settings and files are still the themes
+// module's, nexira.themes and themes.json, so no choice a person made is lost. Like the language
+// module, it answers the theme before the host is up, since the boot window is drawn in the
+// person's theme.
+include(":look:colour-nx-api")
+include(":look:colour-nx")
 include(":profiler-agent")
 include(":authlib-agent")

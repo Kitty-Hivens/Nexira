@@ -40,7 +40,7 @@ import hivens.ui.theme.NxColor
  * and state, the switch, the two progress shapes, the surface vocabulary side by side
  * and one nesting, saved as PNGs. Here rather than beside the primitives because the
  * themes that ship are this module's. @Ignore: run on demand.
- *   ./gradlew :themes:jvmTest --tests "hivens.themes.PrimitiveShots"
+ *   ./gradlew :look:colour-nx:jvmTest --tests "hivens.themes.PrimitiveShots"
  *
  * No assertions on purpose. What this catches is what only an eye catches: a
  * control that vanishes in one theme, two depths that read as one tone. The
