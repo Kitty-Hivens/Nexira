@@ -78,8 +78,8 @@ import hivens.ui.layers.layerTrigger
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.nx.NxCalloutBanner
-import hivens.ui.nx.NxCalloutTone
+import hivens.ui.nx.CalloutBanner
+import hivens.ui.nx.CalloutTone
 import hivens.ui.nx.NxChoiceDivider
 import hivens.ui.nx.NxChoiceItem
 import hivens.ui.nx.NxChoiceMenu
@@ -214,9 +214,9 @@ fun PackDetailScreen(
         // mods need a manual download). It was only ever written to the instance and
         // never shown, so a half-populated import read as an empty success.
         if (pack.notes.isNotBlank()) {
-            NxCalloutBanner(
+            CalloutBanner(
                 body      = pack.notes,
-                tone      = NxCalloutTone.Info,
+                tone      = CalloutTone.Info,
                 modifier  = Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp),
                 // It reports how this instance came to be, which is read once and
                 // then is a band across the page forever. Closing it clears the

@@ -28,8 +28,8 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status
 
-/** Severity of a [NxCalloutBanner]; drives its accent colour and default glyph. */
-enum class NxCalloutTone { Info, Warning, Error }
+/** Severity of a [CalloutBanner]; drives its accent colour and default glyph. */
+enum class CalloutTone { Info, Warning, Error }
 
 /**
  * Boxed notice with a leading icon: a tinted fill + hairline in the [tone]'s
@@ -43,27 +43,27 @@ enum class NxCalloutTone { Info, Warning, Error }
  * standing one must not be dismissable into thinking it went away.
  */
 @Composable
-fun NxCalloutBanner(
+fun CalloutBanner(
     title: String? = null,
     body: String? = null,
     modifier: Modifier = Modifier,
-    tone: NxCalloutTone = NxCalloutTone.Info,
+    tone: CalloutTone = CalloutTone.Info,
     icon: IconKey? = null,
     onDismiss: (() -> Unit)? = null,
     content: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     val status = when (tone) {
-        NxCalloutTone.Info    -> Status.Info
-        NxCalloutTone.Warning -> Status.Warning
-        NxCalloutTone.Error   -> Status.Error
+        CalloutTone.Info    -> Status.Info
+        CalloutTone.Warning -> Status.Warning
+        CalloutTone.Error   -> Status.Error
     }
     val accent = NxColor.status(status)
     // Opaque, so the banner reads the same over a wallpaper as over the page.
     val fill = NxColor.wash(accent, 0.12f)
     val glyph = icon ?: when (tone) {
-        NxCalloutTone.Info    -> NxIcon.Info
-        NxCalloutTone.Warning -> NxIcon.Warning
-        NxCalloutTone.Error   -> NxIcon.Warning
+        CalloutTone.Info    -> NxIcon.Info
+        CalloutTone.Warning -> NxIcon.Warning
+        CalloutTone.Error   -> NxIcon.Warning
     }
     val shape = MaterialTheme.shapes.medium
     OnFill(fill) {
@@ -104,11 +104,11 @@ fun NxCalloutBanner(
 
 @Preview
 @Composable
-private fun NxCalloutBannerDarkPreview() = CalloutBannerTones(dark = true)
+private fun CalloutBannerDarkPreview() = CalloutBannerTones(dark = true)
 
 @Preview
 @Composable
-private fun NxCalloutBannerLightPreview() = CalloutBannerTones(dark = false)
+private fun CalloutBannerLightPreview() = CalloutBannerTones(dark = false)
 
 @Composable
 private fun CalloutBannerTones(dark: Boolean) {
@@ -117,9 +117,9 @@ private fun CalloutBannerTones(dark: Boolean) {
             modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            NxCalloutBanner(title = "Info", body = "A standing condition the reader should know about.")
-            NxCalloutBanner(title = "Warning", body = "Something may go wrong.", tone = NxCalloutTone.Warning, onDismiss = {})
-            NxCalloutBanner(body = "An error with no title.", tone = NxCalloutTone.Error) {
+            CalloutBanner(title = "Info", body = "A standing condition the reader should know about.")
+            CalloutBanner(title = "Warning", body = "Something may go wrong.", tone = CalloutTone.Warning, onDismiss = {})
+            CalloutBanner(body = "An error with no title.", tone = CalloutTone.Error) {
                 NxButton("Retry", onClick = {})
             }
         }

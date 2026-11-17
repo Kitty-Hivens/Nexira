@@ -37,8 +37,8 @@ import hivens.ui.components.formatBuildTimestamp
 import hivens.ui.components.rememberRunningPackGuard
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.nx.NxCalloutBanner
-import hivens.ui.nx.NxCalloutTone
+import hivens.ui.nx.CalloutBanner
+import hivens.ui.nx.CalloutTone
 import hivens.ui.nx.NxReveal
 import hivens.ui.nx.NxSettingGroup
 import hivens.ui.nx.NxSettingRow
@@ -207,13 +207,13 @@ internal fun PackVersionSection(
     NxReveal(visible = available != null) {
         shownCheck?.let { c ->
             val isRollback = c.direction == UpdateDirection.Older
-            NxCalloutBanner(
+            CalloutBanner(
                 // A mirror-side rollback of latest arrives through the same check as
                 // a release; calling it "available build" would be true but reads as
                 // an update, and the target is older than what is installed.
                 title = if (isRollback) s.text("packVersionRolledBack", c.toVersion) else s.text("packVersionAvailable", c.toVersion),
                 body = if (c.compat.isSafe) s.text("packVersionSafe") else s.text("packVersionNeedsCare"),
-                tone = if (c.compat.isSafe && !isRollback) NxCalloutTone.Info else NxCalloutTone.Warning,
+                tone = if (c.compat.isSafe && !isRollback) CalloutTone.Info else CalloutTone.Warning,
             ) {
                 // No line at all when the plan is absent: the source could not say
                 // what would change without handing over the whole pack, and a

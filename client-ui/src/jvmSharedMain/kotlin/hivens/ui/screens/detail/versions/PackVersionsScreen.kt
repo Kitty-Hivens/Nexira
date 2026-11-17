@@ -82,8 +82,8 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.nx.CenteredProgress
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.nx.NxCalloutBanner
-import hivens.ui.nx.NxCalloutTone
+import hivens.ui.nx.CalloutBanner
+import hivens.ui.nx.CalloutTone
 import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxDiffRow
 import hivens.ui.nx.NxDiffRowKind
@@ -358,7 +358,7 @@ private fun BuildListPane(
     val s = nexiraStrings()
     when {
         loadFailed -> Column(modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            NxCalloutBanner(body = s.text("packVersionsLoadError"), tone = NxCalloutTone.Error) {
+            CalloutBanner(body = s.text("packVersionsLoadError"), tone = CalloutTone.Error) {
                 NxButton(s.text("packVersionsRetry"), onClick = onRetry, style = NxButtonStyle.Secondary, compact = true)
             }
         }
@@ -582,7 +582,7 @@ private fun BuildDetailPane(
             }
             preview is UpdateCheck.Available -> {
                 val p = preview as UpdateCheck.Available
-                NxCalloutBanner(
+                CalloutBanner(
                     // Without a plan the banner leads with the version instead of
                     // a file tally, rather than showing a tally of nothing.
                     title = p.plan
@@ -590,7 +590,7 @@ private fun BuildDetailPane(
                         ?: s.text("packVersionsSwitchTo"),
                     body  = (if (p.compat.isSafe) s.text("packVersionSafe") else s.text("packVersionNeedsCare")) +
                         (p.plan?.takeIf { it.conflicts.isNotEmpty() }?.let { "\n" + s.text("packVersionsConflicts", it.conflicts.size) }.orEmpty()),
-                    tone  = if (p.compat.isSafe) NxCalloutTone.Info else NxCalloutTone.Warning,
+                    tone  = if (p.compat.isSafe) CalloutTone.Info else CalloutTone.Warning,
                 ) {
                     Row {
                         PuppetClick("packVersions.switch.${build.versionNumber}", enabled = !busy) { onSwitch(p) }
@@ -693,7 +693,7 @@ private fun DiffSection(
                 else -> result.fold(
                     onSuccess = { (computed, enriched) -> DiffBody(computed, enriched, icons) },
                     onFailure = {
-                        NxCalloutBanner(body = s.text("packVersionsFailed", it.message ?: it.toString()), tone = NxCalloutTone.Error)
+                        CalloutBanner(body = s.text("packVersionsFailed", it.message ?: it.toString()), tone = CalloutTone.Error)
                     },
                 )
             }
