@@ -5,6 +5,7 @@ import hivens.catalogue.api.CatalogueApi
 import hivens.i18n.api.I18nApi
 import hivens.look.colour.nx.controls.ColourNxControls
 import hivens.look.manager.api.LookApi
+import hivens.look.motion.nx.controls.MotionNxControls
 import hivens.packs.api.PacksApi
 import hivens.source.mirror.MirrorSourceModule
 import hivens.source.modrinth.ModrinthSourceModule
@@ -87,7 +88,7 @@ class KeyDeclarationDriftTest {
     @Test
     fun `the bundled document names the language, themes, look, packs, accounts and catalogue modules and the two sources, so a fresh install has their keys`() {
         assertEquals(
-            listOf(I18nApi.ID, ThemesApi.ID, LookApi.ID, ColourNxControls.ID, PacksApi.ID, AccountsApi.ID, CatalogueApi.ID, MirrorSourceModule.ID, ModrinthSourceModule.ID),
+            listOf(I18nApi.ID, ThemesApi.ID, LookApi.ID, ColourNxControls.ID, MotionNxControls.ID, PacksApi.ID, AccountsApi.ID, CatalogueApi.ID, MirrorSourceModule.ID, ModrinthSourceModule.ID),
             DefaultLayout.modules(),
         )
         assertEquals(null, DefaultLayout.load().modules, "the bundled graph itself names none, so nothing written from it freezes the list")
@@ -98,6 +99,7 @@ class KeyDeclarationDriftTest {
         assertTrue(CompiledModules.any { it.id == ThemesApi.ID }, "and the themes module")
         assertTrue(CompiledModules.any { it.id == LookApi.ID }, "and the look manager")
         assertTrue(CompiledModules.any { it.id == ColourNxControls.ID }, "and the colour provider's controls")
+        assertTrue(CompiledModules.any { it.id == MotionNxControls.ID }, "and the motion provider's controls")
         assertTrue(CompiledModules.any { it.id == MirrorSourceModule.ID }, "and the mirror source")
         assertTrue(CompiledModules.any { it.id == ModrinthSourceModule.ID }, "and the Modrinth source")
     }

@@ -42,7 +42,7 @@ import hivens.ui.theme.NxThemed
 fun <T> NxSwap(
     target: T,
     modifier: Modifier = Modifier,
-    role: MotionRole = Motion.fade,
+    role: MotionRole = Motion.pageSwap,
     label: String = "nxSwap",
     contentKey: (T) -> Any? = { it },
     content: @Composable (T) -> Unit,

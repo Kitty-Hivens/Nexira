@@ -1,7 +1,6 @@
 package hivens.ui.nx
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.ScrollState
@@ -74,11 +73,7 @@ private fun autoHideStyle(revealed: Boolean): ScrollbarStyle {
         targetValue   = if (revealed) 1f else 0f,
         // Duration and curve come from the fade role; the idle pause before
         // hiding is UX pacing rather than motion, so it is not scaled with it.
-        animationSpec = tween(
-            durationMillis = Motion.fade.durationMs,
-            delayMillis    = if (revealed) 0 else IdleFadeDelayMs,
-            easing         = Motion.fade.easing,
-        ),
+        animationSpec = Motion.fade.of(delayMs = if (revealed) 0 else IdleFadeDelayMs),
         label = "nxScrollbarAlpha",
     )
     return ScrollbarStyle(

@@ -30,7 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.core.api.dto.modrinth.ModrinthProject
 import hivens.launcher.instance.InstalledContent
-import hivens.ui.customization.LocalCustomization
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -153,8 +152,9 @@ internal fun PackLockCard(
 
 @Composable
 private fun LockMark() {
-    val still = LocalCustomization.current.reduceMotion
-    val land = Motion.emphasis
+    // Null where the look holds decoration still.
+    val land = Motion.decoration(Motion.emphasis)
+    val still = land == null
     val ring = Motion.reveal
     val close = Motion.fade
     val lead = NxColor.lead()
@@ -166,11 +166,11 @@ private fun LockMark() {
     val fill = remember { Animatable(if (still) 1f else 0f) }
     val pulse = remember { Animatable(if (still) 1f else 0f) }
     LaunchedEffect(Unit) {
-        if (still) return@LaunchedEffect
+        val landing = land ?: return@LaunchedEffect
         launch { pulse.animateTo(1f, ring.of()) }
-        scale.animateTo(1f, land.of())
+        scale.animateTo(1f, landing.of())
         launch { fill.animateTo(1f, close.of()) }
-        val d = land.durationMs
+        val d = landing.durationMs
         rock.animateTo(
             0f,
             keyframes {

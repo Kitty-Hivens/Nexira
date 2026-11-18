@@ -49,7 +49,7 @@ fun Modifier.pulsatingGlow(
 ): Modifier = composed {
     if (!enabled) return@composed this
 
-    val pulse = Motion.ownRhythm(PULSE_MS)
+    val pulse = Motion.ambient(PULSE_MS)
     val intensity by rememberInfiniteTransition(label = "pulsatingGlow").animateFloat(
         initialValue = GLOW_REST,
         targetValue  = 0.72f,
@@ -82,12 +82,12 @@ fun Modifier.shimmerOverlay(
 ): Modifier = composed {
     if (!enabled) return@composed this
 
-    val sweepRhythm = Motion.ownRhythm(SHIMMER_MS)
+    val sweepRhythm = Motion.ambient(SHIMMER_MS)
     val offsetX by rememberInfiniteTransition(label = "shimmer").animateFloat(
         initialValue = -1.1f,
         targetValue  =  2.1f,
         animationSpec = infiniteRepeatable(
-            tween(sweepRhythm.durationMs, delayMillis = SHIMMER_GAP_MS, easing = sweepRhythm.easing),
+            sweepRhythm.of(gapMs = SHIMMER_GAP_MS),
             RepeatMode.Restart
         ),
         label = "shimmerX"
@@ -118,7 +118,7 @@ fun Modifier.neonBorder(
     cornerRadius: Dp,
     strokeWidth: Dp = 2.dp
 ): Modifier = composed {
-    val neonRhythm = Motion.ownRhythm(NEON_MS)
+    val neonRhythm = Motion.ambient(NEON_MS)
     val alpha by rememberInfiniteTransition(label = "neonBorder").animateFloat(
         initialValue = 0.50f,
         targetValue  = 1.00f,
@@ -151,9 +151,8 @@ fun Modifier.neonBorder(
     }
 }
 
-// Periods of the decorative effects above. Artistic choices rather than roles on
-// the motion scale, but declared through Motion.ownRhythm so the scale stays the
-// one place a duration is spelled.
+// Periods of the decorative effects above. Artistic choices rather than roles of
+// the motion axis, handed to Motion.ambient, which answers how a period runs.
 private const val PULSE_MS = 950
 private const val SHIMMER_MS = 3_200
 private const val SHIMMER_GAP_MS = 700

@@ -39,7 +39,6 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
-import hivens.ui.customization.LocalCustomization
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
@@ -166,10 +165,9 @@ internal fun softHoverAlpha(interaction: MutableInteractionSource, held: Boolean
         hovered || held -> 0.06f
         else    -> 0f
     }
-    val still = LocalCustomization.current.reduceMotion
     return animateFloatAsState(
         targetValue   = target,
-        animationSpec = if (still) snap() else Motion.tap,
+        animationSpec = Motion.decoration(Motion.tap) ?: snap(),
         label         = "softHoverAlpha",
     )
 }

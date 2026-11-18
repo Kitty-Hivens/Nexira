@@ -3,10 +3,6 @@ package hivens.ui.nx
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -255,13 +251,9 @@ internal fun NxMenuPopup(
             // On its way out the popup is a picture: a second click on a row during
             // the fade ran the row's action again.
             modifier = Modifier.inertUnless(expanded),
-            // The fade is the quicker half so the menu reads as an object arriving
-            // rather than as text swelling into place; the scale is the opening
-            // role, which is what this is.
-            enter = fadeIn(Motion.tap.of()) +
-                scaleIn(Motion.reveal.of(), initialScale = 0.86f, transformOrigin = origin.value),
-            exit  = fadeOut(Motion.tap.of()) +
-                scaleOut(Motion.tap.of(), targetScale = 0.92f, transformOrigin = origin.value),
+            // Unfolding from where it was opened, which the position worked out.
+            enter = Motion.popup.enter(origin.value),
+            exit  = Motion.popup.exit(origin.value),
         ) {
             body()
         }

@@ -88,7 +88,7 @@ fun NxTabRow(
     val scroll = rememberScrollState()
     val span = spans[selected]
     val viewport = scroll.viewportSize
-    val scrollSpec = Motion.track.of<Float>()
+    val scrollSpec = Motion.scroll.of<Float>()
     LaunchedEffect(span, viewport) {
         val tab = span ?: return@LaunchedEffect
         if (viewport <= 0) return@LaunchedEffect

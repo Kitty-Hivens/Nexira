@@ -57,7 +57,6 @@ import hivens.widget.model.Entrance
 import hivens.widget.model.WidgetMotion
 import hivens.ui.nx.NxSelect
 import hivens.ui.widgets.MAX_DELAY_MS
-import hivens.ui.widgets.autoEntranceDelayMs
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.PropHidden
 import hivens.widget.model.FillSource
@@ -274,7 +273,7 @@ private fun PropPanelBody(
                 ?.indexOfFirst { it.instanceId == instanceId }?.coerceAtLeast(0) ?: 0
             MotionSection(
                 entrance = descriptor.resolveEntrance(instance),
-                delayMs  = instance.motion?.delayMs ?: autoEntranceDelayMs(order),
+                delayMs  = instance.motion?.delayMs ?: Motion.stagger(order),
                 motion   = instance.motion ?: WidgetMotion(),
                 write    = { controller.updateMotion(path, instanceId, it) },
             )

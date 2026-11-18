@@ -7,6 +7,7 @@ import androidx.compose.ui.text.font.FontFamily
 import hivens.look.colour.api.Colour
 import hivens.look.colour.api.ColourAnswers
 import hivens.look.manager.api.Status as LookStatus
+import hivens.look.motion.api.Motion as MotionAxis
 
 /**
  * This scheme as the colour axis's answers: every role nx-ui draws, answered from the scheme the way
@@ -41,20 +42,23 @@ fun Scheme.colourAnswers(): ColourAnswers {
 }
 
 /**
- * [content] drawn in [theme], in its dark scheme or its light one by [dark], whatever the look around
- * answers for colour: the theme's answers provided for the colour axis, and the bridge ([NxTheme]) set
- * from them. For what draws one theme on purpose, a preview of it or a render of a component in it.
+ * [content] drawn in [theme], in its dark scheme or its light one by [dark], and moving as nx moves,
+ * with its decorative movement held still by [reduceMotion], whatever the look around answers: the
+ * theme's answers provided for the colour axis, nx's for the motion axis ([nxMotionAnswers]), and the
+ * bridge ([NxTheme]) set from them. For what draws one theme on purpose, a preview of it or a render of
+ * a component in it.
  */
 @Composable
 fun NxThemed(
     theme: Theme,
     dark: Boolean = true,
     uiFamily: FontFamily? = null,
+    reduceMotion: Boolean = false,
     content: @Composable () -> Unit,
 ) {
     val scheme = theme.scheme(dark)
     val answers = remember(scheme) { scheme.colourAnswers() }
-    CompositionLocalProvider(Colour.local provides answers) {
+    CompositionLocalProvider(Colour.local provides answers, MotionAxis.local provides nxMotionAnswers(reduceMotion)) {
         NxTheme(uiFamily = uiFamily, content = content)
     }
 }

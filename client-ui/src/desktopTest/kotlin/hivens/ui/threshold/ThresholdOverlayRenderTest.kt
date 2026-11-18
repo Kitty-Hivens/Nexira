@@ -3,6 +3,7 @@ package hivens.ui.threshold
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -10,7 +11,9 @@ import androidx.compose.ui.unit.Density
 import hivens.launcher.CrashReporter
 import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.launcher.platform.PlatformPaths
+import hivens.look.motion.api.Motion
 import hivens.ui.i18n.NexiraStrings
+import hivens.ui.theme.nxMotionAnswers
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.skia.EncodedImageFormat
 import org.koin.dsl.koinApplication
@@ -74,16 +77,19 @@ class ThresholdOverlayRenderTest {
         val width = 1280
         val height = 800
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            Box(Modifier.fillMaxSize().background(backdrop)) {
-                ThresholdOverlay(
-                    stageFlow = stage,
-                    outcome   = outcome,
-                    strings   = strings,
-                    logsDir   = tmp,
-                    dark      = dark,
-                    onQuit    = {},
-                    onDone    = {},
-                )
+            // Drawn in the look the boot window opens in, nx's motion where nx answers it.
+            CompositionLocalProvider(Motion.local provides nxMotionAnswers(reduceMotion = false)) {
+                Box(Modifier.fillMaxSize().background(backdrop)) {
+                    ThresholdOverlay(
+                        stageFlow = stage,
+                        outcome   = outcome,
+                        strings   = strings,
+                        logsDir   = tmp,
+                        dark      = dark,
+                        onQuit    = {},
+                        onDone    = {},
+                    )
+                }
             }
         }
         try {
@@ -126,16 +132,19 @@ class ThresholdOverlayRenderTest {
     private fun renderFailed(): java.awt.image.BufferedImage {
         val tmp = Files.createTempDirectory("threshold-render-failed")
         val scene = ImageComposeScene(FAIL_W, FAIL_H, density = Density(1f)) {
-            Box(Modifier.fillMaxSize().background(backdrop)) {
-                ThresholdOverlay(
-                    stageFlow = MutableStateFlow(BootStage.Modules),
-                    outcome   = BootOutcome.Failed(IllegalStateException("no definition found for a thing")),
-                    strings   = NexiraStrings.shipped("ru"),
-                    logsDir   = tmp,
-                    dark      = true,
-                    onQuit    = {},
-                    onDone    = {},
-                )
+            // Drawn in the look the boot window opens in, nx's motion where nx answers it.
+            CompositionLocalProvider(Motion.local provides nxMotionAnswers(reduceMotion = false)) {
+                Box(Modifier.fillMaxSize().background(backdrop)) {
+                    ThresholdOverlay(
+                        stageFlow = MutableStateFlow(BootStage.Modules),
+                        outcome   = BootOutcome.Failed(IllegalStateException("no definition found for a thing")),
+                        strings   = NexiraStrings.shipped("ru"),
+                        logsDir   = tmp,
+                        dark      = true,
+                        onQuit    = {},
+                        onDone    = {},
+                    )
+                }
             }
         }
         try {

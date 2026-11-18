@@ -2,7 +2,6 @@ package hivens.ui.screens.detail
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -251,8 +250,8 @@ fun PackDetailScreen(
             AnimatedContent(
                 targetState    = tabIndex,
                 transitionSpec = {
-                    fadeIn(tween(arrive.durationMs, leave.durationMs / 2, arrive.easing)) togetherWith
-                        fadeOut(tween(leave.durationMs, easing = leave.easing))
+                    fadeIn(arrive.of(delayMs = leave.durationMs / 2)) togetherWith
+                        fadeOut(leave.of())
                 },
                 label          = "packTab",
             ) { tab ->

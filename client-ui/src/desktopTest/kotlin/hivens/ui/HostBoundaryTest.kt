@@ -35,6 +35,9 @@ class HostBoundaryTest {
         "import hivens.look.colour.api.ColourModule",
         "import hivens.look.packs.LookPacksModule",
         "import hivens.look.colour.nx.controls.ColourNxControls",
+        "import hivens.look.motion.api.MotionModule",
+        "import hivens.look.motion.nx.MotionNxModule",
+        "import hivens.look.motion.nx.controls.MotionNxControls",
     )
 
     /** The recovery surface, and the one engine of the launcher's own words it may make. */
@@ -131,6 +134,14 @@ class HostBoundaryTest {
     }
 
     @Test
+    fun `no host source reads the person's reduce motion, which is the motion provider's own setting`() {
+        val found = sources().flatMap { (path, text) ->
+            text.lines().mapIndexedNotNull { index, line -> "$path:${index + 1}: ${line.trim()}".takeIf { REDUCE_MOTION.containsMatchIn(line) } }
+        }
+        assertEquals(emptyList(), found, "the host draws movement as the look answers it")
+    }
+
+    @Test
     fun `every way of naming a module's insides is seen`() {
         val holes = mapOf(
             "a wildcard import" to "import hivens.themes.*",
@@ -198,6 +209,9 @@ class HostBoundaryTest {
 
         /** A key of the themes module, by its member where it names one, or one of the inputs the host feeds it. */
         val THEMES = Regex("""\bThemesKeys(\.[A-Za-z_]+)?|\bThemeInputs\b|\bSystemScheme\b|\bThemeMode\b""")
+
+        /** The person's reduce motion, by any of the names it went by. */
+        val REDUCE_MOTION = Regex("""\breduce[dD]?Motion\b|\bReduceMotion\b""")
 
         /** An engine of the launcher's own words, called, taken by reference or imported. */
         val OWN_ENGINE = Regex("""\bNexiraStrings(\.|::)(engine|translator|shipped)\b""")

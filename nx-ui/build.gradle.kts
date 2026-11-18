@@ -53,6 +53,8 @@ kotlin {
                 // What every colour here is read from: the colour axis's answers, provided by
                 // whatever answers the axis around the composition, and its base answers outside any.
                 api(project(":look:colour-api"))
+                // What every movement here is read from: the motion axis's answers, the same way.
+                api(project(":look:motion-api"))
             }
         }
 

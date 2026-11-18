@@ -15,6 +15,7 @@ kotlin.sourceSets.named("jvmTest") {
     dependencies {
         implementation(project(":look:manager"))
         implementation(project(":look:colour-api"))
+        implementation(project(":look:motion-api"))
         implementation(libs.compose.runtime)
     }
 }

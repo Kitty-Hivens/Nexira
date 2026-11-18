@@ -82,24 +82,28 @@ val LocalWidgetSurfaceRenderer: ProvidableCompositionLocal<WidgetSurfaceRenderer
     staticCompositionLocalOf { { _, content -> content() } }
 
 /**
- * Plays a widget's arrival. [order] is its place in its slot and [delayMs] its own
- * pinned delay, null for the slot's stagger.
+ * Plays a widget's arrival. [entrance] is the character it arrives by, [onNode] whether
+ * the node itself names that character rather than leaving it to its widget's
+ * declaration, [order] is its place in its slot and [delayMs] the node's own pinned
+ * delay, null for the slot's stagger.
  *
- * The kernel knows which character a widget asked for and where it stands, and
- * nothing about time: durations and curves are the interface's motion scale,
- * which this module cannot see. So the default plays nothing, and :client-ui
- * provides the one that moves. Called inside the widget's movable content, so
+ * The kernel knows which character a widget asked for, who asked and where it stands,
+ * and nothing about time: durations and curves are the look's, which this module
+ * cannot see. So the default plays nothing, and :client-ui provides the one that
+ * moves. A character or a delay the node names is the node's, and is played as set
+ * whatever the look holds still. Called inside the widget's movable content, so
  * toggling the editor, which relocates that content, does not play it again.
  */
 typealias WidgetEntrance = @Composable (
     entrance: Entrance,
+    onNode: Boolean,
     order: Int,
     delayMs: Int?,
     content: @Composable () -> Unit,
 ) -> Unit
 
 val LocalWidgetEntrance: ProvidableCompositionLocal<WidgetEntrance> =
-    staticCompositionLocalOf { { _, _, _, content -> content() } }
+    staticCompositionLocalOf { { _, _, _, _, content -> content() } }
 
 // Rendered by SlotRenderer when a slot has no widgets. Default = nothing
 // (production behavior: empty slot stays invisible). The editor swaps

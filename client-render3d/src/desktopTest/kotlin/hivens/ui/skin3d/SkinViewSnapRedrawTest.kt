@@ -7,8 +7,8 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.Density
-import hivens.ui.customization.CustomizationSettings
-import hivens.ui.customization.LocalCustomization
+import hivens.look.motion.api.Motion
+import hivens.ui.theme.nxMotionAnswers
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType
@@ -45,7 +45,7 @@ class SkinViewSnapRedrawTest {
         val texture = skin()
         val scene = ImageComposeScene(160, 240, density = Density(1f)) {
             // Motion reduced: no frame loop runs, so nothing but the snap can redraw.
-            CompositionLocalProvider(LocalCustomization provides CustomizationSettings(reduceMotion = true)) {
+            CompositionLocalProvider(Motion.local provides nxMotionAnswers(reduceMotion = true)) {
                 SkinView3D(texture, Modifier.fillMaxSize(), interactive = false, autoSpin = false, state = state)
             }
         }

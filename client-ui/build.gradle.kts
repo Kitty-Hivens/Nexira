@@ -181,10 +181,14 @@ kotlin {
                 // take whether a document names them or not. The shell compiles against none of
                 // them beyond listing their CompiledModule.
                 implementation(project(":look:colour-api"))
+                implementation(project(":look:motion-api"))
                 implementation(project(":look:packs"))
-                // The nx colour provider's controls, compiled in like the provider: the shell
-                // names nothing of it beyond its CompiledModule, and draws its widgets by kind.
+                // The nx motion provider, compiled in like the colour one.
+                implementation(project(":look:motion-nx"))
+                // The nx providers' controls, compiled in like the providers: the shell names
+                // nothing of them beyond their CompiledModule, and draws their widgets by kind.
                 implementation(project(":look:colour-nx-controls"))
+                implementation(project(":look:motion-nx-controls"))
                 implementation(project(":nx-ui"))
                 implementation(project(":ui-layers"))
                 implementation(project(":ui-puppet"))

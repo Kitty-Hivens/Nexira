@@ -114,6 +114,7 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 | `nexira.catalogue`    | `:catalogue-api`      | `hivens.catalogue.api`    | Searching, installing a project, and bringing a source             |
 | `nexira.look.manager` | `:look:manager-api`   | `hivens.look.manager.api` | Bringing an axis of the look, a provider or a pack, and the choice |
 | `nexira.look.colour`  | `:look:colour-api`    | `hivens.look.colour.api`  | Asking colour by role, and answering the colour axis               |
+| `nexira.look.motion`  | `:look:motion-api`    | `hivens.look.motion.api`  | Asking movement by role, and answering the motion axis             |
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
 
@@ -308,6 +309,14 @@ A document names the manager and nothing else of the look. The axes, providers a
 The colour axis, `colour`, comes with the launcher in `:look:colour-api` (`nexira.look.colour`). A widget asks it by what it draws, never by a value: `Ink` for text and glyphs (`Ink.main`, `Ink.quiet`, `Ink.on(fill)`), `Paint` for colours that mean something (`Paint.lead`, `Paint.status(Status.Error)`, `Paint.category(member)`, and `Paint.partner`, `Paint.third` and `Paint.palette`, the look's own colours for art and decoration), `Fill` for areas, `Line` for strokes, `Ground` for what content sits on (`Ground.current`, `Ground.page`, `Ground.dark`) and `Media` for colours over a picture. A fill, a rule and the faint ink are made over the colour content sits on, which whatever draws a plane sets in `LocalGround`, and the page outside any. `Status` is the manager's API's, so every axis that answers by it names the same word.
 
 A provider of colour answers with `ColourAnswers.build { ... }`, filling the roles it answers. A role it leaves alone keeps its base answer, and a role the others are made of carries them along: fill only the lead, and the tinted fills, marks and edges are in that lead. Where no provider answers, the base answers hold, plain greys for a dark ground with no colour at all. The default pack names the `nx` family for colour.
+
+### Motion
+
+The motion axis, `motion`, comes with the launcher in `:look:motion-api` (`nexira.look.motion`). A widget asks it by what is happening, never by a duration: `Motion.tap` for a press or a hover answering, `Motion.colourShift`, `Motion.track` for a mark travelling, `Motion.fade`, `Motion.popup`, `Motion.panelSlide`, `Motion.reveal`, `Motion.emphasis` and `Motion.pageSwap` for something arriving or leaving, `Motion.scroll` and `Motion.dismiss` for what input drives, `Motion.lookChange` for the look itself changing, and `Motion.drift`, `Motion.sweep` and `Motion.ambient(periodMs)` for movement that goes on. A role is a `MotionRole`: a spec for any type through `of()`, usable as it is where a `FiniteAnimationSpec<Float>` is asked, with the `enter` and `exit` of something coming and going by it. A widget's arrival is `Motion.arrival(entrance)` and the order a slot's widgets arrive in `Motion.stagger(order)`.
+
+Some movement only dresses a change already made. A widget that has some asks `Motion.decoration(role)`, and draws the change at once where it answers null. `Motion.lookChange` and `Motion.drift` answer null the same way. That is how a provider holds movement still where the person asked for less: reduce motion is the provider's own setting, not the launcher's, and an entrance or a delay a widget's node names is the node's and plays all the same.
+
+A provider of motion answers with `MotionAnswers.build { ... }`. A role it leaves alone keeps its base answer, Compose's own 300 ms tween on its standard curve, a plain fade, and linear loops. The default pack names the `nx` family for motion.
 
 ## Catalogue sources
 

@@ -208,5 +208,11 @@ include(":look:colour-nx-api")
 include(":look:colour-nx")
 // The UI that steers the nx colour provider: the day and night switch, the mode, the theme picker.
 include(":look:colour-nx-controls")
+include(":look:motion-api")
+// The nx motion provider: nx's durations and curves, and the person's reduce motion, kept in its
+// own settings.
+include(":look:motion-nx")
+// The UI that steers the nx motion provider: the reduce motion switch.
+include(":look:motion-nx-controls")
 include(":profiler-agent")
 include(":authlib-agent")

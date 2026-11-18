@@ -7,7 +7,7 @@ import androidx.compose.runtime.Composable
  *
  * [values] are the person's own settings for this effect, read through the keys [ScreenEffect.settings]
  * declared, and an effect is expected to scale its look by them rather than treat full strength as the
- * only one. [reducedMotion] is the interface's reduced motion setting: an effect that moves must hold
+ * only one. [reducedMotion] says the look holds ambient movement still: an effect that moves must hold
  * still, and may keep a still version of its look.
  */
 data class ScreenEffectState(

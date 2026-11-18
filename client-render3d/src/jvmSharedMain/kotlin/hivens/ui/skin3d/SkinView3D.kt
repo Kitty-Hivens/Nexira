@@ -15,12 +15,12 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalWindowInfo
-import hivens.ui.customization.LocalCustomization
 import hivens.ui.render3d.Texture
 import hivens.ui.scene3d.Node
 import hivens.ui.scene3d.OrthoCamera
 import hivens.ui.scene3d.Scene3DState
 import hivens.ui.scene3d.Scene3DView
+import hivens.ui.theme.Motion
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.time.Duration.Companion.milliseconds
@@ -106,9 +106,9 @@ fun SkinView3D(
     var dragging by remember { mutableStateOf(false) }
 
     // The scene drives its own clock and takes a multiplier rather than a
-    // still/not question, so an idle spin slows before it stops. The reduce-motion
-    // preference is what sets it: zero stops the spin and makes a retarget snap.
-    val still = LocalCustomization.current.reduceMotion
+    // still/not question, so an idle spin slows before it stops. The look holding
+    // ambient drift still is what sets it: zero stops the spin and makes a retarget snap.
+    val still = Motion.drift == null
     SideEffect { state.motionMultiplier = if (still) 0f else 1f }
     val motion = if (still) 0f else 1f
 

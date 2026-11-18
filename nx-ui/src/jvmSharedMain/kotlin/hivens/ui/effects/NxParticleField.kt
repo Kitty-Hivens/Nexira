@@ -26,10 +26,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.LocalCustomization
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.look.colour.api.Paint
+import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -105,9 +105,9 @@ fun NxParticleField(
     val palette: List<Color> = remember(colors, field, ink, quiet) { field.palette(ink, quiet, colors) }
     // Named apart from the draw scope's own density, which is the screen's.
     val perArea = density
-    // Held on its first frame when the person asked for less movement: the field
+    // Held on its first frame where the look holds ambient drift still: the field
     // still decorates, it just stops drifting, and stops costing a frame a frame.
-    val still = LocalCustomization.current.reduceMotion
+    val still = Motion.drift == null
     // The two bounds the skin view puts on its own loop, for the same reasons.
     // Asking for every frame keeps the compositor redrawing at the panel's rate,
     // so the loop sleeps a floor first and asks for a frame second. And it stops

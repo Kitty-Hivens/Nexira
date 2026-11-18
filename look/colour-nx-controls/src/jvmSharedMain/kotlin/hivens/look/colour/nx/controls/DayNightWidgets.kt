@@ -26,7 +26,6 @@ import androidx.compose.ui.unit.dp
 import hivens.i18n.api.strings
 import hivens.themes.api.ThemeMode
 import hivens.themes.api.ThemesKeys
-import hivens.ui.customization.LocalCustomization
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxChoiceChip
@@ -167,13 +166,12 @@ internal fun DayNightRow(
 ) {
     val tint = if (checked) MoonBlue else SunOrange
     val reveal = LocalThemeReveal.current
-    // The theme wipe's own pace, a set piece rather than an interface response. With motion reduced it
-    // is no wipe at all: the reveal reads a non-positive duration as a plain flip.
-    val still = LocalCustomization.current.reduceMotion
-    val durationMs = if (still) 0 else Motion.ownRhythm(THEME_REVEAL_MS).durationMs
+    // The look changing is the look's own role. Where the look holds it still there is no wipe at all,
+    // and the reveal reads that as a plain flip.
+    val change = Motion.lookChange
     var switchOrigin by remember { mutableStateOf(Offset.Zero) }
     val onToggle: (Boolean) -> Unit = { newValue ->
-        if (reveal != null) reveal.reveal(switchOrigin, durationMs) { onCheckedChange(newValue) }
+        if (reveal != null) reveal.reveal(switchOrigin, change) { onCheckedChange(newValue) }
         else onCheckedChange(newValue)
     }
     Row(
@@ -198,6 +196,3 @@ internal fun DayNightRow(
         )
     }
 }
-
-/** How long the theme wipe takes to cross the window. */
-private const val THEME_REVEAL_MS = 550

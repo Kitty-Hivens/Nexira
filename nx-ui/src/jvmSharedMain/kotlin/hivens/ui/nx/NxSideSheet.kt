@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,8 +35,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.CustomizationSettings
-import hivens.ui.customization.LocalCustomization
 import hivens.ui.icons.NxIcon
 import hivens.ui.layers.Layer
 import hivens.ui.layers.LayerHost
@@ -81,8 +78,9 @@ fun NxSideSheet(
     expandedWidth: Dp = 1120.dp,
     content: @Composable ColumnScope.(close: () -> Unit) -> Unit,
 ) {
-    val still = LocalCustomization.current.reduceMotion
-    val slide = Motion.panelSlide
+    // Null where the look holds decoration still: the sheet then stands where it lands.
+    val slide = Motion.decoration(Motion.panelSlide)
+    val still = slide == null
     val scrimColour = NxColor.page
     // 0 is off screen, 1 is in place. One value drives the travel and the scrim, so
     // the page dims exactly as far as the sheet has come.
@@ -90,12 +88,12 @@ fun NxSideSheet(
     var leaving by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val dismiss = rememberUpdatedState(onDismissRequest)
-    LaunchedEffect(Unit) { if (!still) shown.animateTo(1f, slide.of()) }
+    LaunchedEffect(Unit) { slide?.let { shown.animateTo(1f, it.of()) } }
     val close: () -> Unit = {
         if (!leaving) {
             leaving = true
             scope.launch {
-                if (!still) shown.animateTo(0f, slide.of())
+                slide?.let { shown.animateTo(0f, it.of()) }
                 dismiss.value()
             }
         }
@@ -112,7 +110,7 @@ fun NxSideSheet(
         ) {
             val room = (maxWidth - EDGE * 2).coerceAtLeast(0.dp)
             val target = minOf(if (expanded) expandedWidth else width, room)
-            val sheetWidth by animateDpAsState(target, if (still) Motion.tap.of() else slide.of(), label = "sheetWidth")
+            val sheetWidth by animateDpAsState(target, (slide ?: Motion.tap).of(), label = "sheetWidth")
             NxSurface(
                 kind     = SurfaceKind.Dialog,
                 shape    = MaterialTheme.shapes.large,
@@ -155,31 +153,29 @@ private fun NxSideSheetLightPreview() = OpenSideSheet(dark = false)
  */
 @Composable
 private fun OpenSideSheet(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
-        CompositionLocalProvider(LocalCustomization provides CustomizationSettings(reduceMotion = true)) {
-            LayerHost(rememberWindowLayers(), Modifier.size(640.dp, 400.dp).background(NxColor.page)) {
-                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NxSectionHeader("Page behind")
-                    repeat(6) { Text("A line of the page beside the sheet", color = NxInk.main) }
+    NxThemed(NeutralTheme, dark = dark, reduceMotion = true) {
+        LayerHost(rememberWindowLayers(), Modifier.size(640.dp, 400.dp).background(NxColor.page)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                NxSectionHeader("Page behind")
+                repeat(6) { Text("A line of the page beside the sheet", color = NxInk.main) }
+            }
+            NxSideSheet(onDismissRequest = {}, width = 320.dp) { close ->
+                Row(
+                    modifier          = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        "Pack settings",
+                        style      = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color      = NxInk.main,
+                        modifier   = Modifier.weight(1f),
+                    )
+                    NxIconButton(NxIcon.Close, "Close", onClick = close)
                 }
-                NxSideSheet(onDismissRequest = {}, width = 320.dp) { close ->
-                    Row(
-                        modifier          = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            "Pack settings",
-                            style      = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold,
-                            color      = NxInk.main,
-                            modifier   = Modifier.weight(1f),
-                        )
-                        NxIconButton(NxIcon.Close, "Close", onClick = close)
-                    }
-                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                        NxToggle("Close on launch", checked = true, onCheckedChange = {})
-                        NxSlider("Memory", value = 6f, range = 2f..16f, valueText = "6 GB", onValueChange = {})
-                    }
+                Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    NxToggle("Close on launch", checked = true, onCheckedChange = {})
+                    NxSlider("Memory", value = 6f, range = 2f..16f, valueText = "6 GB", onValueChange = {})
                 }
             }
         }

@@ -11,9 +11,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.Density
 import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
-import hivens.ui.customization.CustomizationSettings
-import hivens.ui.customization.LocalCustomization
-import androidx.compose.runtime.CompositionLocalProvider
 import org.jetbrains.skia.Bitmap
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -99,11 +96,9 @@ class ParticleFieldTest {
     @Test
     fun `with reduced motion the field holds still`() {
         val scene = ImageComposeScene(300, 200, density = Density(1f)) {
-            CompositionLocalProvider(LocalCustomization provides CustomizationSettings(reduceMotion = true)) {
-                NxThemed(TestTheme, dark = true) {
-                    Box(Modifier.fillMaxSize().background(Color.Black)) {
-                        NxParticleField(ParticleField.Snow, Modifier.fillMaxSize(), ParticleDensity.Rich)
-                    }
+            NxThemed(TestTheme, dark = true, reduceMotion = true) {
+                Box(Modifier.fillMaxSize().background(Color.Black)) {
+                    NxParticleField(ParticleField.Snow, Modifier.fillMaxSize(), ParticleDensity.Rich)
                 }
             }
         }

@@ -22,17 +22,15 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 
 // Right island of the Appearance studio beside the wallpaper controls, over the live
-// preview: whether surfaces blur and whether motion is reduced, and around them the
-// slots the colour provider's controls are drawn in (dark and light, what decides it,
-// and the way to the theme picker), which hold nothing where they are absent or their
+// preview: whether surfaces blur, and around it the slots the look's providers' controls
+// are drawn in (dark and light, what decides it, the way to the theme picker, and
+// whether motion is reduced), which hold nothing where they are absent or their
 // provider does not draw. The wallpaper does not colour the theme: it is a picture
 // under the interface, darkened with the theme's own page colour.
 @Composable
 internal fun AppearanceThemeIsland(
     surfaceBlur: Boolean,
     onSurfaceBlurChanged: (Boolean) -> Unit,
-    reduceMotion: Boolean,
-    onReduceMotionChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val s = nexiraStrings()
@@ -60,15 +58,7 @@ internal fun AppearanceThemeIsland(
 
             // Beside the blur because it is the same kind of choice: decoration that
             // costs something, switched off in one place rather than widget by widget.
-            NxToggle(
-                label           = s.text("settingsReduceMotion"),
-                checked         = reduceMotion,
-                modifier        = gap,
-                description     = s.text("settingsReduceMotionDesc"),
-                icon            = NxIcon.Speed,
-                accent          = NxColor.lead(),
-                onCheckedChange = onReduceMotionChanged,
-            )
+            SlotRenderer(SurfaceId(BG_SETTINGS_SURFACE), SlotId("motion"), gap, spacing = ROW_GAP)
 
             ModuleEffectRows(gap)
 

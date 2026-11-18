@@ -12,6 +12,10 @@ import kotlinx.serialization.Serializable
  *
  * The fields decide whether surfaces blur and how the nav-rail selection is drawn.
  *
+ * Reduce motion used to live here too. It is the nx motion provider's own setting now,
+ * which takes a choice made here over once, so the field is read there and no longer
+ * written here.
+ *
  * An accent override used to live here too, pasting a hex over the theme's colour
  * after the theme was built. Nothing wrote it, and the theme now owns its colours
  * outright, so there is no later step for it to paste into.
@@ -42,16 +46,6 @@ data class CustomizationSettings(
      * the plane keeps its body, its opacity and its shape, it just stops filtering.
      */
     val surfaceBlur: Boolean = true,
-
-    /**
-     * Whether the interface keeps decorative movement to itself.
-     *
-     * On, widgets are where they belong when a surface opens instead of arriving, and
-     * a field of particles holds still on its first frame instead of drifting. It is
-     * one switch for the movement nothing depends on, and it leaves the motion that
-     * says something alone: a press still answers, a panel still opens.
-     */
-    val reduceMotion: Boolean = false,
 
     /**
      * How the active item in the left navigation rail is highlighted.

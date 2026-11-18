@@ -8,6 +8,7 @@ import hivens.look.colour.api.Colour
 import hivens.look.colour.nx.controls.ColourNxControls
 import hivens.look.manager.api.LookApi
 import hivens.look.manager.api.LookKeys
+import hivens.look.motion.nx.controls.MotionNxControls
 import hivens.test.stopThenDelete
 import hivens.themes.Themes
 import hivens.themes.api.ThemesApi
@@ -51,10 +52,10 @@ class DocumentModulesTest {
 
     @Test
     fun `the standard document names the look manager and no axis, provider or pack of the look`() {
-        // The colour provider's controls are named beside it: a controller is none of the three, the
-        // manager never brings one in, and its page key is in only where a document names it.
+        // The providers' controls are named beside it: a controller is none of the three, the manager
+        // never brings one in, and its keys are in only where a document names it.
         val look = DefaultLayout.modules().filter { it.startsWith("nexira.look") }
-        assertEquals(listOf(LookApi.ID, ColourNxControls.ID), look)
+        assertEquals(listOf(LookApi.ID, ColourNxControls.ID, MotionNxControls.ID), look)
     }
 
     @Test

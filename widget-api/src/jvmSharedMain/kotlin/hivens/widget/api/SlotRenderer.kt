@@ -93,6 +93,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.roundToInt
+import hivens.widget.model.Entrance
 import hivens.widget.model.FlowPlacement
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
@@ -1476,7 +1477,7 @@ private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance,
         val drawn = @Composable {
             if (hidden != null && !descriptor.shownHere()) hidden(descriptor, instance, body) else body()
         }
-        entrance(descriptor.resolveEntrance(instance), order, instance.motion?.delayMs) {
+        entrance(descriptor.resolveEntrance(instance), Entrance.parse(instance.motion?.enter) != null, order, instance.motion?.delayMs) {
             if (ceiling == null) drawn() else Box(ceiling) { drawn() }
         }
     }

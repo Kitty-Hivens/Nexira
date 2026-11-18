@@ -49,8 +49,6 @@ fun BgSettingsSurface(
     onBack: () -> Unit,
     surfaceBlur: Boolean,
     onSurfaceBlurChanged: (Boolean) -> Unit,
-    reduceMotion: Boolean,
-    onReduceMotionChanged: (Boolean) -> Unit,
 ) {
     // The shell's value, not a copy taken on the way in. The screen is not the
     // only writer: the player's volume and a transcode that finishes after the
@@ -65,7 +63,6 @@ fun BgSettingsSurface(
         onSettingsChanged { copy(imagePath = null, enabled = false) }
     }
     PuppetToggle("background.surfaceBlur", surfaceBlur, onValueChange = onSurfaceBlurChanged)
-    PuppetToggle("background.reduceMotion", reduceMotion, onValueChange = onReduceMotionChanged)
     PuppetClick("background.reset") { onSettingsChanged { BackgroundSettings() } }
 
     Row(Modifier.fillMaxSize().padding(16.dp)) {
@@ -87,8 +84,6 @@ fun BgSettingsSurface(
         AppearanceThemeIsland(
             surfaceBlur          = surfaceBlur,
             onSurfaceBlurChanged = onSurfaceBlurChanged,
-            reduceMotion         = reduceMotion,
-            onReduceMotionChanged = onReduceMotionChanged,
             modifier             = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
         )
     }

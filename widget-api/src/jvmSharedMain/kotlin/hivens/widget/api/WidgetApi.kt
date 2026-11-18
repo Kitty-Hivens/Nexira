@@ -48,6 +48,8 @@ package hivens.widget.api
  *    composition answers the kernel's own keys for moving what it shows ([CompositionKeys]).
  *    A settings domain may answer the value a launcher's first start opens on
  *    ([SettingsDomain.firstRun]), which the host writes into the domain's file then.
+ *    A widget's arrival is told whether the node itself names its character ([WidgetEntrance]),
+ *    since a value the node names is played as set whatever the look holds still.
  */
 object WidgetApi {
     const val VERSION: Int = 3

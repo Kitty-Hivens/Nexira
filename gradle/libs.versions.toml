@@ -198,6 +198,7 @@ koin-compose                    = { group = "io.insert-koin", name = "koin-compo
 # Compose (explicit refs in addition to plugin DSL accessors)
 compose-runtime                 = { group = "org.jetbrains.compose.runtime",    name = "runtime",             version.ref = "compose" }
 compose-foundation              = { group = "org.jetbrains.compose.foundation", name = "foundation",          version.ref = "compose" }
+compose-animation               = { group = "org.jetbrains.compose.animation",  name = "animation",           version.ref = "compose" }
 compose-material3               = { group = "org.jetbrains.compose.material3",  name = "material3",           version.ref = "composeMaterial3" }
 compose-ui                      = { group = "org.jetbrains.compose.ui",         name = "ui",                  version.ref = "compose" }
 compose-components-resources    = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose" }
