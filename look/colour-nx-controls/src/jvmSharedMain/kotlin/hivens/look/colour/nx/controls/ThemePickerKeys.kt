@@ -7,14 +7,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.text.font.FontFamily
 import hivens.i18n.api.strings
-import hivens.look.colour.api.Colour
-import hivens.look.manager.api.LookKeys
 import hivens.themes.api.ThemePreview
 import hivens.themes.api.ThemesApi
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Theme
-import hivens.widget.api.rememberScopedSource
-import hivens.widget.api.valueOrNull
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 
@@ -42,15 +38,6 @@ internal val ThemeSelectionSource: SourceKey<ThemeSelection> = SourceKey("theme.
 @Composable
 internal fun Theme.label(): String =
     if (id == ThemesApi.WALLPAPER_THEME_ID) strings(ColourNxControls.ID).text("themeFromWallpaper") else name
-
-/**
- * Whether the nx colour provider draws the colour now, by the look's state. The controls steer that
- * provider and nothing else, so where another family draws the colour, or no look manager says what
- * draws it, they draw nothing.
- */
-@Composable
-internal fun nxDrawsColour(): Boolean =
-    rememberScopedSource(LookKeys.State).valueOrNull()?.draws(Colour.id, ThemesApi.COLOUR_FAMILY) == true
 
 /**
  * [content] drawn in [theme], in its dark or light scheme by [dark], with the interface face [face]:

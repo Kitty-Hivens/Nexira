@@ -47,10 +47,10 @@ import androidx.compose.ui.graphics.Color
     prefWidth = 320, prefHeight = 432,
     maxWidth = 720, maxHeight = 760,
     needs = [ThemesKeys.ACTIVE_ID, ThemesKeys.DARK_ID, "theme.picker.selection"],
+    shownWhen = NX_DRAWING_ID,
 )
 @Composable
 fun ThemePickerPreviewWidget() {
-    if (!nxDrawsColour()) return
     val active = rememberScopedSource(ThemesKeys.Active).valueOrNull() ?: return
     val dark = rememberScopedSource(ThemesKeys.Dark).valueOrNull() ?: return
     val selection = rememberScopedSource(ThemeSelectionSource).valueOrNull() ?: return

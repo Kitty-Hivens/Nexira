@@ -1,6 +1,6 @@
 package hivens.ui.widgets.bgsettings
 
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -16,6 +16,8 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NxColor
 import hivens.ui.surface.SurfaceKind
 import hivens.widget.api.SlotRenderer
+import hivens.widget.api.childGap
+import hivens.widget.api.withoutLeadingGap
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 
@@ -35,18 +37,21 @@ internal fun AppearanceThemeIsland(
 ) {
     val s = nexiraStrings()
 
+    // Each row takes its gap itself rather than from the column's spacing, so a slot whose
+    // controls are absent takes none, the first one included.
+    val gap = Modifier.childGap(ROW_GAP, Orientation.Vertical)
     NxSurface(SurfaceKind.Panel, modifier) {
         Column(
-            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+            Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp).withoutLeadingGap(ROW_GAP, Orientation.Vertical),
         ) {
-            SlotRenderer(SurfaceId(BG_SETTINGS_SURFACE), SlotId("theme"), spacing = 16.dp)
+            SlotRenderer(SurfaceId(BG_SETTINGS_SURFACE), SlotId("theme"), gap, spacing = ROW_GAP)
 
             // A backdrop filter is recomputed every frame by construction, so the
             // one place it can be spent or saved is here rather than per surface.
             NxToggle(
                 label           = s.text("settingsSurfaceBlur"),
                 checked         = surfaceBlur,
+                modifier        = gap,
                 description     = s.text("settingsSurfaceBlurDesc"),
                 icon            = NxIcon.Layers,
                 accent          = NxColor.lead(),
@@ -58,15 +63,19 @@ internal fun AppearanceThemeIsland(
             NxToggle(
                 label           = s.text("settingsReduceMotion"),
                 checked         = reduceMotion,
+                modifier        = gap,
                 description     = s.text("settingsReduceMotionDesc"),
                 icon            = NxIcon.Speed,
                 accent          = NxColor.lead(),
                 onCheckedChange = onReduceMotionChanged,
             )
 
-            ModuleEffectRows()
+            ModuleEffectRows(gap)
 
-            SlotRenderer(SurfaceId(BG_SETTINGS_SURFACE), SlotId("theme.link"))
+            SlotRenderer(SurfaceId(BG_SETTINGS_SURFACE), SlotId("theme.link"), gap)
         }
     }
 }
+
+/** The gap between the island's rows, and between the controls in its theme slot. */
+private val ROW_GAP = 16.dp

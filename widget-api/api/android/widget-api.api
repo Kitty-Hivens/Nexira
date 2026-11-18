@@ -210,6 +210,7 @@ public final class hivens/widget/api/LevelServicesHost$DefaultImpls {
 public final class hivens/widget/api/LocalsKt {
 	public static final fun getLocalEmptySlotDecorator ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalGridGeometry ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun getLocalHiddenWidget ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalLayoutGraph ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalMapControls ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalMapPanOnPrimary ()Landroidx/compose/runtime/ProvidableCompositionLocal;
@@ -639,6 +640,8 @@ public final class hivens/widget/api/ShadowedKind {
 public final class hivens/widget/api/SlotRendererKt {
 	public static final fun SlotRenderer-QuK5e7E (Ljava/lang/String;Ljava/lang/String;Landroidx/compose/ui/Modifier;FLandroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
 	public static final fun SlotRenderer-smahavU (Lhivens/widget/model/WidgetInstance;Ljava/lang/String;Landroidx/compose/ui/Modifier;FLandroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
+	public static final fun childGap-lG28NQ4 (Landroidx/compose/ui/Modifier;FLandroidx/compose/foundation/gestures/Orientation;)Landroidx/compose/ui/Modifier;
+	public static final fun withoutLeadingGap-lG28NQ4 (Landroidx/compose/ui/Modifier;FLandroidx/compose/foundation/gestures/Orientation;)Landroidx/compose/ui/Modifier;
 }
 
 public final class hivens/widget/api/SurfaceFamilies {
@@ -773,6 +776,7 @@ public abstract interface class hivens/widget/api/WidgetDescriptor {
 	public fun getPropsSerializer ()Lkotlinx/serialization/KSerializer;
 	public fun getProvides ()Ljava/util/Set;
 	public abstract fun getRemovable ()Z
+	public fun getShownWhen ()Ljava/lang/String;
 	public fun getSizing ()Lhivens/widget/model/WidgetSizing;
 	public fun getSlots ()Ljava/util/List;
 }
@@ -786,6 +790,7 @@ public final class hivens/widget/api/WidgetDescriptor$DefaultImpls {
 	public static fun getNeeds (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/List;
 	public static fun getPropsSerializer (Lhivens/widget/api/WidgetDescriptor;)Lkotlinx/serialization/KSerializer;
 	public static fun getProvides (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/Set;
+	public static fun getShownWhen (Lhivens/widget/api/WidgetDescriptor;)Ljava/lang/String;
 	public static fun getSizing (Lhivens/widget/api/WidgetDescriptor;)Lhivens/widget/model/WidgetSizing;
 	public static fun getSlots (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/List;
 }
@@ -837,6 +842,7 @@ public final class hivens/widget/api/WidgetScopeHelpersKt {
 	public static final fun ProvideSamples (Ljava/util/List;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun ProvideScoped (Lhivens/widget/model/SourceKey;Ljava/lang/Object;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 	public static final fun ProvideScopedCommand (Lhivens/widget/model/CommandKey;Lhivens/widget/model/WidgetCommand;Lkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun conditionHolds (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)Z
 	public static final fun hasSamples (Lhivens/widget/api/WidgetScope;Ljava/util/List;)Z
 	public static final fun missingNeeds (Ljava/util/List;Landroidx/compose/runtime/Composer;I)Ljava/util/List;
 	public static final fun rememberChildScope (Lhivens/widget/api/WidgetScope;Lhivens/widget/model/ScopeLevel;Landroidx/compose/runtime/Composer;I)Lhivens/widget/api/WidgetScope;
@@ -844,6 +850,7 @@ public final class hivens/widget/api/WidgetScopeHelpersKt {
 	public static final fun rememberScopedAction (Lhivens/widget/model/CommandKey;Landroidx/compose/runtime/Composer;I)Lkotlin/jvm/functions/Function0;
 	public static final fun rememberScopedCommand (Lhivens/widget/model/CommandKey;Landroidx/compose/runtime/Composer;I)Lkotlin/jvm/functions/Function1;
 	public static final fun rememberScopedSource (Lhivens/widget/model/SourceKey;Landroidx/compose/runtime/Composer;I)Lhivens/widget/api/ScopedSource;
+	public static final fun shownHere (Lhivens/widget/api/WidgetDescriptor;Landroidx/compose/runtime/Composer;I)Z
 	public static final fun valueOrNull (Lhivens/widget/api/ScopedSource;)Ljava/lang/Object;
 }
 

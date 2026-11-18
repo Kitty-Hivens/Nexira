@@ -42,10 +42,10 @@ import hivens.widget.model.Widget
     drawsOwnSurface = true,
     enter = "none",
     needs = [ThemesKeys.ACTIVE_ID, "theme.picker.selection"],
+    shownWhen = NX_DRAWING_ID,
 )
 @Composable
 fun ThemePickerHeaderWidget() {
-    if (!nxDrawsColour()) return
     val active = rememberScopedSource(ThemesKeys.Active).valueOrNull() ?: return
     val selection = rememberScopedSource(ThemeSelectionSource).valueOrNull() ?: return
     val s = strings(ColourNxControls.ID)

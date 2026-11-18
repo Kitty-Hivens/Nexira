@@ -66,10 +66,10 @@ import hivens.widget.model.Widget
     minWidth = 260, minHeight = 220,
     maxWidth = 960, maxHeight = 1600,
     needs = [ThemesKeys.OFFERED_ID, ThemesKeys.ACTIVE_ID, ThemesKeys.DARK_ID, "theme.picker.selection"],
+    shownWhen = NX_DRAWING_ID,
 )
 @Composable
 fun ThemePickerGridWidget() {
-    if (!nxDrawsColour()) return
     val themes = rememberScopedSource(ThemesKeys.Offered).valueOrNull() ?: return
     val active = rememberScopedSource(ThemesKeys.Active).valueOrNull() ?: return
     val dark = rememberScopedSource(ThemesKeys.Dark).valueOrNull() ?: return

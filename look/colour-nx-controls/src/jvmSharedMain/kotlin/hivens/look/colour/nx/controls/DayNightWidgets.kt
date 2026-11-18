@@ -46,21 +46,20 @@ import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 
 // The switches that steer the nx colour provider, each a widget a layout places where the host
-// leaves a slot for it. Each draws nothing while nx does not draw the colour, and nothing where the
-// themes module's key it shows has no answer, since a switch that steers nothing is clutter. None
-// declares the themes module's keys as its needs for the same reason: a need with no answer draws the
-// misplaced placeholder, where these are to be absent. Already there when their page opens, as the
-// rows around them are.
+// leaves a slot for it. Each is shown under NX_DRAWING_ID, so a slot does not place it while nx does
+// not draw the colour, and each draws nothing where the themes module's key it shows has no answer,
+// since a switch that steers nothing is clutter. None declares the themes module's keys as its needs
+// for the same reason: a need with no answer draws the misplaced placeholder, where these are to be
+// absent. Already there when their page opens, as the rows around them are.
 
 /** The config the picker link shows: the theme picker's. */
 private const val PICKER_CONFIG = "theme.picker"
 
 // Day or night by the person's own hand, which hands what decides it back to the manual mode. The
 // puppet id is the one the settings screen had, kept so a driver finds the switch where it was.
-@Widget(id = "theme.daynight", displayName = "widget.theme.daynight", enter = "none")
+@Widget(id = "theme.daynight", displayName = "widget.theme.daynight", enter = "none", shownWhen = NX_DRAWING_ID)
 @Composable
 fun DayNightWidget() {
-    if (!nxDrawsColour()) return
     val dark = rememberScopedSource(ThemesKeys.Dark).valueOrNull() ?: return
     val setDark = rememberScopedCommand(ThemesKeys.SetDark)
     val s = strings(ColourNxControls.ID)
@@ -77,10 +76,9 @@ fun DayNightWidget() {
 
 // A theme without a light scheme stays dark in light mode rather than having one invented for it,
 // so this says why the switch changed nothing. Nothing at all for a theme that has one.
-@Widget(id = "theme.darkonly", displayName = "widget.theme.darkonly", enter = "none")
+@Widget(id = "theme.darkonly", displayName = "widget.theme.darkonly", enter = "none", shownWhen = NX_DRAWING_ID)
 @Composable
 fun DarkOnlyWidget() {
-    if (!nxDrawsColour()) return
     val active = rememberScopedSource(ThemesKeys.Active).valueOrNull() ?: return
     if (active.hasLight) return
     Text(
@@ -93,10 +91,9 @@ fun DarkOnlyWidget() {
 // What decides day and night: the person's hand, the system's scheme where the host can read one,
 // or the wallpaper's brightness. Following the system is offered, and greyed out with a line saying
 // why, where the system's scheme cannot be read.
-@Widget(id = "theme.mode", displayName = "widget.theme.mode", enter = "none")
+@Widget(id = "theme.mode", displayName = "widget.theme.mode", enter = "none", shownWhen = NX_DRAWING_ID)
 @Composable
 fun ThemeModeWidget() {
-    if (!nxDrawsColour()) return
     val mode = rememberScopedSource(ThemesKeys.Mode).valueOrNull() ?: return
     val systemAvailable = rememberScopedSource(ThemesKeys.SystemSchemeAvailable).valueOrNull() ?: false
     val setMode = rememberScopedCommand(ThemesKeys.SetMode) ?: {}
@@ -133,10 +130,9 @@ fun ThemeModeWidget() {
 
 // The way to the theme picker, which shows its config in the composition this is drawn in. The puppet
 // id is the one the settings screen had.
-@Widget(id = "theme.picker.link", displayName = "widget.theme.picker.link", enter = "none")
+@Widget(id = "theme.picker.link", displayName = "widget.theme.picker.link", enter = "none", shownWhen = NX_DRAWING_ID)
 @Composable
 fun ThemePickerLinkWidget() {
-    if (!nxDrawsColour()) return
     val show = rememberScopedCommand(CompositionKeys.ShowConfig)
     val s = strings(ColourNxControls.ID)
     val open: () -> Unit = { show?.invoke(PICKER_CONFIG) }

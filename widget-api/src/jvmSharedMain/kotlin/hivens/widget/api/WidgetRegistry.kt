@@ -83,6 +83,14 @@ interface WidgetDescriptor {
     val needs: List<String>
         get() = emptyList()
 
+    // The id of the Boolean source this widget is shown under, or null for one shown
+    // wherever it stands. Populated by the KSP processor from @Widget(shownWhen = ...).
+    // Where the source answers false or nothing answers it, a slot leaves the widget out
+    // altogether, and draws [LocalHiddenWidget] in its place while somebody arranges.
+    // See [shownHere].
+    val shownWhen: String?
+        get() = null
+
     @Composable
     fun Render(instance: WidgetInstance)
 }

@@ -108,10 +108,12 @@ import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.Severity
 import hivens.ui.theme.OnFill
+import hivens.ui.widgets.HiddenWidget
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.widget.api.EmptySlotDecorator
 import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalFamilyOverrides
+import hivens.widget.api.LocalHiddenWidget
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalPlacementReflow
 import hivens.widget.api.LocalMapPanOnPrimary
@@ -669,6 +671,10 @@ fun EditorSurfaceHost(
         LocalSlotBoundsReporter provides slotBoundsReporter,
         LocalSlotBoundsWithdrawal provides slotBoundsWithdrawal,
         LocalRefusedMount provides refusedMount,
+        // A widget whose show condition does not hold is left out of its slot, except
+        // while arranging, on every surface, so it can be found where it stands. Preview
+        // shows the real look, which leaves it out.
+        LocalHiddenWidget provides if (state is EditModeState.On && !previewing) HiddenWidget else null,
         // A press on empty map selects the slot while arranging; the middle button
         // moves the map then.
         LocalMapPanOnPrimary provides !(state is EditModeState.On && !previewing),

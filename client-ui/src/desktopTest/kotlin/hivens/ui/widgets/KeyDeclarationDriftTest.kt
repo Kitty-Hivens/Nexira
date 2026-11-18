@@ -20,6 +20,7 @@ import hivens.ui.uiDataRegistry
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.KeyDeclaration
+import hivens.widget.api.KeyKind
 import hivens.widget.api.KeyOrigin
 import hivens.widget.api.flowSource
 import hivens.widget.generated.GeneratedWidgetRegistry
@@ -71,6 +72,16 @@ class KeyDeclarationDriftTest {
             descriptor.needs.filter { declarationOf(it) == null }.map { "${descriptor.kind.value} needs '$it'" }
         }
         assertEquals(emptyList(), unknown, "these widgets would be kept off every surface and drawn as misplaced everywhere")
+    }
+
+    @Test
+    fun `every show condition of every widget the build carries names a source the launcher declares`() {
+        val widgets = GeneratedWidgetRegistry.all().values + CompiledModules.flatMap { it.widgets.all().values }
+        val unknown = widgets.mapNotNull { descriptor ->
+            val condition = descriptor.shownWhen ?: return@mapNotNull null
+            "${descriptor.kind.value} is shown under '$condition'".takeIf { declarationOf(condition)?.kind != KeyKind.Source }
+        }
+        assertEquals(emptyList(), unknown, "these widgets would be hidden on every surface")
     }
 
     @Test

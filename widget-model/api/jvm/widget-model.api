@@ -980,6 +980,7 @@ public abstract interface annotation class hivens/widget/model/Widget : java/lan
 	public abstract fun prefWidth ()I
 	public abstract fun propsClass ()Ljava/lang/Class;
 	public abstract fun removable ()Z
+	public abstract fun shownWhen ()Ljava/lang/String;
 	public abstract fun slots ()[Ljava/lang/String;
 	public abstract fun surface ()Ljava/lang/String;
 }

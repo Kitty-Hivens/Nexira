@@ -7,10 +7,11 @@ plugins {
 }
 
 // The UI that steers the nx colour provider: the day and night switch, what decides dark and light,
-// the theme picker and its previews. Widgets only, which fire the provider's own commands and read
-// its own sources, and read the look's state only to ask whether nx draws the colour, hiding
-// themselves where it does not. Compiled into the application, which draws the widgets by kind and
-// names nothing of this module but its CompiledModule. Nothing compiles against it, so it has no API.
+// the theme picker and its previews. Widgets, which fire the provider's own commands and read its
+// own sources, and one source of its own, read off the look's state: whether nx draws the colour,
+// which every widget is shown under, so a slot leaves it out where nx does not draw. Compiled into
+// the application, which draws the widgets by kind and names nothing of this module but its
+// CompiledModule. Nothing compiles against it, so it has no API.
 kotlin.sourceSets.named("jvmSharedMain") {
     dependencies {
         implementation(project(":look:colour-nx-api"))

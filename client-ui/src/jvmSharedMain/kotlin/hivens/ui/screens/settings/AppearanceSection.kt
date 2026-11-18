@@ -1,6 +1,7 @@
 package hivens.ui.screens.settings
 
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,6 +43,7 @@ import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
 import hivens.widget.api.SlotRenderer
+import hivens.widget.api.childGap
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 
@@ -76,7 +78,11 @@ internal fun AppearanceSection(
     var langShown by remember { mutableStateOf(false) }
     val langTurn by animateFloatAsState(if (langExpanded) 180f else 0f, animationSpec = Motion.tap, label = "langChevron")
 
-    NxSection(s.text("settingsSectionUI")) {
+    // The rows take their gap themselves rather than from the section's spacing, so a slot
+    // whose controls are absent takes none. The language row is always there and starts the
+    // section, so it takes none either.
+    val gap = Modifier.childGap(INTERFACE_ROW_GAP, Orientation.Vertical)
+    NxSection(s.text("settingsSectionUI"), spacing = 0.dp) {
         // Language. The whole row opens the picker; the trailing shows the
         // current language and hosts the menu. A PuppetClick per language, by tag,
         // lets a driver switch without opening the menu first.
@@ -120,11 +126,12 @@ internal fun AppearanceSection(
             },
         )
 
-        SlotRenderer(SurfaceId(APPEARANCE_SURFACE), SlotId("theme.link"))
+        SlotRenderer(SurfaceId(APPEARANCE_SURFACE), SlotId("theme.link"), gap)
 
         // Custom background shortcut.
         PuppetClick("settings.openBackground") { onOpenBackgroundSettings() }
         NxRow(
+            modifier = gap,
             title    = s.text("settingsBackground"),
             subtitle = s.text("settingsBackgroundSub"),
             icon     = NxIcon.Wallpaper,
@@ -133,7 +140,7 @@ internal fun AppearanceSection(
             trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxColor.lead()) },
         )
 
-        SlotRenderer(SurfaceId(APPEARANCE_SURFACE), SlotId("theme.daynight"))
+        SlotRenderer(SurfaceId(APPEARANCE_SURFACE), SlotId("theme.daynight"), gap)
 
         // Window chrome. `undecorated` is fixed when the window is created, so the flip
         // lands at the next launch and the row says so rather than looking inert. Where
@@ -146,12 +153,14 @@ internal fun AppearanceSection(
         NxToggle(
             label       = s.text("settingsCustomChrome"),
             checked     = shownChecked(form.useCustomChrome, customChromeAvailable),
+            modifier    = gap,
             description = s.text("settingsCustomChromeDesc"),
             icon        = NxIcon.Computer,
             enabled     = customChromeAvailable,
         ) { form.useCustomChrome = it; save() }
         if (!customChromeAvailable) {
             Text(
+                modifier = gap,
                 text  = if (host.customChromeSupported) s.text("settingsCustomChromeTiling") else s.text("settingsUnsupportedHere"),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet,
@@ -220,3 +229,6 @@ internal fun PickerBlock(
 
 /** The surface whose slots this section leaves for the colour provider's controls. */
 private const val APPEARANCE_SURFACE = "settings.appearance"
+
+/** The gap between the rows of the Interface section, the section's own default spacing. */
+private val INTERFACE_ROW_GAP = 12.dp

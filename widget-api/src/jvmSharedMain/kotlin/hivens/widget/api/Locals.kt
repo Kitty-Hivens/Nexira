@@ -135,6 +135,21 @@ typealias MisplacedWidgetDecorator = @Composable (descriptor: WidgetDescriptor, 
 val LocalMisplacedWidget: ProvidableCompositionLocal<MisplacedWidgetDecorator> =
     staticCompositionLocalOf { { _, _, _ -> } }
 
+/**
+ * Drawn by the slot renderer for a widget whose show condition does not hold where it
+ * stands ([WidgetDescriptor.shownWhen]), with [content] the widget as it would draw.
+ *
+ * Null, the default and what anybody not arranging has, leaves such a widget out of its
+ * slot altogether: it is not placed, so it takes no gap, no cell of a grid and no share
+ * of a line. The editor provides one while arranging, which draws the widget dimmed and
+ * says why it is hidden, so it can still be found, moved and removed. Static, since it
+ * changes only when editing starts or ends.
+ */
+typealias HiddenWidgetDecorator = @Composable (descriptor: WidgetDescriptor, instance: WidgetInstance, content: @Composable () -> Unit) -> Unit
+
+val LocalHiddenWidget: ProvidableCompositionLocal<HiddenWidgetDecorator?> =
+    staticCompositionLocalOf { null }
+
 // Phase G / Tier 2: a zero-footprint Modifier the editor applies to each slot's
 // flow root (and the empty Box). It lets the editor highlight the slot, select it,
 // and open its orientation menu WITHOUT being a layout child -- the old in-flow
