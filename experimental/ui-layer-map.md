@@ -1,5 +1,9 @@
 # The UI layer, as it actually is
 
+Since this was written, the Brut style and the `StyleSpec` it lived in, the neon presets
+and Lotus Dark were removed, and the themes became the nx colour provider under `look/`.
+Read the passages that name them as a record of `63b6f097`, not of the tree today.
+
 Written from the code at `63b6f097`. The purpose is the modular work ahead: before
 anything can be contributed from outside, what the launcher's own UI is made of has
 to be written down, including the parts that do not fit the story the kernel tells
