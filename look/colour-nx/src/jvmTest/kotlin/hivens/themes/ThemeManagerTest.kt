@@ -5,7 +5,6 @@ import hivens.i18n.api.LanguageInfo
 import hivens.i18n.api.Strings
 import hivens.i18n.api.Translations
 import hivens.i18n.api.Translator
-import hivens.themes.api.SystemScheme
 import hivens.themes.api.ThemeContribution
 import hivens.themes.api.ThemeMode
 import hivens.themes.api.ThemeScheme

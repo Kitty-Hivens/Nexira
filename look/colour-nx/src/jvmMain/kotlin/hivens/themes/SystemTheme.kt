@@ -1,4 +1,4 @@
-package hivens.ui.theme
+package hivens.themes
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -16,8 +16,8 @@ import kotlin.time.Duration.Companion.milliseconds
 private val log = LoggerFactory.getLogger("SystemTheme")
 
 /**
- * Reads the OS colour scheme -- the Rule 7 "system colour-scheme listener feeding
- * NxTheme". One-shot subprocess probes, no daemons and no native bindings:
+ * Reads the desktop's colour scheme, which the themes module follows in the system mode.
+ * One-shot subprocess probes, no daemons and no native bindings:
  *
  *  - Linux: the XDG desktop portal `Settings.Read` of `org.freedesktop.appearance`
  *    `color-scheme` via `gdbus`, falling back to `busctl`. The legacy `Read` call
@@ -32,7 +32,7 @@ private val log = LoggerFactory.getLogger("SystemTheme")
  * backend, no-preference answer, missing binaries, timeout). Callers surface the
  * null as an unavailable capability, not an error.
  */
-object SystemTheme {
+internal object SystemTheme : SystemSchemeReader {
 
     private const val PROBE_TIMEOUT_SECONDS = 4L
 
@@ -41,7 +41,7 @@ object SystemTheme {
         return os.contains("nux") || os.contains("nix")
     }
 
-    suspend fun probe(): Boolean? = withContext(Dispatchers.IO) {
+    override suspend fun probe(): Boolean? = withContext(Dispatchers.IO) {
         val os = System.getProperty("os.name").orEmpty().lowercase()
         when {
             os.contains("win")                      -> probeWindows()
@@ -55,11 +55,14 @@ object SystemTheme {
      * The OS scheme as a cold flow, live only while collected (= while the System
      * theme mode is active). One [probe] up front; then on Linux the portal's
      * `SettingChanged` signal via a `gdbus monitor` subprocess -- an OS flip lands
-     * instantly. Polling every [pollMs] is the fallback: Windows/macOS have no
+     * instantly. Polling every five seconds is the fallback: Windows/macOS have no
      * subprocess signal, and a monitor that cannot start (no gdbus) or dies
      * (portal restart) falls through to it after a re-sync probe.
      */
-    fun observe(pollMs: Long = 5_000): Flow<Boolean?> = flow {
+    override fun observe(): Flow<Boolean?> = observe(pollMs = 5_000)
+
+    /** [observe], polling every [pollMs] where there is no signal to listen to. */
+    fun observe(pollMs: Long): Flow<Boolean?> = flow {
         emit(probe())
         if (isLinux()) {
             emitAll(portalSignalFlow())

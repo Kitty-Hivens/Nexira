@@ -91,6 +91,15 @@ object ThemesSettingsDomain : SettingsDomain<ThemeSettings>("themes", ThemeSetti
 
     override fun defaults(): ThemeSettings = ThemeSettings()
 
+    /**
+     * Dark, by the person's own switch rather than [ThemeMode.System], which would hand the first window
+     * to the desktop. A launcher is opened to start a game, most often in the evening, and the light
+     * scheme a stock Windows still ships with would otherwise put a white screen in front of that.
+     * Following the system stays one click away and is kept once chosen: this only decides which way
+     * the very first window opens.
+     */
+    override fun firstRun(): ThemeSettings = defaults().copy(mode = ThemeMode.Manual, dark = true)
+
     override fun imported(legacy: JsonObject, current: ThemeSettings?): ThemeSettings? {
         val dark = (legacy[DARK] as? JsonPrimitive)?.booleanOrNull
         val mode = (legacy[MODE] as? JsonPrimitive)?.contentOrNull
@@ -112,8 +121,7 @@ object ThemesSettingsDomain : SettingsDomain<ThemeSettings>("themes", ThemeSetti
 
 /**
  * The keys in [ThemesKeys], answered over the module's own manager, and [ThemeInputs], kept for the
- * host and the modules compiled into it: what the wallpaper and the system's scheme say is the host's
- * to tell, and no jar's.
+ * host and the modules compiled into it: what the wallpaper shows is the host's to tell, and no jar's.
  */
 object ThemesKeysContribution : KeyContribution {
     override val id: String = "themes.keys"
@@ -141,7 +149,11 @@ object ThemesKeysContribution : KeyContribution {
  * directory, written where the host writes. It names the themes modules bring in the words of the
  * language module where the document brings one in and it could start, and by their keys where not. A
  * theme file a newer build wrote is told to the host as the manager opens, under this module's own
- * word for it, so the person hears that what this session changes in it is not kept.
+ * word for it, so the person hears that what this session changes in it is not kept. From then on the
+ * manager follows the system's colour scheme, which the module reads itself ([followSystemScheme]).
+ *
+ * The look manager's first pass makes it as the launcher starts, by opening the colour provider
+ * ([NxColourProvider]), so the newer build's file is on record before the shell first looks.
  */
 private fun moduleManager(context: ServiceContext): ThemeManager {
     val files = context.hostServices.get<HostFiles>()
@@ -155,6 +167,7 @@ private fun moduleManager(context: ServiceContext): ThemeManager {
     ).also { manager ->
         if (manager.readOnly) files.newerBuild(files.dataDir.resolve(ThemeLibraryFile.FILE_NAME), ThemesApi.ID, ThemesModule.FILE)
         context.hostServices.find<TakenContributions>()?.let { taken -> manager.follow(taken.all, context.coroutineScope) }
+        followSystemScheme(manager, systemSchemeReader(context), context.coroutineScope)
     }
 }
 

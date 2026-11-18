@@ -121,8 +121,11 @@ private fun answerOf(
     return answered
 }
 
-/** The app sources and the settings domains a module declares, by id. */
-private class Owned(val sources: Set<String>, val domains: Set<String>) {
+/** The app sources and the settings domains a module declares: the sources by id, the domains as declared. */
+internal class Owned(val sources: Set<String>, val declared: List<SettingsDomain<*>>) {
+    /** The ids of [declared]. */
+    val domains: Set<String> get() = declared.mapTo(HashSet()) { it.id }
+
     companion object {
         /** What [contributions] declare, as their key contributions declare it to the host. */
         fun of(contributions: List<ModuleContribution>): Owned {
@@ -133,10 +136,10 @@ private class Owned(val sources: Set<String>, val domains: Set<String>) {
     }
 }
 
-/** Keeps the ids of the app sources and the settings domains declared into it, and nothing else. */
+/** Keeps the app sources declared into it by id and the settings domains as declared, and nothing else. */
 private class Recorder : ModuleKeys {
     val sources = HashSet<String>()
-    val domains = HashSet<String>()
+    val domains = ArrayList<SettingsDomain<*>>()
 
     override fun <T> source(key: SourceKey<T>, sample: (() -> T)?, factory: SourceFactory<T>) {
         if (key.level == ScopeLevel.App) sources += key.id
@@ -149,7 +152,7 @@ private class Recorder : ModuleKeys {
     override fun owned(key: CommandKey<*>) = Unit
 
     override fun <T : Any> settings(domain: SettingsDomain<T>, source: SourceKey<T>, update: CommandKey<SettingsChange<T>>) {
-        domains += domain.id
+        domains += domain
         if (source.level == ScopeLevel.App) sources += source.id
     }
 

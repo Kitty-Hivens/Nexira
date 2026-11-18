@@ -2,7 +2,6 @@ package hivens.themes
 
 import hivens.i18n.api.Translations
 import hivens.i18n.api.Translator
-import hivens.themes.api.SystemScheme
 import hivens.themes.api.ThemeContribution
 import hivens.themes.api.ThemeInputs
 import hivens.themes.api.ThemeMode
@@ -43,10 +42,10 @@ data class ThemeOpening(val theme: Theme, val dark: Boolean)
  * too, which only a build from before the theme file's second version writes. A file that could
  * not be written leaves the record as it was, and a choice made since stays the choice.
  *
- * The automatic sources of the dark flag are inputs only the host feeds in ([ThemeInputs]): the
- * wallpaper through [wallpaper] and the system's scheme through [systemScheme]. Only the source the
- * mode names is listened to, and a source that agrees with the current flag writes nothing (see
- * [darkThemeFor]).
+ * The automatic sources of the dark flag are the wallpaper, which only the host can tell through
+ * [wallpaper] ([ThemeInputs]), and the system's scheme, which the module reads itself and tells
+ * through [systemScheme] (see [followSystemScheme]). Only the source the mode names is listened to,
+ * and a source that agrees with the current flag writes nothing (see [darkThemeFor]).
  *
  * Themes modules bring come in through [contribute] and leave through [withdraw], which [follow]
  * calls as the modules brought in change. They are named
@@ -119,7 +118,7 @@ class ThemeManager(
 
     private val _systemSchemeAvailable = MutableStateFlow(false)
 
-    /** Whether the host can read the system's colour scheme, so following it can be offered. */
+    /** Whether the system's colour scheme can be read, so following it can be offered. */
     val systemSchemeAvailable: StateFlow<Boolean> = _systemSchemeAvailable.asStateFlow()
 
     /** Whether the theme file belongs to a newer build, so nothing is written to it this session. */
@@ -171,7 +170,7 @@ class ThemeManager(
     }
 
     /** What the system's scheme says. Decides [dark] in the system mode. */
-    override fun systemScheme(scheme: SystemScheme) {
+    fun systemScheme(scheme: SystemScheme) {
         _systemSchemeAvailable.value = scheme.readable
         follow { current -> darkThemeFor(current.mode, current.dark, systemDark = scheme.dark) }
     }

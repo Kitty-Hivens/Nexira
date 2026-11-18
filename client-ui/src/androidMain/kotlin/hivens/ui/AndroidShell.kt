@@ -3,7 +3,6 @@ package hivens.ui
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -40,9 +39,6 @@ import hivens.i18n.api.LocalTranslator
 import hivens.launcher.launch.LauncherController
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
-import hivens.themes.api.SystemScheme
-import hivens.themes.api.ThemeInputs
-import hivens.themes.api.ThemesKeys
 import hivens.ui.bootstrap.ShellStartup
 import hivens.ui.bootstrap.StartupPolicy
 import hivens.ui.chrome.EscapeAsBack
@@ -67,7 +63,6 @@ import hivens.ui.host.HostedWindow
 import hivens.ui.host.MainWindowNavigation
 import hivens.ui.host.WindowId
 import hivens.ui.host.WindowOwner
-import hivens.ui.host.launcherServices
 import hivens.ui.host.rememberActivityWindow
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.layers.Layer
@@ -180,10 +175,8 @@ private fun AndroidShellContent() {
 
     // How the launcher looks and speaks is the modules'. The shell draws in the look the manager
     // answers and with the words the language module answers at the app level, and with its
-    // fallbacks where the document brings no such module (see ShellLookValues). It tells the
-    // themes module the system's scheme through the inputs the module keeps for the host: a
-    // phone can always read it.
-    val themeMode = appLevel.readOrNull(ThemesKeys.Mode)
+    // fallbacks where the document brings no such module (see ShellLookValues). What decides the
+    // look, the system's colour scheme among it, the modules read themselves.
     val words = appLevel.read(ShellLookValues.Words)
 
     // The application makes the look on a thread of its own as the process starts, and the
@@ -196,13 +189,6 @@ private fun AndroidShellContent() {
             lookReady = true
         }
     }
-
-    // The manager listens to the source the mode names, so the scheme is handed over
-    // whenever it or the mode changes. AppRoot hands it what the wallpaper shows. Missing
-    // where the document brings no themes module: then nothing follows the system.
-    val inputs = remember(appLevel) { appLevel.launcherServices.find(ThemeInputs::class) }
-    val systemDark = isSystemInDarkTheme()
-    LaunchedEffect(themeMode, systemDark) { inputs?.systemScheme(SystemScheme(readable = true, dark = systemDark)) }
 
     LaunchedEffect(Unit) {
         val before = layoutGraphRepo.value()

@@ -46,6 +46,8 @@ package hivens.widget.api
  *    ([ModuleStrings.read]).
  *    A module compiled in brings widgets of its own ([CompiledModule.widgets]), and every
  *    composition answers the kernel's own keys for moving what it shows ([CompositionKeys]).
+ *    A settings domain may answer the value a launcher's first start opens on
+ *    ([SettingsDomain.firstRun]), which the host writes into the domain's file then.
  */
 object WidgetApi {
     const val VERSION: Int = 3

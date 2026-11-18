@@ -84,12 +84,12 @@ import hivens.packs.api.ReattachRequest
 import hivens.packs.toPackView
 import hivens.packs.toView
 import hivens.test.stopThenDelete
+import hivens.themes.SystemScheme
 import hivens.themes.ThemeLibraryFile
 import hivens.themes.ThemeManager
 import hivens.themes.Themes
 import hivens.themes.ThemesModule
 import hivens.themes.ThemesSettingsDomain
-import hivens.themes.api.SystemScheme
 import hivens.themes.api.ThemeInputs
 import hivens.themes.api.ThemeMode
 import hivens.themes.api.ThemesApi
@@ -1286,8 +1286,9 @@ class CoreKeysTest {
         assertEquals("de", launcher.source(other, I18nKeys.Settings).language, "every composition reads the one choice")
         awaitTrue("the words follow it") { launcher.source(other, I18nKeys.Language).tag == "de" }
 
-        launcher.inputs.systemScheme(SystemScheme(readable = true, dark = false))
-        assertTrue(launcher.source(launcher.app, ThemesKeys.SystemSchemeAvailable))
+        assertFalse(launcher.source(launcher.app, ThemesKeys.SystemSchemeAvailable), "no test reads the system's scheme")
+        launcher.themes.systemScheme(SystemScheme(readable = true, dark = false))
+        assertTrue(launcher.source(launcher.app, ThemesKeys.SystemSchemeAvailable), "what the module reads of the system is offered")
 
         val saved = launcher.legacy()
         assertTrue(saved.isDarkTheme, "the old file holds the scheme for a build from before the move")
@@ -1323,7 +1324,7 @@ class CoreKeysTest {
     }
 
     @Test
-    fun `what the wallpaper and the system say is the host's to tell, and a jar cannot reach it`() {
+    fun `what the wallpaper shows is the host's to tell, and a jar cannot reach it`() {
         val launcher = Launcher()
         val reached = SourceKey<Boolean>("probe.themeInputs")
         val jar = object : KeyContribution {

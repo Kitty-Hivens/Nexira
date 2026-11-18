@@ -10,7 +10,7 @@ plugins {
 
 // What another module compiles against to read which theme the launcher is drawn in and
 // to change it: the themes module's keys and settings, the theme a module brings, and the
-// inputs the host feeds the choice of dark and light with. A theme itself is the design
+// input the host feeds the wallpaper's tone through. A theme itself is the design
 // system's, so its type comes from :nx-ui, and the widget kernel carries the keys. The
 // module that answers is :look:colour-nx.
 kotlin {

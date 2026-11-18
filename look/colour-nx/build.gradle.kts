@@ -15,7 +15,9 @@ plugins {
 // where all of that is kept. It answers the keys :look:colour-nx-api names. Compiled into the
 // application. The module makes its manager itself, from the host's data directory, and
 // answers the theme the window the launcher boots in is drawn in before the host is up,
-// worked out from the same files.
+// worked out from the same files. It reads the system's colour scheme itself, for the mode that
+// follows it: on a desktop by asking the system's own tools (jvmMain), on a phone from the
+// configuration of the application, whose context the host hands it (androidMain).
 //
 // It is also the look's nx provider of colour: it answers the colour axis of :look:colour-api
 // from the theme in use, before the boot from the same files and once the host is up from its

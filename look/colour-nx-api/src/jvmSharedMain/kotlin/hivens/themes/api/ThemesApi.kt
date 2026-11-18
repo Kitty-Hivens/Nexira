@@ -23,7 +23,10 @@ object ThemesApi {
      * The version of this API. A minor step only adds. A major step removes or changes
      * a key or a value type.
      *
-     * 1.1 adds [COLOUR_FAMILY] and [ThemePreview].
+     * 1.1 adds [COLOUR_FAMILY] and [ThemePreview]. It also drops `SystemScheme` and
+     * `ThemeInputs.systemScheme`, through which the host told the module the system's colour
+     * scheme, since the module reads the scheme itself. That breaks no jar: [ThemeInputs] is a
+     * host service, which no jar reaches, and `SystemScheme` was only ever handed to it.
      *
      * The module builds stamp their manifests from the `nexira.themesApi` Gradle property,
      * which a test holds equal to this.

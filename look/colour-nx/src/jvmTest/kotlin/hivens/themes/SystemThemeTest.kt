@@ -1,4 +1,4 @@
-package hivens.ui.theme
+package hivens.themes
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

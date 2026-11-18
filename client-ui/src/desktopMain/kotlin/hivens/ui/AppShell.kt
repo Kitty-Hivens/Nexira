@@ -36,10 +36,6 @@ import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.platform.AppRelauncher
 import hivens.launcher.update.ApplyRecovery
 import hivens.launcher.update.PackAutoUpdateService
-import hivens.themes.api.SystemScheme
-import hivens.themes.api.ThemeInputs
-import hivens.themes.api.ThemeMode
-import hivens.themes.api.ThemesKeys
 import hivens.tray.TrayController
 import hivens.tray.TrayStrings
 import hivens.ui.bootstrap.ShellStartup
@@ -87,7 +83,6 @@ import hivens.ui.host.WindowCommand
 import hivens.ui.host.WindowId
 import hivens.ui.host.WindowOwner
 import hivens.ui.host.WindowRegistry
-import hivens.ui.host.launcherServices
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
@@ -105,7 +100,6 @@ import hivens.ui.system.SystemNotifier
 import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.SystemTheme
 import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.nexiraCjkFamily
 import hivens.ui.theme.rememberThemeReveal
@@ -362,33 +356,9 @@ private fun FrameWindowScope.ShellContent(
 
     // How the launcher looks and speaks is the modules'. The shell draws in the look the manager
     // answers and with the words the language module answers at the app level, and with its
-    // fallbacks where the document brings no such module (see ShellLookValues). It tells the
-    // themes module what only a host can see, through the inputs the module keeps for the host:
-    // whether the system's scheme can be read, and what it says. The wallpaper is told by AppRoot.
-    // The mode is read here, during the first composition, which also has the themes module make
-    // its manager, and put a theme file from a newer build on record, before the read-only notice
-    // below looks.
-    val themeMode = appLevel.readOrNull(ThemesKeys.Mode)
+    // fallbacks where the document brings no such module (see ShellLookValues). What decides the
+    // look, the system's colour scheme among it, the modules read themselves.
     val words = appLevel.read(ShellLookValues.Words)
-    // Missing where the document brings no themes module: then nothing follows the system.
-    val inputs = remember(appLevel) { appLevel.launcherServices.find(ThemeInputs::class) }
-    // Whether the OS scheme is readable at all (no portal backend on Linux -> no).
-    // Probed once, and said with what it read. It drives the System chip's enabled
-    // state in the theme island.
-    var schemeReadable by remember { mutableStateOf<Boolean?>(null) }
-    LaunchedEffect(Unit) {
-        val probed = withContext(Dispatchers.IO) { SystemTheme.probe() }
-        schemeReadable = probed != null
-        inputs?.systemScheme(SystemScheme(readable = probed != null, dark = probed))
-    }
-    // System mode: follow the OS scheme while the mode is active -- the cold flow
-    // (portal signal on Linux, polling fallback) runs only while collected, so the
-    // other modes cost nothing.
-    LaunchedEffect(themeMode, schemeReadable) {
-        val readable = schemeReadable ?: return@LaunchedEffect
-        if (themeMode != ThemeMode.System) return@LaunchedEffect
-        SystemTheme.observe().collect { dark -> inputs?.systemScheme(SystemScheme(readable = readable, dark = dark)) }
-    }
 
     // The chaos engine is a plain singleton rather than a composable, so it is
     // told what the interface looks like rather than reading it. Both values were

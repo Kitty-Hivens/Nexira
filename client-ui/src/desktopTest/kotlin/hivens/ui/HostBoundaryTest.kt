@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
  * the look's axes and packs among them, is where the build lists the modules compiled into it, by its
  * CompiledModule, the way every compiled module is listed there, and the one engine of the launcher's own words the host makes is the recovery
  * surface's floor, which has to speak when every module failed. No window is drawn with the themes module's keys: what of them the host
- * still names is listed file by file, with the step that takes it out.
+ * still names is listed file by file, with what takes it out.
  *
  * Read as text, since an import the compiler drops leaves no trace in what it builds. The text is read
  * the way the compiler would join it: names in backticks without them, dots spaced or not, and string
@@ -42,21 +42,15 @@ class HostBoundaryTest {
 
     /**
      * The host sources that still name the themes module's keys or inputs, each with what it names and
-     * the step of the look plan that takes it out. Nothing here is read to draw: every window draws in
-     * the look the manager answers. What is left is the nx colour provider's controller, still in the
-     * host, and the inputs the host feeds it. The controls of the nx colour provider are a module of
-     * their own, which the host draws by widget kind in the slots it leaves for them.
+     * what takes it out. Nothing here is read to draw: every window draws in the look the manager
+     * answers, the module reads the system's colour scheme itself, and a first start's values are each
+     * settings domain's own. What is left is the one input the host feeds it. The controls of the nx
+     * colour provider are a module of their own, which the host draws by widget kind in the slots it
+     * leaves for them.
      */
     private val themesAllowances: Map<String, Set<String>> = mapOf(
-        // The system's scheme, probed by the host and fed to the module: step 8 moves the probe into the module.
-        "hivens/ui/AppShell.kt" to setOf("ThemesKeys.Mode", "ThemeInputs", "SystemScheme", "ThemeMode"),
-        "hivens/ui/AndroidShell.kt" to setOf("ThemesKeys.Mode", "ThemeInputs", "SystemScheme"),
         // The tone of the wallpaper, fed by the host until the background is a widget module of its own.
         "hivens/ui/AppRoot.kt" to setOf("ThemeInputs"),
-        // The first start's mode, written into the former settings file for the module to take. A
-        // first-launch value of a settings domain's own, beside step 8's boot work of the themes module,
-        // takes it out, together with the language module's first-start language.
-        "hivens/ui/bootstrap/FirstRunDefaults.kt" to setOf("ThemeMode"),
     )
 
     /** Every name of the themes module's keys and inputs [line] holds, a key by its member where it names one. */
@@ -129,7 +123,10 @@ class HostBoundaryTest {
         }
         assertEquals(1, findings("hivens/ui/Somewhere.kt", "val dark = app.read(ThemesKeys.Dark)").size)
         assertEquals(1, findings("hivens/ui/AppShell.kt", "val dark = app.read(ThemesKeys.Dark)").size, "a shell may not read the dark flag")
-        assertEquals(emptyList(), findings("hivens/ui/AppShell.kt", "val mode = app.readOrNull(ThemesKeys.Mode)"))
+        assertEquals(1, findings("hivens/ui/AppShell.kt", "val mode = app.readOrNull(ThemesKeys.Mode)").size, "nor the mode, which the module follows the system by itself")
+        assertEquals(1, findings("hivens/ui/AndroidShell.kt", "inputs?.systemScheme(SystemScheme(readable = true, dark = dark))").size, "nor tell the module the system's scheme")
+        assertEquals(1, findings("hivens/ui/bootstrap/FirstRunDefaults.kt", "themeMode = ThemeMode.Manual.name").size, "nor name a first start's mode")
+        assertEquals(emptyList(), findings("hivens/ui/AppRoot.kt", "val inputs = remember(level) { level?.launcherServices?.find(ThemeInputs::class) }"))
         assertEquals(emptyList(), findings("hivens/ui/Somewhere.kt", " * the keys are in `hivens.themes.api.ThemesKeys`"), "a comment naming the keys is not a read")
     }
 

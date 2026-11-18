@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
  * What decides whether the launcher is drawn dark or light. Exactly one is in charge:
  *
  * - [Manual]: the person's own day and night switch.
- * - [System]: the system's colour scheme, where the host can read one.
+ * - [System]: the system's colour scheme, where it can be read.
  * - [Wallpaper]: the wallpaper's average brightness.
  *
  * Choosing day or night by hand while [System] or [Wallpaper] is in charge hands the
@@ -48,17 +48,10 @@ data class ThemeSettings(
 )
 
 /**
- * What the host reads of the system's colour scheme. [readable] says whether it can read
- * one at all, which decides whether following the system is offered. [dark] is what the
- * scheme says now, null where it cannot tell at the moment.
- */
-data class SystemScheme(val readable: Boolean, val dark: Boolean? = null)
-
-/**
- * What only the host feeds the themes module: what the wallpaper shows and what the system's
- * scheme says. A service the module keeps for the host and the modules compiled into it,
- * reached through the host's view of a level, so no jar can fake the system's scheme or write
- * a wallpaper's colours into the person's files.
+ * What only the host feeds the themes module: what the wallpaper shows. A service the module
+ * keeps for the host and the modules compiled into it, reached through the host's view of a
+ * level, so no jar can write a wallpaper's colours into the person's files. The system's colour
+ * scheme is not among it: the module reads that itself.
  */
 interface ThemeInputs {
     /**
@@ -68,9 +61,6 @@ interface ThemeInputs {
      * [WallpaperTone.NONE] once there is none.
      */
     fun wallpaper(tone: WallpaperTone)
-
-    /** What the system's colour scheme says. Decides [ThemesKeys.Dark] in [ThemeMode.System]. */
-    fun systemScheme(scheme: SystemScheme)
 }
 
 /**
@@ -110,7 +100,7 @@ object ThemesKeys {
     /** What decides [Dark]. */
     val Mode = SourceKey<ThemeMode>(MODE_ID, ScopeLevel.App)
 
-    /** Whether the host can read the system's colour scheme, so following it can be offered. */
+    /** Whether the system's colour scheme can be read, so following it can be offered. */
     val SystemSchemeAvailable = SourceKey<Boolean>(SYSTEM_SCHEME_AVAILABLE_ID, ScopeLevel.App)
 
     /** Puts the theme of this id in use. */

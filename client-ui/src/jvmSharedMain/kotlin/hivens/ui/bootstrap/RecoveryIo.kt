@@ -128,19 +128,19 @@ object RecoveryIo {
      * desktop is not where a first launch would have put them either.
      *
      * The modules' own settings go with it, every domain's file under
-     * [Storage.SETTINGS_DIR]. A domain with no file reads what settings.json holds
-     * of it once more, so the language comes back as the first run would pick it.
+     * [Storage.SETTINGS_DIR], and each domain then gets what a first launch gives
+     * it, the language the machine speaks among them.
      */
     fun resetSettings(dataDir: Path) {
         val keep = readDisabledModules(dataDir)
-        val root = FirstRunDefaults.firstRunOverrides()
         writeSettings(
             dataDir,
-            if (keep.isEmpty()) root else JsonObject(root + ("disabledModules" to modulesArray(keep))),
+            if (keep.isEmpty()) JsonObject(emptyMap()) else JsonObject(mapOf("disabledModules" to modulesArray(keep))),
         )
         val _ = runCatching {
             Files.newDirectoryStream(dataDir.resolve(Storage.SETTINGS_DIR), "*.json").use { files -> files.forEach(::deleteQuietly) }
         }
+        val _ = runCatching { FirstRunDefaults.seedDomains(dataDir) }
     }
 
     /**

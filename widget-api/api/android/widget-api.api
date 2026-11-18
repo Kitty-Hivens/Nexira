@@ -600,6 +600,7 @@ public abstract class hivens/widget/api/SettingsDomain {
 	public static final field Companion Lhivens/widget/api/SettingsDomain$Companion;
 	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/KSerializer;)V
 	public abstract fun defaults ()Ljava/lang/Object;
+	public fun firstRun ()Ljava/lang/Object;
 	public final fun getId ()Ljava/lang/String;
 	public fun getSchema ()I
 	public final fun getSerializer ()Lkotlinx/serialization/KSerializer;
