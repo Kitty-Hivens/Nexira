@@ -1,11 +1,12 @@
 package hivens.ui.system
 
 import dev.hivens.libnotify.Notification
-import dev.hivens.libnotify.NotificationEvent
 import dev.hivens.libnotify.NotificationHandle
+import dev.hivens.libnotify.NotificationListener
 import dev.hivens.libnotify.Notifier
 import dev.hivens.libnotify.NotifierCapabilities
 import dev.hivens.libnotify.NotifierConfig
+import dev.hivens.libnotify.Subscription
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
@@ -25,10 +26,10 @@ class SystemNotifierLifecycleTest {
     private class FakeNotifier : Notifier {
         @Volatile var closed = false
         override val isOpen: Boolean get() = !closed
-        override val capabilities = NotifierCapabilities(false, 0, false, false, false, false, false)
+        override val capabilities = NotifierCapabilities.Builder().build()
         override fun notify(notification: Notification): NotificationHandle? = null
         override fun cancel(handle: NotificationHandle): Boolean = false
-        override fun onEvent(handler: (NotificationEvent) -> Unit): () -> Unit = {}
+        override fun onEvent(listener: NotificationListener): Subscription = Subscription { }
         override fun close() { closed = true }
     }
 
