@@ -12,7 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Density
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,7 +34,7 @@ class NxSteadyTextWidthTest {
     private fun widthOf(body: @Composable (Modifier) -> Unit): Int {
         var width = -1
         val scene = ImageComposeScene(400, 120, density = Density(2f)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.CenterStart) {
                     body(Modifier.onGloballyPositioned { width = it.size.width })
                 }

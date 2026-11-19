@@ -47,7 +47,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.decorativePair
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
@@ -398,7 +398,7 @@ class HomeConceptsProbe {
         val out = Path.of("build/render/home", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(1545, 935, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page)) { content() }
             }
         }

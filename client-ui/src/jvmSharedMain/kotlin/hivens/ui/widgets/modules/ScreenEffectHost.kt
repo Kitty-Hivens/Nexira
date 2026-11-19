@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import hivens.widget.api.ModuleValues
 import hivens.widget.api.ScreenEffectState
+import hivens.ui.theme.Motion
 import hivens.ui.widgets.modules.WidgetModules.Contributed
 import hivens.widget.api.ScreenEffect
 
@@ -22,18 +23,21 @@ import hivens.widget.api.ScreenEffect
  * The content is one movable composition, so switching an effect on or off moves it between being
  * drawn bare and being drawn by the effects without recomposing it from nothing: the screen the
  * person is on, what they typed, the open panels all stay.
+ *
+ * An effect that moves is told to hold still where the look holds ambient movement still
+ * ([Motion.drift]), the way the particles and the skin's spin are.
  */
 @Composable
 fun ScreenEffectHost(
     effects: List<Contributed<ScreenEffect>>,
     settings: Map<String, Map<String, String>>,
-    reducedMotion: Boolean,
     content: @Composable () -> Unit,
 ) {
+    val still = Motion.drift == null
     val latest by rememberUpdatedState(content)
     val shown = remember { movableContentOf { latest() } }
     val on = effects.filter { settings[it.scope]?.get(WidgetModules.EFFECT_ENABLED)?.toBooleanStrictOrNull() == true }
-    Layer(on, 0, settings, reducedMotion, shown)
+    Layer(on, 0, settings, still, shown)
 }
 
 @Composable
@@ -41,7 +45,7 @@ private fun Layer(
     on: List<Contributed<ScreenEffect>>,
     index: Int,
     settings: Map<String, Map<String, String>>,
-    reducedMotion: Boolean,
+    still: Boolean,
     inner: @Composable () -> Unit,
 ) {
     val entry = on.getOrNull(index)
@@ -51,7 +55,7 @@ private fun Layer(
     }
     // Keyed by what the effect is, so one switched on or off in the middle leaves the others' state alone.
     key(entry.scope) {
-        val state = ScreenEffectState(ModuleValues(entry.item.settings, settings[entry.scope].orEmpty()), reducedMotion)
-        entry.item.Apply(state) { Layer(on, index + 1, settings, reducedMotion, inner) }
+        val state = ScreenEffectState(ModuleValues(entry.item.settings, settings[entry.scope].orEmpty()), still)
+        entry.item.Apply(state) { Layer(on, index + 1, settings, still, inner) }
     }
 }

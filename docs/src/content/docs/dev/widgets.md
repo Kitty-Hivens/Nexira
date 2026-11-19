@@ -105,14 +105,17 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 "Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.themes=1.0, nexira.packs=2.0, nexira.accounts=1.0, nexira.catalogue=1.0",
 ```
 
-| API id                | Artifact            | Package                   | What it is for                                                     |
-|-----------------------|---------------------|---------------------------|--------------------------------------------------------------------|
-| `nexira.i18n`         | `:i18n-api`         | `hivens.i18n.api`         | Looking words up, the language in use, the language setting        |
-| `nexira.themes`       | `:themes-api`       | `hivens.themes.api`       | The theme in use, the choice, and bringing a theme                 |
-| `nexira.packs`        | `:packs-api`        | `hivens.packs.api`        | Listing, launching, installing and updating packs                  |
-| `nexira.accounts`     | `:accounts-api`     | `hivens.accounts.api`     | Who is signed in, the stored accounts, signing in and out          |
-| `nexira.catalogue`    | `:catalogue-api`    | `hivens.catalogue.api`    | Searching, installing a project, and bringing a source             |
-| `nexira.look.manager` | `:look:manager-api` | `hivens.look.manager.api` | Bringing an axis of the look, a provider or a pack, and the choice |
+| API id                | Artifact              | Package                   | What it is for                                                     |
+|-----------------------|-----------------------|---------------------------|--------------------------------------------------------------------|
+| `nexira.i18n`         | `:i18n-api`           | `hivens.i18n.api`         | Looking words up, the language in use, the language setting        |
+| `nexira.themes`       | `:look:colour-nx-api` | `hivens.themes.api`       | The theme in use, the choice, and bringing a theme                 |
+| `nexira.packs`        | `:packs-api`          | `hivens.packs.api`        | Listing, launching, installing and updating packs                  |
+| `nexira.accounts`     | `:accounts-api`       | `hivens.accounts.api`     | Who is signed in, the stored accounts, signing in and out          |
+| `nexira.catalogue`    | `:catalogue-api`      | `hivens.catalogue.api`    | Searching, installing a project, and bringing a source             |
+| `nexira.look.manager` | `:look:manager-api`   | `hivens.look.manager.api` | Bringing an axis of the look, a provider or a pack, and the choice |
+| `nexira.look.colour`  | `:look:colour-api`    | `hivens.look.colour.api`  | Asking colour by role, and answering the colour axis               |
+| `nexira.look.motion`  | `:look:motion-api`    | `hivens.look.motion.api`  | Asking movement by role, and answering the motion axis             |
+| `nexira.look.shape`   | `:look:shape-api`     | `hivens.look.shape.api`   | Asking corners and outlines by role, and answering the shape axis  |
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
 
@@ -204,7 +207,7 @@ The launcher applies changes one at a time and writes the file whole. Where the 
 
 ## Themes
 
-A theme is drawn by the design system, `nx-ui`, and kept and chosen by the themes module. To bring one, name `nexira.themes` in the manifest, compile against `:themes-api`, and implement `ThemeContribution`:
+A theme is drawn by the design system, `nx-ui`, and kept and chosen by the themes module. To bring one, name `nexira.themes` in the manifest, compile against `:look:colour-nx-api`, and implement `ThemeContribution`:
 
 ```kotlin
 class Dusk : ThemeContribution {
@@ -238,9 +241,9 @@ fun ThemeCount() {
 
 ## The look the launcher draws
 
-The launcher draws its windows with what modules answer, and names nothing of the modules behind it. The theme and whether it is dark are what `ThemesKeys.Active` and `ThemesKeys.Dark` answer at the app level, and the words what `I18nKeys.Words` answers, read the way a widget reads any key. Where the document brings in no module that answers one, the window is drawn with a fallback: a neutral grey theme that `nx-ui` carries for exactly this, dark, and every word shown as its key.
+The launcher draws its windows with what modules answer, and names nothing of the modules behind it. It reads two keys at the app level, the way a widget reads any key: `LookKeys.Provide` (`look.provide`), the answers of every axis of the look as the look manager resolves them, which it wraps everything it draws in, and `I18nKeys.Words`, the words. It names no axis and no provider: an axis a module brings reaches every window through that one value, see [Axes of the look](#axes-of-the-look). Colour is such an axis, so the theme a window is drawn in, and whether it is dark, are what the colour provider answers, the themes module's for the default look. Where no look manager is brought in, every axis reads its base answers, colourless and dark, and where no language module is, every word is shown as its key.
 
-Beside them the launcher reads one more key, `LookKeys.Provide` (`look.provide`), the answers of every axis of the look as the look manager resolves them, and wraps everything it draws in it. It names no axis and no provider: an axis a module brings reaches every window through that one value, see [Axes of the look](#axes-of-the-look). Where no look manager is brought in, every axis reads its base answers.
+Inside the look, `NxTheme { }` is the bridge from the look to Compose and Material: it sets Material's colour scheme, the content colour, the indication, text selection and the right-click menu from the colour axis's answers, so a Material component and a foundation default draw in the look too. To draw something in one theme of the themes module on purpose, a preview of a component say, wrap it in `NxThemed(theme, dark) { }`, which provides that theme's answers for colour and the bridge over them.
 
 The themes module and the language module make what answers those keys themselves, as app services: the theme manager over the module's settings and its theme file, the language engine over the person's own translations and the words every module ships. A module compiled into the launcher reaches what it needs for that through services the host keeps for the modules it trusts, and no jar sees: `HostFiles` for the data directory, the host's atomic, ordered writes inside it, and the name a file of the module's is told to the person as when a newer build wrote it, `TakenWords` for the words every owner ships, `TakenContributions` for what the modules brought in contribute, and `BringIn` to bring in a module compiled into the launcher that the document does not name, through the same checks as the ones it names.
 
@@ -301,6 +304,26 @@ List each in `META-INF/services` under its type, `hivens.look.manager.api.LookAx
 A widget reads `WobbleAxis.local.current`, and draws still outside any look. To draw a subtree in another look, wrap it in `OverrideLook(LookChoice.build { pack = "mymodule.jelly" }) { ... }`: the subtree gets what the person would get by choosing that on top of their own choice, every axis going down the whole chain again, the subtree's family for it, the person's own, the subtree's pack or else the person's, the default pack, the base. Until its providers have answered, the subtree keeps the look around it. A choice is made with `LookChoice.build` and changed with its `with` functions, never through a constructor, so a field a later launcher adds does not break your module. The person's choice is `LookKeys.Settings`, changed through `LookKeys.UpdateSettings`, and `LookKeys.State` says which provider answers each axis, why, and what is on offer. Code outside composition, a window's chrome or a tray icon say, reads every axis at once from `LookKeys.Answers`, a `LookSnapshot` holding what the composition is provided at that moment: `snapshot.of(WobbleAxis)`. A service, which reads no source, gets the same from the app service `LookView`, beside the state. Before the boot the manager answers the snapshot too, from the same pass as the rest.
 
 A document names the manager and nothing else of the look. The axes, providers and packs of every module compiled into the launcher reach the manager whether the document names their module or not, beside those of every jar switched on, and only what the choice needs is opened. A provider is opened with what its own module may use: the services as its module sees them, its own settings among them and no other module's, in `LookContext.services`. Where the provider's module is compiled into the launcher and the document does not name it, the manager brings that module in first, so its keys, services and settings are there as if the document named it, and it stays in while the launcher runs. Before the boot a provider gets its own module's boot context in `LookContext.boot` instead, its files and settings read and not kept, and answers the same from them. The boot window opens in the look the shell then draws: the manager answers the same keys before the boot, from the same choice and the modules compiled in, and closes the providers it opened for that before the window draws. A jar is not loaded before the boot, so a choice that names a jar's pack or family opens the boot window on what comes next in the choice, and the shell turns to the jar's look once the jar is loaded.
+
+### Colour
+
+The colour axis, `colour`, comes with the launcher in `:look:colour-api` (`nexira.look.colour`). A widget asks it by what it draws, never by a value: `Ink` for text and glyphs (`Ink.main`, `Ink.quiet`, `Ink.on(fill)`), `Paint` for colours that mean something (`Paint.lead`, `Paint.status(Status.Error)`, `Paint.category(member)`, and `Paint.partner`, `Paint.third` and `Paint.palette`, the look's own colours for art and decoration), `Fill` for areas, `Line` for strokes, `Ground` for what content sits on (`Ground.current`, `Ground.page`, `Ground.dark`) and `Media` for colours over a picture. A fill, a rule and the faint ink are made over the colour content sits on, which whatever draws a plane sets in `LocalGround`, and the page outside any. `Status` is the manager's API's, so every axis that answers by it names the same word.
+
+A provider of colour answers with `ColourAnswers.build { ... }`, filling the roles it answers. A role it leaves alone keeps its base answer, and a role the others are made of carries them along: fill only the lead, and the tinted fills, marks and edges are in that lead. Where no provider answers, the base answers hold, plain greys for a dark ground with no colour at all. The default pack names the `nx` family for colour.
+
+### Motion
+
+The motion axis, `motion`, comes with the launcher in `:look:motion-api` (`nexira.look.motion`). A widget asks it by what is happening, never by a duration: `Motion.tap` for a press or a hover answering, `Motion.colourShift`, `Motion.track` for a mark travelling, `Motion.fade`, `Motion.popup`, `Motion.panelSlide`, `Motion.reveal`, `Motion.emphasis` and `Motion.pageSwap` for something arriving or leaving, `Motion.scroll` and `Motion.dismiss` for what input drives, `Motion.lookChange` for the look itself changing, and `Motion.drift`, `Motion.sweep` and `Motion.ambient(periodMs)` for movement that goes on. A role is a `MotionRole`: a spec for any type through `of()`, usable as it is where a `FiniteAnimationSpec<Float>` is asked, with the `enter` and `exit` of something coming and going by it. A widget's arrival is `Motion.arrival(entrance)` and the order a slot's widgets arrive in `Motion.stagger(order)`.
+
+Some movement only dresses a change already made. A widget that has some asks `Motion.decoration(role)`, and draws the change at once where it answers null. `Motion.lookChange` and `Motion.drift` answer null the same way. That is how a provider holds movement still where the person asked for less: reduce motion is the provider's own setting, not the launcher's, and an entrance or a delay a widget's node names is the node's and plays all the same.
+
+A provider of motion answers with `MotionAnswers.build { ... }`. A role it leaves alone keeps its base answer, Compose's own 300 ms tween on its standard curve, a plain fade, and linear loops. The default pack names the `nx` family for motion.
+
+### Shape
+
+The shape axis, `shape`, comes with the launcher in `:look:shape-api` (`nexira.look.shape`). A widget asks it by the kind of thing it draws, a category every interface has, never by a radius: `Shape.control` for something pressed, typed into or picked, `Shape.card` for a region in the flow, `Shape.capsule` for what is round at its ends, `Shape.indicator` for a mark saying where something is, `Shape.menu`, `Shape.tooltip`, `Shape.sheet` and `Shape.dialog` for what floats, and `Shape.thumb` for a scrollbar's grip. Each answers a Compose `Shape`, so a provider may answer cut, smoothed or any other corners. A component that keeps a corner of its own beside its category's answer keeps it as its own, and is no new role. `Shape.plate` answers the outline of a widget's own plate where the widget's node leaves it unsaid: its corner, its smoothing and how round a star's or a polygon's points are. A value set on the node is stronger.
+
+A provider of shape answers with `ShapeAnswers.build { ... }`. A role it leaves alone keeps its base answer: square, as Compose draws where nobody chose, with the capsule fully round and the thumb at Compose's own 4dp. The default pack names the `nx` family for shape.
 
 ## Catalogue sources
 

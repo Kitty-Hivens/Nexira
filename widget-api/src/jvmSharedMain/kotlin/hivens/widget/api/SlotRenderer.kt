@@ -3,6 +3,7 @@ package hivens.widget.api
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.foundation.hoverable
@@ -60,13 +61,20 @@ import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.toSize
+import androidx.compose.ui.layout.IntrinsicMeasurable
+import androidx.compose.ui.layout.IntrinsicMeasureScope
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Measurable
+import androidx.compose.ui.layout.MeasureResult
+import androidx.compose.ui.layout.MeasureScope
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.node.LayoutModifierNode
+import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
@@ -85,6 +93,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.roundToInt
+import hivens.widget.model.Entrance
 import hivens.widget.model.FlowPlacement
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
@@ -135,7 +144,9 @@ import hivens.widget.model.viewportMode
 // absent from the registry renders through LocalUnknownWidgetDecorator
 // instead (default nothing in production; the editor paints an "unsupported
 // widget" placeholder so the orphan is visible and removable), and keeps
-// its on-disk props / children intact.
+// its on-disk props / children intact. A widget whose show condition does not
+// hold is not placed at all, and is drawn through LocalHiddenWidget only while
+// somebody is arranging (see shownOf).
 @Composable
 fun SlotRenderer(
     surface: SurfaceId,
@@ -192,8 +203,9 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp, c
     val graph = LocalLayoutGraph.current
     val slotChrome = LocalSlotChromeModifier.current
 
-    val content: SlotContent = graph.traverse(path) ?: SlotContent()
-    val chrome = slotChrome(path, content)
+    val stored: SlotContent = graph.traverse(path) ?: SlotContent()
+    val chrome = slotChrome(path, stored)
+    val content = shownOf(stored)
 
     if (content.widgets.isEmpty()) {
         // Occupy the slot footprint (inter-slot sizing lives in `modifier`)
@@ -246,6 +258,30 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp, c
     }
 }
 
+/**
+ * [content] less the widgets whose show condition does not hold here
+ * ([WidgetDescriptor.shownWhen]), unless somebody is arranging, who sees them dimmed in
+ * their places through [LocalHiddenWidget] instead.
+ *
+ * Taken out before the slot lays anything out, so a hidden widget is no item at all: no
+ * gap, no cell of a grid, no share of a line, no reach of a page. A widget that only
+ * draws nothing is still an item and keeps what an item holds whatever its size, a
+ * weighted cell say. A slot left with none is an empty slot, which is what it shows.
+ */
+@Composable
+private fun shownOf(content: SlotContent): SlotContent {
+    if (content.widgets.isEmpty() || LocalHiddenWidget.current != null) return content
+    val registry = LocalWidgetRegistry.current
+    val hidden = HashSet<String>()
+    content.widgets.forEach { instance ->
+        key(instance.instanceId) {
+            val descriptor = registry[instance.kind]
+            if (descriptor != null && !descriptor.shownHere()) hidden += instance.instanceId
+        }
+    }
+    return if (hidden.isEmpty()) content else content.copy(widgets = content.widgets.filter { it.instanceId !in hidden })
+}
+
 /** Whether the widget is held in place while its slot moves. See [Placement.pinned]. */
 private val WidgetInstance.isPinned: Boolean get() = placement?.pinned == true
 
@@ -273,15 +309,15 @@ private fun PinnedFlowFrame(
     val natural: Weigh = { _, _ -> Modifier }
     if (horizontal) {
         Row(outer, horizontalArrangement = Arrangement.spacedBy(spacing)) {
-            Row(Modifier.withoutLeadingGap(spacing, horizontal = true)) {
-                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural, Modifier.gapBefore(spacing, horizontal = true))
+            Row(Modifier.withoutLeadingGap(spacing, Orientation.Horizontal)) {
+                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural, Modifier.childGap(spacing, Orientation.Horizontal))
             }
             scrolled(Modifier.weight(1f).fillMaxHeight())
         }
     } else {
         Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
-            Column(Modifier.withoutLeadingGap(spacing, horizontal = false)) {
-                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural, Modifier.gapBefore(spacing, horizontal = false))
+            Column(Modifier.withoutLeadingGap(spacing, Orientation.Vertical)) {
+                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural, Modifier.childGap(spacing, Orientation.Vertical))
             }
             scrolled(Modifier.weight(1f).fillMaxWidth())
         }
@@ -718,16 +754,16 @@ private fun FlowSlot(
 
     if (lineLength == 0) {
         if (flow.horizontal) {
-            Row(outer.withoutLeadingGap(spacing, horizontal = true)) {
+            Row(outer.withoutLeadingGap(spacing, Orientation.Horizontal)) {
                 val weigh: Weigh = alongScroll(true)?.let { viewportShare(it, totalWeight(drawn)) }
                     ?: { w, _ -> Modifier.weight(w) }
-                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh, Modifier.gapBefore(spacing, horizontal = true))
+                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh, Modifier.childGap(spacing, Orientation.Horizontal))
             }
         } else {
-            Column(outer.withoutLeadingGap(spacing, horizontal = false)) {
+            Column(outer.withoutLeadingGap(spacing, Orientation.Vertical)) {
                 val weigh: Weigh = alongScroll(false)?.let { viewportShare(it, totalWeight(drawn)) }
                     ?: { w, _ -> Modifier.weight(w) }
-                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh, Modifier.gapBefore(spacing, horizontal = false))
+                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh, Modifier.childGap(spacing, Orientation.Vertical))
             }
         }
         return
@@ -737,26 +773,34 @@ private fun FlowSlot(
     // stacked along the other one. A uniform line gives every cell an equal
     // share and pads the short last line with weighted spacers so the columns
     // stay aligned; a non-uniform one lets each child take its own size.
+    //
+    // The gaps are the plain line's, at both depths: each cell takes its gap in its
+    // line, and each line takes its gap in the stack, only where it has a size. So a
+    // cell with nothing to show takes no gap beside it, and a line of nothing takes
+    // none above it. A uniform cell and the spacers padding a short line always have
+    // their share, so they always take theirs and the columns stay aligned.
     val lines = items.chunked(lineLength)
     if (flow.horizontal) {
-        Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
-            lines.forEachIndexed { lineIndex, line ->
-                Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
+        Column(outer.withoutLeadingGap(spacing, Orientation.Vertical)) {
+            lines.forEach { line ->
+                Row(Modifier.childGap(spacing, Orientation.Vertical).withoutLeadingGap(spacing, Orientation.Horizontal)) {
                     val weigh: Weigh = alongScroll(true)?.let { viewportShare(it, lineLength.toFloat()) }
                         ?: { w, _ -> Modifier.weight(w) }
-                    WrappedLine(address, line, flow.uniform, registry, decorator, unknownDecorator, weigh)
-                    if (flow.uniform) repeat(lineLength - line.size) { Spacer(weigh(1f, WidgetSizing.UNDECLARED)) }
+                    val gap = Modifier.childGap(spacing, Orientation.Horizontal)
+                    WrappedLine(address, line, flow.uniform, registry, decorator, unknownDecorator, weigh, gap)
+                    if (flow.uniform) repeat(lineLength - line.size) { Spacer(gap.then(weigh(1f, WidgetSizing.UNDECLARED))) }
                 }
             }
         }
     } else {
-        Row(outer, horizontalArrangement = Arrangement.spacedBy(spacing)) {
-            lines.forEachIndexed { lineIndex, line ->
-                Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+        Row(outer.withoutLeadingGap(spacing, Orientation.Horizontal)) {
+            lines.forEach { line ->
+                Column(Modifier.childGap(spacing, Orientation.Horizontal).withoutLeadingGap(spacing, Orientation.Vertical)) {
                     val weigh: Weigh = alongScroll(false)?.let { viewportShare(it, lineLength.toFloat()) }
                         ?: { w, _ -> Modifier.weight(w) }
-                    WrappedLine(address, line, flow.uniform, registry, decorator, unknownDecorator, weigh)
-                    if (flow.uniform) repeat(lineLength - line.size) { Spacer(weigh(1f, WidgetSizing.UNDECLARED)) }
+                    val gap = Modifier.childGap(spacing, Orientation.Vertical)
+                    WrappedLine(address, line, flow.uniform, registry, decorator, unknownDecorator, weigh, gap)
+                    if (flow.uniform) repeat(lineLength - line.size) { Spacer(gap.then(weigh(1f, WidgetSizing.UNDECLARED))) }
                 }
             }
         }
@@ -764,22 +808,25 @@ private fun FlowSlot(
 }
 
 /**
- * The gap of a flow line, given only before a widget that drew something.
+ * What a container gives each of its children for the gap between them: [gap] before
+ * the child along [orientation], and only when the child has a size along it.
  *
- * A widget can have nothing to show where it stands: a filter for a kind that is
- * not being searched, a project block for a project that declares nothing. It keeps
- * its place in the flow at no size, and a plain spacedBy still gave it the gap on
- * either side, so the line grew a double gap wherever one stood. Here a widget of
- * no size along the line takes no gap, and one that draws takes it before itself.
+ * A child can have nothing to show where it stands: a filter for a kind that is not
+ * being searched, the controls of a provider that is not drawing. It keeps its place
+ * at no size, and a plain spacedBy still gave it the gap on either side, so the line
+ * grew a double gap wherever one stood. With this a child of no size along the line
+ * takes no gap, and one that draws takes it before itself.
  *
- * Carried by the widgets rather than by the line's arrangement. An arrangement only
+ * Carried by the children rather than by the line's arrangement. An arrangement only
  * places what the line has already measured, and the line had measured a gap for
- * every widget, drawn or not, so a column of empty blocks still stood taller than
- * what it drew. The line hands back the gap before its first widget, see
- * [withoutLeadingGap].
+ * every child, drawn or not, so a column of empty blocks still stood taller than what
+ * it drew. So a container lays its children out with no spacing of its own, gives each
+ * of them this, and wears [withoutLeadingGap] with the same [gap] itself. A container
+ * whose first child is always drawn may leave that one without it instead.
  */
-private fun Modifier.gapBefore(gap: Dp, horizontal: Boolean): Modifier = if (gap <= 0.dp) this else layout { measurable, constraints ->
+fun Modifier.childGap(gap: Dp, orientation: Orientation): Modifier = if (gap <= 0.dp) this else layout { measurable, constraints ->
     val g = gap.roundToPx()
+    val horizontal = orientation == Orientation.Horizontal
     val placeable = measurable.measure(if (horizontal) constraints.offset(horizontal = -g) else constraints.offset(vertical = -g))
     val along = if (horizontal) placeable.width else placeable.height
     when {
@@ -790,11 +837,13 @@ private fun Modifier.gapBefore(gap: Dp, horizontal: Boolean): Modifier = if (gap
 }
 
 /**
- * A line of [gapBefore] widgets, less the gap before the first of them: the line is
- * measured with that much more room, then reports that much less and is drawn back
- * by it, so the first drawn widget meets the line's edge.
+ * What a container wears whose children carry [childGap]: the line less the gap before
+ * the first of them. It is measured with [gap] more room along [orientation], then
+ * reports that much less and is drawn back by it, so the first child that draws meets
+ * the line's edge whichever child that is.
  */
-private fun Modifier.withoutLeadingGap(gap: Dp, horizontal: Boolean): Modifier = if (gap <= 0.dp) this else layout { measurable, constraints ->
+fun Modifier.withoutLeadingGap(gap: Dp, orientation: Orientation): Modifier = if (gap <= 0.dp) this else layout { measurable, constraints ->
+    val horizontal = orientation == Orientation.Horizontal
     val g = gap.roundToPx()
     val placeable = measurable.measure(if (horizontal) constraints.offset(horizontal = g) else constraints.offset(vertical = g))
     if (horizontal) {
@@ -826,7 +875,7 @@ private fun FlowWidgets(
                 val movable = rememberWidgetMovable(descriptor, instance, index)
                 // Outer spacing around the widget, from its placement so a flow
                 // widget reserves room the same way a placed one does.
-                val pad = Modifier.padding((instance.placement?.padding ?: SurfaceInsets()).asPadding())
+                val pad = Modifier.outerPadding(instance.placement?.padding)
                 // Precedence lives on the model as flowPlacement(), so the rule is
                 // testable without a composition.
                 when (val placement = instance.flowPlacement()) {
@@ -847,7 +896,7 @@ private fun FlowWidgets(
 
 // One line of a wrapped flow. Each child carries its position in the whole slot,
 // not in the line, because that is what the drop hit-test and the decorator
-// address it by.
+// address it by. [gap] is what each cell wears for the line's gap, outside its share.
 @Composable
 private fun WrappedLine(
     address: SlotAddress,
@@ -857,18 +906,18 @@ private fun WrappedLine(
     decorator: WidgetDecorator,
     unknownDecorator: UnknownWidgetDecorator,
     weigh: Weigh,
+    gap: Modifier,
 ) {
     line.forEach { (index, instance) ->
         key(instance.instanceId) {
             val descriptor = registry[instance.kind]
             val cell: Modifier = if (uniform) weigh(1f, descriptor?.sizing ?: WidgetSizing.UNDECLARED) else Modifier
-            Box(cell) {
+            Box(gap.then(cell)) {
                 if (descriptor == null) {
                     RenderUnknown(unknownDecorator, address, index, instance)
                 } else {
                     val movable = rememberWidgetMovable(descriptor, instance, index)
-                    val pad = Modifier.padding((instance.placement?.padding ?: SurfaceInsets()).asPadding())
-                    Box(pad) { decorator(address, index, descriptor, instance) { movable() } }
+                    Box(Modifier.outerPadding(instance.placement?.padding)) { decorator(address, index, descriptor, instance) { movable() } }
                 }
             }
         }
@@ -894,15 +943,78 @@ private fun boundedModifier(placement: FlowPlacement.Bounded, sizing: WidgetSizi
     return m
 }
 
-// Outer spacing from a widget's placement, as PaddingValues, so a widget's padding
-// reads the same in a flow slot as in a placement one. All zero is the common case
-// and draws as no inset.
-private fun SurfaceInsets.asPadding(): PaddingValues = PaddingValues(
-    start = start(0f).dp,
-    top = top(0f).dp,
-    end = end(0f).dp,
-    bottom = bottom(0f).dp,
-)
+/**
+ * The room a widget's placement reserves around it ([Placement.padding]), the same in a
+ * flow slot as in a placement one, and none along an axis on which its content measures
+ * zero.
+ *
+ * Kept there, it left a band the size of the padding where the widget had nothing to
+ * show, which a line then gave a gap as well. Collapsed, a widget that draws nothing is
+ * as absent as its content: no size at all, so no gap. One that is only flat, a row that
+ * spans the width at no height, keeps its width and loses its height, as it would with
+ * no padding. A spacer that is all height keeps the room above and below it.
+ *
+ * All zero, the common case, adds no node at all. Otherwise it measures as a padding
+ * does, so a widget that draws is laid out exactly as before, and it answers intrinsic
+ * sizes by the same rule: none where the content's is none.
+ */
+private fun Modifier.outerPadding(insets: SurfaceInsets?): Modifier {
+    if (insets == null) return this
+    val start = insets.start(0f)
+    val top = insets.top(0f)
+    val end = insets.end(0f)
+    val bottom = insets.bottom(0f)
+    if (start == 0f && top == 0f && end == 0f && bottom == 0f) return this
+    return this.then(OuterPaddingElement(start.dp, top.dp, end.dp, bottom.dp))
+}
+
+private data class OuterPaddingElement(val start: Dp, val top: Dp, val end: Dp, val bottom: Dp) : ModifierNodeElement<OuterPaddingNode>() {
+    override fun create(): OuterPaddingNode = OuterPaddingNode(start, top, end, bottom)
+
+    override fun update(node: OuterPaddingNode) {
+        node.start = start
+        node.top = top
+        node.end = end
+        node.bottom = bottom
+    }
+}
+
+private class OuterPaddingNode(var start: Dp, var top: Dp, var end: Dp, var bottom: Dp) : Modifier.Node(), LayoutModifierNode {
+    override fun MeasureScope.measure(measurable: Measurable, constraints: Constraints): MeasureResult {
+        val left = start.roundToPx()
+        val above = top.roundToPx()
+        val across = left + end.roundToPx()
+        val down = above + bottom.roundToPx()
+        val placeable = measurable.measure(constraints.offset(-across, -down))
+        val wide = placeable.width > 0
+        val tall = placeable.height > 0
+        val width = constraints.constrainWidth(if (wide) placeable.width + across else 0)
+        val height = constraints.constrainHeight(if (tall) placeable.height + down else 0)
+        return layout(width, height) {
+            placeable.placeRelative(if (wide) left else 0, if (tall) above else 0)
+        }
+    }
+
+    override fun IntrinsicMeasureScope.minIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int): Int =
+        padded(measurable.minIntrinsicWidth(less(height, vertical())), horizontal())
+
+    override fun IntrinsicMeasureScope.maxIntrinsicWidth(measurable: IntrinsicMeasurable, height: Int): Int =
+        padded(measurable.maxIntrinsicWidth(less(height, vertical())), horizontal())
+
+    override fun IntrinsicMeasureScope.minIntrinsicHeight(measurable: IntrinsicMeasurable, width: Int): Int =
+        padded(measurable.minIntrinsicHeight(less(width, horizontal())), vertical())
+
+    override fun IntrinsicMeasureScope.maxIntrinsicHeight(measurable: IntrinsicMeasurable, width: Int): Int =
+        padded(measurable.maxIntrinsicHeight(less(width, horizontal())), vertical())
+
+    private fun IntrinsicMeasureScope.horizontal(): Int = start.roundToPx() + end.roundToPx()
+
+    private fun IntrinsicMeasureScope.vertical(): Int = top.roundToPx() + bottom.roundToPx()
+
+    private fun less(size: Int, padding: Int): Int = if (size == Constraints.Infinity) size else (size - padding).coerceAtLeast(0)
+
+    private fun padded(size: Int, padding: Int): Int = if (size == 0) 0 else size + padding
+}
 
 // ── Placement ────────────────────────────────────────────────────────
 
@@ -1265,20 +1377,13 @@ private fun PlacedBox(
     // onSizeChanged: the plane keeps its claimed size, the padding sits around it,
     // and what the clamp measures (ownDp) is the padded footprint, so the reserved
     // space stays inside the slot the same way the plane does. Never a Modifier.size,
-    // so it offsets and reserves rather than shrinking the plane.
-    val pad = placement.padding
+    // so it offsets and reserves rather than shrinking the plane. None around a widget
+    // that draws nothing, see [outerPadding].
     Box(
         position(PlacedAt(alignmentFor(anchor), heldX, heldY, startX = hBias == 0f, startY = vBias == 0f))
             .offset(heldX.dp, heldY.dp)
             .onSizeChanged { ownDp = with(density) { Size(it.width.toDp().value, it.height.toDp().value) } }
-            .padding(
-                PaddingValues(
-                    start = pad.start(0f).dp,
-                    top = pad.top(0f).dp,
-                    end = pad.end(0f).dp,
-                    bottom = pad.bottom(0f).dp,
-                ),
-            )
+            .outerPadding(placement.padding)
             .then(sizeMod),
     ) {
         // What was chosen, not what happened to be free. A widget that adapts to
@@ -1366,8 +1471,14 @@ private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance,
         // sees changes: most of the registry declares nothing and none of it should
         // start measuring differently for this.
         val ceiling = descriptor.sizing.unboundedAxisCeiling(LocalViewportExtent.current)
-        entrance(descriptor.resolveEntrance(instance), order, instance.motion?.delayMs) {
-            if (ceiling == null) body() else Box(ceiling) { body() }
+        // Only a slot somebody is arranging places a widget whose condition does not
+        // hold (see [shownOf]), and there it says so rather than passing for live.
+        val hidden = LocalHiddenWidget.current
+        val drawn = @Composable {
+            if (hidden != null && !descriptor.shownHere()) hidden(descriptor, instance, body) else body()
+        }
+        entrance(descriptor.resolveEntrance(instance), Entrance.parse(instance.motion?.enter) != null, order, instance.motion?.delayMs) {
+            if (ceiling == null) drawn() else Box(ceiling) { drawn() }
         }
     }
 }

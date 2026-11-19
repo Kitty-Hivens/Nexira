@@ -1,5 +1,9 @@
 # Making the UI modular: decisions
 
+Since this was written, the Brut style, the neon presets and Lotus Dark were removed,
+and the themes became the nx colour provider under `look/`, so E2's list of what becomes
+an addon names things that are gone.
+
 Companion to `ui-layer-map.md`. The map is the evidence -- what the UI layer is made
 of, measured at `63b6f097`. This document is the other half: what we decided to do
 about it, and why each decision is the one that fits what the map found.

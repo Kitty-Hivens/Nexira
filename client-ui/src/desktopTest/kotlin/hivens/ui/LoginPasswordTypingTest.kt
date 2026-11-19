@@ -12,7 +12,7 @@ import hivens.themes.Themes
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.widget.api.LocalScope
@@ -66,7 +66,7 @@ class LoginPasswordTypingTest {
     private fun form(body: TypingScene.() -> Unit) = onEventThread {
         TypingScene(500, 700) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = true) {
+                NxThemed(Themes.default, dark = true) {
                     LayerHost(rememberWindowLayers(), Modifier.fillMaxSize()) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,

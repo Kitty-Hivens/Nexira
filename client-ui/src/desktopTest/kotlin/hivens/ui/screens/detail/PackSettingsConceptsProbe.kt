@@ -50,7 +50,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.decorativePair
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
@@ -439,7 +439,7 @@ class PackSettingsConceptsProbe {
         val out = Path.of("build/render/pack-settings", "$name-${width}x$height.png")
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(width, height, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) { content() }
+            NxThemed(Themes.default, dark = true) { content() }
         }
         val png = try {
             val t = scene.settle(frames = 12)

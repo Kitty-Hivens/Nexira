@@ -20,7 +20,7 @@ import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.onEventThread
 import hivens.ui.settle
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.LocalScope
@@ -114,7 +114,7 @@ class SampledWidgetTest {
         val bitmap = onEventThread {
             val scene = ImageComposeScene(300, 200, density = Density(1f)) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(Themes.default, dark = true) {
+                    NxThemed(Themes.default, dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides WidgetCommandRegistry(),

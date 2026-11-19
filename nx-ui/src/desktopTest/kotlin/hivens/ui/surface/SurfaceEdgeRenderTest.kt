@@ -18,7 +18,7 @@ import java.io.File
 import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 
 /**
@@ -89,7 +89,7 @@ class SurfaceEdgeRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun render(name: String, content: @androidx.compose.runtime.Composable () -> Unit): IntArray {
         val scene = ImageComposeScene(width = SW, height = SH, density = Density(1f)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize().background(PAGE)) { content() }
             }
         }

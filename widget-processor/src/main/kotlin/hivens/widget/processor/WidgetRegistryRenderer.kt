@@ -55,6 +55,8 @@ internal data class WidgetModel(
     val enter: String? = null,
     /** The source and command ids the widget reads, already checked to be non-blank and distinct. */
     val needs: List<String> = emptyList(),
+    /** The id of the Boolean source the widget is shown under, already checked, or null for none. */
+    val shownWhen: String? = null,
 )
 
 /**
@@ -164,6 +166,9 @@ internal fun renderRegistry(
         }
         if (entry.needs.isNotEmpty()) {
             appendLine("            override val needs: List<String> = ${entry.needs.toStringListLiteral()}")
+        }
+        if (entry.shownWhen != null) {
+            appendLine("            override val shownWhen: String? = \"${entry.shownWhen.kotlinEscape()}\"")
         }
         // Lazy, all three. The registry is built in full at class-init because the
         // palette lists every kind, but these are the expensive members and none of

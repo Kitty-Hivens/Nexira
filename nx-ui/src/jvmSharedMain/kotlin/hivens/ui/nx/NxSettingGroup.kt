@@ -2,6 +2,7 @@ package hivens.ui.nx
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.snap
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -24,13 +26,15 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.LocalCustomization
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Status
 
 /**
@@ -84,14 +88,13 @@ fun NxSettingRow(
     trailing: @Composable () -> Unit = {},
 ) {
     val alpha = if (enabled) 1f else 0.4f
-    val still = LocalCustomization.current.reduceMotion
-    val reveal = Motion.reveal
+    val settle = Motion.decoration(Motion.reveal)
     Row(
         // The height follows the text rather than jumping to it: a detail line that
         // arrives late (a folder size being measured) or wraps differently once the
         // sheet widens would otherwise move every row under it in one frame.
         modifier              = modifier.fillMaxWidth()
-            .animateContentSize(if (still) snap() else reveal.of())
+            .animateContentSize(settle?.of() ?: snap())
             .heightIn(min = 60.dp).padding(vertical = 12.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(24.dp),
@@ -165,6 +168,53 @@ private fun RuledColumn(modifier: Modifier, content: @Composable () -> Unit) {
                 y += p.height
             }
             if (at != rules) rules = at
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxSettingGroupDarkPreview() = SettingGroups(dark = true)
+
+@Preview
+@Composable
+private fun NxSettingGroupLightPreview() = SettingGroups(dark = false)
+
+@Composable
+private fun SettingGroups(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(480.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(24.dp),
+        ) {
+            NxSettingGroup("Game") {
+                NxSettingRow("Fullscreen", detail = "Starts the game over the whole screen") {
+                    NxSwitch(checked = true, onCheckedChange = {})
+                }
+                NxSettingRow("Java runtime", detail = "Picked for each pack from its version") {
+                    NxButton("Change", onClick = {}, style = NxButtonStyle.Secondary, compact = true)
+                }
+                NxSettingRow("Window mode") {
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        NxChoiceChip("Window", selected = true, onToggle = {})
+                        NxChoiceChip("Borderless", selected = false, onToggle = {})
+                    }
+                }
+                NxSettingRow("Not on this system", detail = "Needs a Wayland session", enabled = false) {
+                    NxSwitch(checked = false, onCheckedChange = {}, enabled = false)
+                }
+                NxSettingBlock {
+                    NxSlider("Memory", value = 6f, range = 2f..16f, valueText = "6 GB", onValueChange = {})
+                }
+            }
+            NxSettingGroup("Danger zone", danger = true) {
+                NxSettingRow("Delete this pack", detail = "Removes its worlds and settings") {
+                    NxButton("Delete", onClick = {}, style = NxButtonStyle.Destructive, compact = true)
+                }
+            }
+            NxSettingGroup(title = null) {
+                NxSettingRow("A group with no title")
+            }
         }
     }
 }

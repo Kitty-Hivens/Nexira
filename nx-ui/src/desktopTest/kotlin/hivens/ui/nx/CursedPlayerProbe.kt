@@ -39,7 +39,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.Image as SkImage
@@ -170,7 +170,7 @@ class CursedPlayerProbe {
         // No background: the card is composited over the source footage, and the
         // codec then has to pay for both at 374 kbit.
         val scene = ImageComposeScene(362, 297, density = Density(1.55f)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { Cursed() }
             }
         }

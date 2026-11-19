@@ -1,6 +1,7 @@
 package hivens.ui.widgets.modules
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -8,6 +9,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
+import hivens.look.motion.api.Motion
+import hivens.ui.theme.nxMotionAnswers
 import hivens.ui.widgets.modules.WidgetModules.Contributed
 import hivens.widget.api.ModuleSetting
 import hivens.widget.api.ScreenEffect
@@ -49,9 +52,12 @@ class ScreenEffectHostTest {
 
         fun open() {
             scene = ImageComposeScene(50, 50, density = Density(1f)) {
-                ScreenEffectHost(effects, this@Harness.settings, this@Harness.reduced) {
-                    // One object kept for as long as this composition lives.
-                    tokens += remember { Any() }
+                // The look holds ambient movement still with reduce motion on, which the host hands on.
+                CompositionLocalProvider(Motion.local provides nxMotionAnswers(this@Harness.reduced)) {
+                    ScreenEffectHost(effects, this@Harness.settings) {
+                        // One object kept for as long as this composition lives.
+                        tokens += remember { Any() }
+                    }
                 }
             }
             settle()
@@ -81,7 +87,7 @@ class ScreenEffectHostTest {
     }
 
     @Test
-    fun `an effect is handed its own values and the motion setting`() {
+    fun `an effect is handed its own values and whether the look holds movement still`() {
         val spy = Spy("a")
         val settings = on("m/a") + ("m/a" to mapOf(WidgetModules.EFFECT_ENABLED to "true", "strength" to "0.8"))
         run(Harness(listOf(entry(Spy("b")), entry(spy)), settings, reduced = true)) {

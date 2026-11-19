@@ -2,6 +2,7 @@ package hivens.ui.nx
 
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.hoverable
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,13 +37,15 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.sliderKeyboardAdjust
 import hivens.ui.theme.Motion
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 
 /**
  * A labeled slider whose track is **bounded** so it never runs to the window
@@ -80,7 +84,7 @@ fun NxSlider(
                 fontWeight = FontWeight.Medium,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
-                modifier   = Modifier.weight(1f, fill = false).padding(end = Spacing.s8),
+                modifier   = Modifier.weight(1f, fill = false).padding(end = 8.dp),
             )
             Text(
                 valueText,
@@ -227,6 +231,30 @@ fun NxSliderTrack(
                     style = Stroke(width = 1.dp.toPx()),
                 )
             }
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxSliderDarkPreview() = Sliders(dark = true)
+
+@Preview
+@Composable
+private fun NxSliderLightPreview() = Sliders(dark = false)
+
+@Composable
+private fun Sliders(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(360.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            NxSlider("Memory", value = 6f, range = 2f..16f, valueText = "6 GB", onValueChange = {})
+            NxSlider("Volume", value = 0.4f, range = 0f..1f, valueText = "40%", onValueChange = {}, compact = true)
+            NxSlider("Render distance", value = 0f, range = 2f..32f, valueText = "2", onValueChange = {}, enabled = false)
+            NxSliderTrack(value = 1f, range = 0f..1f, onValueChange = {})
+            NxSliderTrack(value = 0.5f, range = 0f..1f, onValueChange = {}, compact = true, enabled = false)
         }
     }
 }

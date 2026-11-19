@@ -30,7 +30,6 @@ import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSliderTrack
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.theme.Spacing
 import hivens.ui.widgets.toWidgetColorOrNull
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -78,7 +77,7 @@ internal fun LabeledSlider(
                 color     = NxInk.quiet,
                 textAlign = TextAlign.End,
                 maxLines  = 1,
-                modifier  = Modifier.width(READOUT_WIDTH).padding(start = Spacing.s6),
+                modifier  = Modifier.width(READOUT_WIDTH).padding(start = 6.dp),
             )
         }
     }

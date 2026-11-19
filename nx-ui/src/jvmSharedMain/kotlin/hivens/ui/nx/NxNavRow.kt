@@ -1,5 +1,6 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -21,14 +22,18 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Status
 import hivens.ui.surface.SurfaceKind
 
 /**
@@ -50,7 +55,7 @@ fun NxNavRow(
     /** Null is the theme's lead colour, resolved on the row's own plane. */
     iconTint: Color? = null,
 ) {
-    val shape = MaterialTheme.shapes.medium
+    val shape = Shape.card
     val interaction = remember { MutableInteractionSource() }
     val alpha = softHoverAlpha(interaction)
     val tint = NxInk.main
@@ -68,13 +73,13 @@ fun NxNavRow(
             modifier              = Modifier
                 .fillMaxWidth()
                 .drawBehind { drawSoftHover(tint, alpha.value) }
-                .padding(Spacing.s16),
+                .padding(16.dp),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween,
         ) {
             Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
                 Symbol(icon, null, tint = iconTint ?: NxColor.lead(), size = 24.dp)
-                Spacer(Modifier.width(Spacing.s16))
+                Spacer(Modifier.width(16.dp))
                 Column {
                     Text(title, color = NxInk.main, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (subtitle != null) {
@@ -83,6 +88,35 @@ fun NxNavRow(
                 }
             }
             Symbol(trailing, null, tint = NxInk.quiet)
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxNavRowDarkPreview() = NavRows(dark = true)
+
+@Preview
+@Composable
+private fun NxNavRowLightPreview() = NavRows(dark = false)
+
+@Composable
+private fun NavRows(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            NxNavRow(NxIcon.Palette, "Appearance", onClick = {}, subtitle = "Theme, wallpaper and motion")
+            NxNavRow(NxIcon.Storage, "Storage", onClick = {})
+            NxNavRow(
+                icon     = NxIcon.BugReport,
+                title    = "Report a problem",
+                onClick  = {},
+                subtitle = "Opens the issue tracker in the browser",
+                trailing = NxIcon.OpenInNew,
+                iconTint = NxColor.status(Status.Warning),
+            )
         }
     }
 }

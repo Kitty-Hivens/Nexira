@@ -55,7 +55,7 @@ import hivens.ui.levelServicesModule
 import hivens.ui.onEventThread
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.settle
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.widget.api.LocalScope
@@ -152,7 +152,7 @@ class SignOutQuestionTest {
         onEventThread {
             val scene = ImageComposeScene(900, 900, density = Density(1f)) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(Themes.default, dark = true) {
+                    NxThemed(Themes.default, dark = true) {
                         LayerHost(rememberWindowLayers(), Modifier.fillMaxSize()) {
                             CompositionLocalProvider(
                                 LocalWidgetDataRegistry provides data,

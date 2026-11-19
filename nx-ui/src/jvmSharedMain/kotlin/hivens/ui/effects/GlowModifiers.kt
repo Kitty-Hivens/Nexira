@@ -1,10 +1,22 @@
 package hivens.ui.effects
 
 import androidx.compose.animation.core.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import hivens.ui.theme.Motion
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.CornerRadius
@@ -13,8 +25,16 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Pulsating outer glow -- animates spread and alpha behind the composable
@@ -30,7 +50,7 @@ fun Modifier.pulsatingGlow(
 ): Modifier = composed {
     if (!enabled) return@composed this
 
-    val pulse = Motion.ownRhythm(PULSE_MS)
+    val pulse = Motion.ambient(PULSE_MS)
     val intensity by rememberInfiniteTransition(label = "pulsatingGlow").animateFloat(
         initialValue = GLOW_REST,
         targetValue  = 0.72f,
@@ -63,12 +83,12 @@ fun Modifier.shimmerOverlay(
 ): Modifier = composed {
     if (!enabled) return@composed this
 
-    val sweepRhythm = Motion.ownRhythm(SHIMMER_MS)
+    val sweepRhythm = Motion.ambient(SHIMMER_MS)
     val offsetX by rememberInfiniteTransition(label = "shimmer").animateFloat(
         initialValue = -1.1f,
         targetValue  =  2.1f,
         animationSpec = infiniteRepeatable(
-            tween(sweepRhythm.durationMs, delayMillis = SHIMMER_GAP_MS, easing = sweepRhythm.easing),
+            sweepRhythm.of(gapMs = SHIMMER_GAP_MS),
             RepeatMode.Restart
         ),
         label = "shimmerX"
@@ -99,7 +119,7 @@ fun Modifier.neonBorder(
     cornerRadius: Dp,
     strokeWidth: Dp = 2.dp
 ): Modifier = composed {
-    val neonRhythm = Motion.ownRhythm(NEON_MS)
+    val neonRhythm = Motion.ambient(NEON_MS)
     val alpha by rememberInfiniteTransition(label = "neonBorder").animateFloat(
         initialValue = 0.50f,
         targetValue  = 1.00f,
@@ -132,11 +152,40 @@ fun Modifier.neonBorder(
     }
 }
 
-// Periods of the decorative effects above. Artistic choices rather than roles on
-// the motion scale, but declared through Motion.ownRhythm so the scale stays the
-// one place a duration is spelled.
+// Periods of the decorative effects above. Artistic choices rather than roles of
+// the motion axis, handed to Motion.ambient, which answers how a period runs.
 private const val PULSE_MS = 950
 private const val SHIMMER_MS = 3_200
 private const val SHIMMER_GAP_MS = 700
 private const val NEON_MS = 1_100
 private const val GLOW_REST = 0.18f
+
+@Preview
+@Composable
+private fun GlowModifiersDarkPreview() = GlowEffects(dark = true)
+
+@Preview
+@Composable
+private fun GlowModifiersLightPreview() = GlowEffects(dark = false)
+
+@Composable
+private fun GlowEffects(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(520.dp).background(NxColor.page).padding(28.dp),
+            horizontalArrangement = Arrangement.spacedBy(36.dp),
+        ) {
+            val corner = 12.dp
+            GlowSample("Pulsating glow", Modifier.pulsatingGlow(NxColor.lead(), cornerRadius = corner))
+            GlowSample("Shimmer", Modifier.shimmerOverlay(highlightColor = NxInk.main.copy(alpha = 0.3f)))
+            GlowSample("Neon border", Modifier.neonBorder(NxColor.lead(), cornerRadius = corner))
+        }
+    }
+}
+
+@Composable
+private fun GlowSample(label: String, effect: Modifier) {
+    NxSurface(SurfaceKind.Card, effect.size(120.dp, 72.dp).clip(Shape.card)) {
+        Box(Modifier.align(Alignment.Center)) { Text(label, style = MaterialTheme.typography.labelMedium, color = NxInk.main) }
+    }
+}

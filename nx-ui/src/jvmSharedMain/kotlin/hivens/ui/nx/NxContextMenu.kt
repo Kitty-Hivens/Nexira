@@ -3,15 +3,12 @@ package hivens.ui.nx
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -53,6 +50,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
@@ -61,6 +59,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.window.PopupPositionProvider
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -68,10 +67,11 @@ import hivens.ui.layers.AnchoredLayer
 import hivens.ui.layers.layerTrigger
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NeutralTheme
 import kotlin.math.roundToInt
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Status
 import hivens.ui.surface.SurfaceKind
 
@@ -97,7 +97,7 @@ enum class NxMenuMark { None, Check }
 private val MENU_GAP = 4.dp
 
 /** The inset from the surface edge to the rows, which carry their own padding. */
-private val MENU_INSET = Spacing.s6
+private val MENU_INSET = 6.dp
 
 /**
  * Past this a menu is a column of sentences: the labels ellipsize instead, and
@@ -252,13 +252,9 @@ internal fun NxMenuPopup(
             // On its way out the popup is a picture: a second click on a row during
             // the fade ran the row's action again.
             modifier = Modifier.inertUnless(expanded),
-            // The fade is the quicker half so the menu reads as an object arriving
-            // rather than as text swelling into place; the scale is the opening
-            // role, which is what this is.
-            enter = fadeIn(Motion.tap.of()) +
-                scaleIn(Motion.reveal.of(), initialScale = 0.86f, transformOrigin = origin.value),
-            exit  = fadeOut(Motion.tap.of()) +
-                scaleOut(Motion.tap.of(), targetScale = 0.92f, transformOrigin = origin.value),
+            // Unfolding from where it was opened, which the position worked out.
+            enter = Motion.popup.enter(origin.value),
+            exit  = Motion.popup.exit(origin.value),
         ) {
             body()
         }
@@ -282,7 +278,7 @@ private fun NxMenuSurface(
 
     NxSurface(
         kind     = SurfaceKind.Popup,
-        shape    = MaterialTheme.shapes.medium,
+        shape    = Shape.menu,
         modifier = modifier,
     ) {
         // Intrinsic width outside the bounds, so the menu is as wide as its widest
@@ -381,17 +377,17 @@ fun NxMenuItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
+            .clip(Shape.control)
             .background(wash)
             .hoverable(interaction, enabled = enabled)
             .layerTrigger()
             .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
-            .padding(horizontal = Spacing.s10, vertical = 9.dp),
+            .padding(horizontal = 10.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (icon != null) {
             Symbol(icon, contentDescription = null, tint = color, size = 18.dp)
-            Spacer(Modifier.width(Spacing.s10))
+            Spacer(Modifier.width(10.dp))
         }
         // Exactly one weighted child in the row, and it is the label. Two of them
         // (the label plus a spacer that pushed the hint over) doubled the row's
@@ -411,14 +407,14 @@ fun NxMenuItem(
         val trailingCheck = selected && mark == NxMenuMark.Check
         // Fixed, so the intrinsic pass can see it: the gap between a label and the
         // shortcut beside it is part of how wide the menu has to be.
-        if (hint != null || trailingCheck) Spacer(Modifier.width(Spacing.s16))
+        if (hint != null || trailingCheck) Spacer(Modifier.width(16.dp))
         if (hint != null) {
             Text(
                 text  = hint,
                 style = MaterialTheme.typography.labelSmall,
                 color = quiet,
             )
-            if (trailingCheck) Spacer(Modifier.width(Spacing.s8))
+            if (trailingCheck) Spacer(Modifier.width(8.dp))
         }
         if (trailingCheck) {
             Symbol(NxIcon.Check, contentDescription = null, tint = color, size = 18.dp)
@@ -434,7 +430,7 @@ fun NxMenuItem(
 fun NxMenuDivider() {
     HorizontalDivider(
         color    = NxInk.line,
-        modifier = Modifier.padding(horizontal = Spacing.s10, vertical = Spacing.s6),
+        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
     )
 }
 
@@ -447,7 +443,7 @@ fun NxMenuSection(label: String) {
         color    = NxInk.quiet,
         maxLines = 1,
         overflow = TextOverflow.Ellipsis,
-        modifier = Modifier.padding(start = Spacing.s10, end = Spacing.s10, top = Spacing.s6, bottom = Spacing.s4),
+        modifier = Modifier.padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 4.dp),
     )
 }
 
@@ -558,4 +554,49 @@ private val ACTIVATION_KEYS = setOf(Key.Enter, Key.NumPadEnter, Key.Spacebar, Ke
 private fun anchorOrigin(anchorX: Int, popupX: Int, popupWidth: Int, growsDown: Boolean): TransformOrigin {
     val fx = if (popupWidth == 0) 0.5f else ((anchorX - popupX).toFloat() / popupWidth).coerceIn(0f, 1f)
     return TransformOrigin(fx, if (growsDown) 0f else 1f)
+}
+
+@Preview
+@Composable
+private fun NxContextMenuDarkPreview() = OpenMenus(dark = true)
+
+@Preview
+@Composable
+private fun NxContextMenuLightPreview() = OpenMenus(dark = false)
+
+/**
+ * The menu as it stands once open, drawn through its own surface: the popup that hangs it
+ * off a trigger and unfolds it only exists in a window, and a static frame would catch the
+ * first frame of the unfold.
+ */
+@Composable
+private fun OpenMenus(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(560.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            NxMenuSurface(Modifier, 0.dp, MENU_MAX_WIDTH, MENU_MAX_HEIGHT, footer = null) {
+                NxMenuSection("Pack")
+                NxMenuItem("Open folder", icon = NxIcon.FolderOpen, onClick = {})
+                NxMenuItem("Duplicate", icon = NxIcon.ContentCopy, hint = "Ctrl+D", onClick = {})
+                NxMenuItem("Pinned", icon = NxIcon.Star, selected = true, onClick = {})
+                NxMenuItem("Highlighted", icon = NxIcon.Tune, highlighted = true, onClick = {})
+                NxMenuItem("Unavailable", icon = NxIcon.Upload, enabled = false, onClick = {})
+                NxMenuDivider()
+                NxMenuItem("Delete", icon = NxIcon.Delete, destructive = true, onClick = {})
+            }
+            NxMenuSurface(
+                modifier  = Modifier,
+                minWidth  = 180.dp,
+                maxWidth  = MENU_MAX_WIDTH,
+                maxHeight = MENU_MAX_HEIGHT,
+                footer    = { NxMenuItem("Show snapshots", mark = NxMenuMark.None, onClick = {}) },
+            ) {
+                NxMenuItem("1.21.4", selected = true, onClick = {})
+                NxMenuItem("1.21.3", onClick = {})
+                NxMenuItem("A label long enough to reach the width cap and ellipsize", onClick = {})
+            }
+        }
+    }
 }

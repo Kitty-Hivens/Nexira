@@ -11,7 +11,7 @@ import hivens.core.data.NewsPage
 import hivens.launcher.network.ServerProtocolConfig
 import hivens.themes.Themes
 import hivens.ui.host.HostKoin
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.util.concurrent.atomic.AtomicInteger
@@ -48,7 +48,7 @@ class CompactNewsFeedChannelTest {
         // Built and drawn on the event thread: the rail subscribes a snapshotFlow.
         val scene = onEventThread {
             ImageComposeScene(320, 300, density = Density(1f)) {
-                HostKoin(koin) { NxTheme(Themes.default, dark = true) { CompactNewsFeed(maxItems = 4, feed = feed.value) } }
+                HostKoin(koin) { NxThemed(Themes.default, dark = true) { CompactNewsFeed(maxItems = 4, feed = feed.value) } }
             }
         }
         var t = 0L

@@ -21,7 +21,7 @@ import java.nio.file.Path
 
 /**
  * What a phone supplies to the shared launcher modules: where the files are, how a
- * secret is kept, and how a game process is started.
+ * secret is kept, how a game process is started, and the application's context.
  *
  * The counterpart of the desktop's host module. The Java manager is the one that
  * fetches the pinned runtime for a major, there is no installer runner (the
@@ -42,6 +42,10 @@ fun androidHostModule(context: Context): Module = module {
         )
     }
     single<Path>(createdAtStart = true) { get<PlatformPaths>().dataDir }
+
+    // The application's context, one of the host's own services, which reaches the modules the host
+    // trusts and no jar: what the system says outside any activity, its night mode among it.
+    single<Context> { app }
 
     // Opened on first use, off the thread that asks: the first open of a Keystore key can take a while.
     single<SecretVault> {

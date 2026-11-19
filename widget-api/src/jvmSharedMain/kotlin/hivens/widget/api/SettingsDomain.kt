@@ -28,6 +28,19 @@ abstract class SettingsDomain<T : Any>(
     abstract fun defaults(): T
 
     /**
+     * The value a launcher started for the first time opens on, where the machine it runs on knows
+     * better than [defaults]: the person's own language, say. Null by default, which opens on
+     * [defaults].
+     *
+     * Asked of the modules compiled into the launcher once, on its first start and on a reset of its
+     * settings, before anything reads the domain. A value other than [defaults] is written to the
+     * domain's file then, as a change of the domain is, [mirrored] fields included, so it is kept from
+     * then on like a choice the person made. A jar is loaded after that, and its domains open on
+     * [defaults].
+     */
+    open fun firstRun(): T? = null
+
+    /**
      * The version of the value's shape this module writes. A file stamped with a higher one was written
      * by a newer build of the module, so the host reads what it can of it and writes nothing back.
      */

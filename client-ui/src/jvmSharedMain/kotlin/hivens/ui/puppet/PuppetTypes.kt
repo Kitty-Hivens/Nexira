@@ -31,6 +31,10 @@ internal data class PuppetSnapshot(
     val elements: List<PuppetElement>,
 )
 
+/** What [PuppetRegistry] holds now, in the wire format. */
+internal fun PuppetRegistry.Snapshot.wire(): PuppetSnapshot =
+    PuppetSnapshot(screen, elements.map { PuppetElement(it.id, it.kind, it.value, it.boolValue, it.enabled) })
+
 @Serializable
 internal data class ScreenResponse(val screen: String)
 

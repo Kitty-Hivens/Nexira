@@ -98,7 +98,6 @@ import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.theme.NxTheme
 import hivens.ui.surface.defaultOpacity
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.model.walkInstances
@@ -301,7 +300,7 @@ fun ShellCenterRegion(instance: WidgetInstance) {
         (graph.walkInstances().firstOrNull { it.kind.value == "appshell.region.left" }
             ?.props?.get("opacityPct") as? JsonPrimitive)?.intOrNull?.regionOpacity()
     }
-    val chrome = NxTheme.colours.step(1).copy(alpha = railOpacity ?: SurfaceKind.Chrome.defaultOpacity())
+    val chrome = NxColor.depth(1).copy(alpha = railOpacity ?: SurfaceKind.Chrome.defaultOpacity())
     val cornerDp = 12.dp
     // This rectangle is what the editor's overlays sit over. Reported rather than
     // reconstructed from the rails' props: a rail animates, folds itself away on a

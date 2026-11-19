@@ -39,7 +39,6 @@ import hivens.ui.puppet.PuppetField
 import hivens.ui.screens.custom.ScreenIcons
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status
 import hivens.widget.model.ScreenSpec
@@ -140,7 +139,7 @@ internal fun ScreenPropertiesPanel(
             onDismiss()
         }
         PuppetClick("screen.delete.confirm") { delete() }
-        val container = NxTheme.colours.step(NxTheme.colours.topStep)
+        val container = NxColor.depth(NxColor.floating)
         OnFill(container) {
             NxAlertDialog(
                 onDismissRequest  = { confirmDelete = false },

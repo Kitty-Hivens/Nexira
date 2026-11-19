@@ -6,13 +6,16 @@ import hivens.i18n.api.I18nKeys
 import hivens.i18n.api.Translator
 import hivens.look.manager.api.LookKeys
 import hivens.look.manager.api.LookProvision
-import hivens.themes.api.ThemesKeys
-import hivens.ui.theme.NeutralTheme
-import hivens.ui.theme.Theme
+import hivens.look.manager.api.LookState
 import hivens.widget.api.BootValues
 import hivens.widget.api.WidgetScope
 import hivens.widget.model.SourceKey
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeoutOrNull
 import org.koin.core.KoinApplication
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 /**
  * One value the shell draws its windows with, as it joins it in: the app source a module answers it
@@ -32,9 +35,9 @@ class LookValue<T>(val key: SourceKey<T>, val fallback: T) {
 }
 
 /**
- * The values the shell joins in: the look, the colours a theme module brings and the words of the
- * language module, each through a [LookValue], the key its module's API names and the fallback the
- * shell draws with where no module answers it.
+ * The values the shell joins in: the look and the words of the language module, each through a
+ * [LookValue], the key its module's API names and the fallback the shell draws with where no module
+ * answers it.
  *
  * The look is one value whatever axes it has, colour or motion or geometry or sound: the look manager
  * answers every axis under the one key, and the shell wraps what it draws in it without knowing any.
@@ -43,28 +46,51 @@ object ShellLookValues {
     /** The answers of every axis of the look. None where no look manager is brought in, and every axis reads its base answers. */
     val Look: LookValue<LookProvision> = LookValue(LookKeys.Provide, LookProvision.NONE)
 
-    /** The theme every window is drawn in. Neutral where no themes module is brought in. */
-    val Theme: LookValue<Theme> = LookValue(ThemesKeys.Active, NeutralTheme)
-
-    /** Whether it is drawn in its dark scheme. Dark where nothing says otherwise, as a first start opens. */
-    val Dark: LookValue<Boolean> = LookValue(ThemesKeys.Dark, true)
-
     /** The words every window is drawn in. Every key as itself where no language module is brought in. */
     val Words: LookValue<Translator> = LookValue(I18nKeys.Words, Translator.KEYS)
 
     /** Every value here. */
-    val all: List<LookValue<*>> = listOf(Look, Theme, Dark, Words)
+    val all: List<LookValue<*>> = listOf(Look, Words)
 }
 
 /**
- * Has this app level make what answers every value the shell draws with. A module makes it on the
- * first read, the language module reading its tables cold, which takes longer than a frame, so a host
- * calls this off the event thread before the shell's first composition reads them there.
+ * Has this app level make what answers every value the shell draws with, and waits, at most [bound],
+ * for the look manager to publish its first answers. A module makes its value on the first read, the
+ * language module reading its tables cold, which takes longer than a frame, and the look manager answers
+ * every axis with its base answers until its first pass has opened the providers the choice names. So a
+ * host calls this off the event thread before the shell's first composition reads them there, and the
+ * shell's first frame is drawn in the look rather than in the base answers.
  */
-fun WidgetScope.prepareLook() = ShellLookValues.all.forEach { find(it.key) }
+fun WidgetScope.prepareLook(bound: Duration = LOOK_BOUND) {
+    ShellLookValues.all.forEach { find(it.key) }
+    runBlocking { awaitLook(bound) }
+}
 
 /** [prepareLook] on the app level of the launcher's graph, [graph], for a host that holds only the graph. */
 fun prepareLook(graph: KoinApplication) = graph.koin.get<WidgetScope>().prepareLook()
+
+/**
+ * Whether the look this app level answers has its first answers: true once the look manager published
+ * its first pass, and where no manager is brought in, whose look is the base answers for good. For a
+ * host whose first frame may come before [prepareLook] is done, and which holds that frame instead.
+ */
+fun WidgetScope.lookPublished(): Boolean = find(LookKeys.State)?.state?.value?.let(::published) ?: true
+
+/** Returns once [lookPublished] is true, or after [bound] all the same. */
+suspend fun WidgetScope.awaitLook(bound: Duration = LOOK_BOUND) {
+    val state = find(LookKeys.State) ?: return
+    withTimeoutOrNull(bound) { state.state.first(::published) }
+}
+
+/** Whether [state] is one a pass of the manager published, rather than the one it starts with. */
+private fun published(state: LookState): Boolean = state !== LookState.EMPTY
+
+/**
+ * How long a host waits for the look's first answers before it draws in what it has. The manager's
+ * first pass opens a provider that reads a file or two, so it is done well inside this, and a provider
+ * that hangs costs the boot no more than this.
+ */
+val LOOK_BOUND: Duration = 2.seconds
 
 /** [value] as [app] answers it now and every time it changes, its fallback where nothing does. */
 @Composable

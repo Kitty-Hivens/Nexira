@@ -12,7 +12,7 @@ import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import javax.swing.SwingUtilities
 import kotlin.test.Test
@@ -30,7 +30,7 @@ class NxFieldFocusTest {
     fun `a press on the field's inset gives it the caret`() = SwingUtilities.invokeAndWait {
         val probe = Probe()
         val scene = ImageComposeScene(300, 60, density = Density(1f)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(Modifier.onFocusChanged { probe.hasFocus = it.hasFocus }) {
                     NxField(value = "", onValueChange = {}, placeholder = "", modifier = Modifier.width(300.dp))
                 }

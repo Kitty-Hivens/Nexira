@@ -12,7 +12,7 @@ import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.onEventThread
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -26,7 +26,7 @@ class ConfirmCodeTypingTest {
         val submitted = mutableListOf<String>()
         TypingScene(600, 500) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = true) {
+                NxThemed(Themes.default, dark = true) {
                     LayerHost(rememberWindowLayers(), Modifier.fillMaxSize()) {
                         ConfirmCodeDialog(onDismiss = {}, onSubmit = { submitted += it })
                     }

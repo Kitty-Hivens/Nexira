@@ -57,7 +57,6 @@ import hivens.widget.model.Entrance
 import hivens.widget.model.WidgetMotion
 import hivens.ui.nx.NxSelect
 import hivens.ui.widgets.MAX_DELAY_MS
-import hivens.ui.widgets.autoEntranceDelayMs
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.PropHidden
 import hivens.widget.model.FillSource
@@ -76,6 +75,7 @@ import kotlinx.serialization.json.JsonObject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
+import hivens.ui.theme.plateOutline
 
 // Right-edge prop editor. Opened by a widget's "tune" chrome affordance,
 // which sets the host's prop target (path + instanceId). Resolves the
@@ -274,7 +274,7 @@ private fun PropPanelBody(
                 ?.indexOfFirst { it.instanceId == instanceId }?.coerceAtLeast(0) ?: 0
             MotionSection(
                 entrance = descriptor.resolveEntrance(instance),
-                delayMs  = instance.motion?.delayMs ?: autoEntranceDelayMs(order),
+                delayMs  = instance.motion?.delayMs ?: Motion.stagger(order),
                 motion   = instance.motion ?: WidgetMotion(),
                 write    = { controller.updateMotion(path, instanceId, it) },
             )
@@ -355,7 +355,9 @@ private fun defaultOpacityOf(spec: SurfaceSpec): Float = parseFill(spec.fill).ki
 @Composable
 private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
     val s = nexiraStrings()
-    val corner = 12f
+    // What the plate draws where the record names nothing, so each row opens on it.
+    val plate = plateOutline
+    val corner = plate.corner.value
 
     // One field, a value or a name. Blank follows the theme, a surface word
     // follows it relative to what holds the widget, a literal does not. A typo
@@ -390,7 +392,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
         keyStep       = 1f,
         onValueChange = { write(surface.copy(blurDp = it)) },
     )
-    // Opens on the style's card corner rather than on a sentinel, and writes
+    // Opens on the plate's corner rather than on a sentinel, and writes
     // the baseline WITHOUT clearing the per-corner overrides beside it: it
     // used to replace the whole record, so moving this slider silently threw
     // away corners set one at a time.
@@ -430,7 +432,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
           )
           LabeledSlider(
               label         = s.text("editorSurfaceSmoothing"),
-              value         = (surface.shape.smoothing ?: 0f) * 100f,
+              value         = (surface.shape.smoothing ?: plate.smoothing) * 100f,
               range         = 0f..100f,
               format        = "%.0f%%",
               keyStep       = 1f,
@@ -461,7 +463,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               }
               LabeledSlider(
                   label         = s.text("editorSurfaceShapePointRounding"),
-                  value         = (surface.shape.pointRounding ?: 0f) * 100f,
+                  value         = (surface.shape.pointRounding ?: plate.pointRounding) * 100f,
                   range         = 0f..100f,
                   format        = "%.0f%%",
                   keyStep       = 1f,

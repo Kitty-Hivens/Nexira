@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.themes.Themes
 import hivens.ui.surface.NxSurface
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.widget.model.PropColor
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
@@ -89,7 +89,7 @@ class PropRowsRenderProbe {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun planes(dark: Boolean) {
         val scene = ImageComposeScene(width = 560, height = 320, density = Density(2f)) {
-            NxTheme(Themes.default, dark = dark) {
+            NxThemed(Themes.default, dark = dark) {
                 Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Row(
                         modifier = Modifier.padding(20.dp),
@@ -102,7 +102,7 @@ class PropRowsRenderProbe {
                                 .size(110.dp, 120.dp)
                                 .shadow(18.dp, MaterialTheme.shapes.large)
                                 .clip(MaterialTheme.shapes.large)
-                                .background(NxTheme.colours.step(1)),
+                                .background(NxColor.depth(1)),
                         )
                         // What they draw now: a popup, the same shadow, and a hairline
                         // lifted off the body.
@@ -132,14 +132,14 @@ class PropRowsRenderProbe {
         val values: JsonObject = defaults()
 
         val scene = ImageComposeScene(width = WIDTH, height = HEIGHT, density = Density(DENSITY)) {
-            NxTheme(Themes.default, dark = dark) {
+            NxThemed(Themes.default, dark = dark) {
                 // The page behind the panel, so the plane's own edge is visible rather
                 // than being the same colour as everything around it.
                 Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     Column(
                         modifier = Modifier
                             .width(PANEL_DP.dp)
-                            .background(NxTheme.colours.step(1))
+                            .background(NxColor.depth(1))
                             .padding(horizontal = GUTTER_DP.dp, vertical = GUTTER_DP.dp),
                         verticalArrangement = Arrangement.spacedBy(4.dp),
                     ) {

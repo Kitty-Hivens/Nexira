@@ -54,7 +54,7 @@ fun EmptySlotPlaceholder(
 ) {
     val s = nexiraStrings()
     DisposableEffect(path, registry) { onDispose { registry.withdrawPlaceholder(path) } }
-    val breathRhythm = Motion.ownRhythm(BREATH_MS)
+    val breathRhythm = Motion.ambient(BREATH_MS)
     val breath by rememberInfiniteTransition(label = "empty-slot-breath").animateFloat(
         initialValue  = 0.45f,
         targetValue   = 0.85f,

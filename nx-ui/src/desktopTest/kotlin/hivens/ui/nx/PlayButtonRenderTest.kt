@@ -20,7 +20,7 @@ import org.jetbrains.skia.Image
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 
 /**
@@ -36,7 +36,7 @@ class PlayButtonRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun render(dark: Boolean, name: String) {
         val scene = ImageComposeScene(width = 1150, height = 360, density = Density(2f)) {
-            NxTheme(TestTheme, dark = dark) {
+            NxThemed(TestTheme, dark = dark) {
                 Column(
                     modifier            = Modifier.fillMaxSize().background(Color(BACKDROP)).padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp),

@@ -1,0 +1,19 @@
+plugins {
+    id("nexira.look")
+}
+
+// The colour axis of the look: what a widget asks of colour, by role and in neutral words, the answers
+// a provider fills in, and the colourless answers that hold where no provider answers. It knows no
+// provider and no design system, only the manager's API it registers through.
+// Its version is nexira.lookColourApi in gradle.properties.
+look {
+    api()
+}
+
+kotlin.sourceSets.named("jvmSharedMain") {
+    dependencies {
+        api(project(":look:manager-api"))
+        api(libs.compose.ui)
+        implementation(libs.compose.runtime)
+    }
+}

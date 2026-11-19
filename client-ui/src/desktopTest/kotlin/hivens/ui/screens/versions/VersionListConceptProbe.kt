@@ -43,7 +43,7 @@ import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.surface.NxSurface
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.utils.humanSize
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
@@ -293,7 +293,7 @@ class VersionListConceptProbe {
         val out = Path.of("build/render", name)
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(900, 760, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) { Window(selected, installed) }
+            NxThemed(Themes.default, dark = true) { Window(selected, installed) }
         }
         val png = try {
             var t = 0L

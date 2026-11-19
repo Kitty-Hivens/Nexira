@@ -640,11 +640,16 @@ class JsonMigrationsTest {
             // the project page and the catalogue pack page, once screens of their own
             "project",
             "catalogue.pack",
+            // the slots the settings screen leaves for the colour provider's controls
+            "settings.appearance",
         )
 
         val SLOTS_ADDED_SINCE_FIXTURE = mapOf(
             // the top bar rendered these two lanes before any layout declared them
             "appshell.topbar/general" to setOf("center", "right"),
+            // the colour provider's controls: the picker's header, and the Appearance studio's theme island
+            "theme.picker/general" to setOf("header"),
+            "bg.settings/general" to setOf("theme", "theme.link", "motion"),
         )
     }
 }

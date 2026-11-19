@@ -19,7 +19,7 @@ import hivens.source.mirror.MirrorPackSource
 import hivens.source.mirror.MirrorSourceModule
 import hivens.themes.Themes
 import hivens.ui.puppet.PuppetRegistry
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.HostApi
 import hivens.widget.api.LevelServices
@@ -94,7 +94,7 @@ class BrowseCommandsTest {
             LocalWidgetRegistry provides GeneratedWidgetRegistry,
             LocalScope provides window,
         ) {
-            ModuleLanguageProvider("en", listOf(MirrorSourceModule)) { NxTheme(Themes.default, dark = true) { content() } }
+            ModuleLanguageProvider("en", listOf(MirrorSourceModule)) { NxThemed(Themes.default, dark = true) { content() } }
         }
     }
 

@@ -2,6 +2,7 @@ package hivens.ui.nx
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.snap
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -31,15 +32,21 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
-import hivens.ui.customization.LocalCustomization
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 
 /**
  * A generic in-plane settings row: optional [icon] + [title] (+ [subtitle]) on the
@@ -85,7 +92,7 @@ fun NxRow(
     trailing: @Composable () -> Unit = {},
 ) {
     val rowModifier = if (onClick != null) {
-        val shape = MaterialTheme.shapes.medium
+        val shape = Shape.card
         val interaction = remember { MutableInteractionSource() }
         val alpha = softHoverAlpha(interaction, highlighted)
         val tint = NxInk.main
@@ -96,9 +103,9 @@ fun NxRow(
             .drawBehind { drawSoftHover(tint, alpha.value) }
             .layerTrigger()
             .clickable(interactionSource = interaction, indication = null, onClick = onClick)
-            .padding(horizontal = edgeBleed, vertical = Spacing.s8)
+            .padding(horizontal = edgeBleed, vertical = 8.dp)
     } else {
-        Modifier.fillMaxWidth().padding(vertical = if (compact) Spacing.s4 else Spacing.s8)
+        Modifier.fillMaxWidth().padding(vertical = if (compact) 4.dp else 8.dp)
     }
     Row(
         modifier              = modifier.then(rowModifier),
@@ -112,7 +119,7 @@ fun NxRow(
         Row(label, verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
                 Symbol(icon, null, tint = iconTint, size = if (compact) 16.dp else 22.dp)
-                Spacer(Modifier.width(if (compact) Spacing.s8 else Spacing.s12))
+                Spacer(Modifier.width(if (compact) 8.dp else 12.dp))
             }
             Column {
                 Text(
@@ -132,7 +139,7 @@ fun NxRow(
                 }
             }
         }
-        Spacer(Modifier.width(if (compact) Spacing.s8 else Spacing.s12))
+        Spacer(Modifier.width(if (compact) 8.dp else 12.dp))
         // The trailing slot takes the rest of the row when the label is pinned, so a
         // field or a slider fills the column it was given rather than wrapping to its
         // own content and leaving a gap the eye reads as a missing control.
@@ -159,10 +166,9 @@ internal fun softHoverAlpha(interaction: MutableInteractionSource, held: Boolean
         hovered || held -> 0.06f
         else    -> 0f
     }
-    val still = LocalCustomization.current.reduceMotion
     return animateFloatAsState(
         targetValue   = target,
-        animationSpec = if (still) snap() else Motion.tap,
+        animationSpec = Motion.decoration(Motion.tap) ?: snap(),
         label         = "softHoverAlpha",
     )
 }
@@ -188,5 +194,39 @@ private fun Modifier.bleedHorizontally(amount: Dp): Modifier = layout { measurab
     val placeable = measurable.measure(constraints.copy(maxWidth = maxWidth))
     layout((placeable.width - extra).coerceAtLeast(0), placeable.height) {
         placeable.place(-amount.roundToPx(), 0)
+    }
+}
+
+@Preview
+@Composable
+private fun NxRowDarkPreview() = RowForms(dark = true)
+
+@Preview
+@Composable
+private fun NxRowLightPreview() = RowForms(dark = false)
+
+@Composable
+private fun RowForms(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(Modifier.width(440.dp).background(NxColor.page).padding(16.dp)) {
+            NxSurface(SurfaceKind.Panel, Modifier.fillMaxWidth()) {
+                Column(Modifier.fillMaxWidth().padding(16.dp)) {
+                    NxRow("Plain row")
+                    NxRow("With icon", icon = NxIcon.Memory, subtitle = "A line of detail under the title") {
+                        NxSwitch(checked = true, onCheckedChange = {})
+                    }
+                    NxRow("Clickable", icon = NxIcon.Folder, onClick = {}) {
+                        Symbol(NxIcon.ChevronRight, null, tint = NxInk.quiet)
+                    }
+                    NxRow("Highlighted", icon = NxIcon.Folder, onClick = {}, highlighted = true)
+                    NxRow("Compact", icon = NxIcon.Tune, compact = true) {
+                        NxSwitch(checked = false, onCheckedChange = {})
+                    }
+                    NxRow("Pinned label", compact = true, labelWidth = 120.dp) {
+                        NxField(value = "1920", onValueChange = {}, placeholder = "Width")
+                    }
+                }
+            }
+        }
     }
 }

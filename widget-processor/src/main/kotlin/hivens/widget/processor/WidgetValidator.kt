@@ -55,6 +55,8 @@ internal object WidgetValidator {
         val enter: String? = null,
         /** The source and command ids the widget reads, in the order declared. */
         val needs: List<String> = emptyList(),
+        /** The id of the Boolean source the widget is shown under, or null for one shown everywhere. */
+        val shownWhen: String? = null,
     )
 
     // KSP entry point. Returns the extracted annotation args, or null
@@ -255,6 +257,12 @@ internal object WidgetValidator {
             return null
         }
 
+        val shownWhen = (args["shownWhen"] as? String).orEmpty()
+        shownWhenFault(shownWhen, needs)?.let {
+            env.logger.error("@Widget '$id' $it", symbol)
+            return null
+        }
+
         // Until now nothing in the processor referenced the two service
         // annotations, so a widget could claim a contract it never registers,
         // or read one no widget provides, and the build stayed quiet either
@@ -273,7 +281,22 @@ internal object WidgetValidator {
             sizing = sizing,
             enter = Entrance.parse(rawEnter)?.name,
             needs = needs,
+            shownWhen = shownWhen.ifEmpty { null },
         )
+    }
+
+    /**
+     * What is wrong with a widget's show condition, or null when nothing is. Empty is fine
+     * and means no condition. A blank one names no key, so the widget would be hidden on
+     * every surface. One also listed in [needs] asks for two answers to the same absence:
+     * a missing need marks the widget misplaced, a missing condition hides it. Whether the
+     * id names a Boolean source is a question for the running app, as it is for a need.
+     */
+    internal fun shownWhenFault(shownWhen: String, needs: List<String>): String? {
+        if (shownWhen.isEmpty()) return null
+        if (shownWhen.isBlank()) return "declares a blank show condition"
+        if (shownWhen in needs) return "names '$shownWhen' both as a need and as its show condition"
+        return null
     }
 
     /**

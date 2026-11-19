@@ -19,7 +19,7 @@ import hivens.ui.host.HostKoin
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.puppet.PuppetRegistry
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.koin.dsl.koinApplication
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -48,14 +48,11 @@ class UnsupportedToggleTest {
         val scene = ImageComposeScene(900, 2000, density = Density(1f)) {
             HostKoin(koin) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(Themes.default, dark = true) {
+                    NxThemed(Themes.default, dark = true) {
                         Column(Modifier.verticalScroll(rememberScrollState())) {
                             AppearanceSection(
                                 form = form,
                                 save = {},
-                                isDarkTheme = true,
-                                onToggleTheme = {},
-                                onOpenThemePicker = {},
                                 onOpenBackgroundSettings = {},
                                 currentLanguage = NexiraStrings.translator("en").language,
                                 languages = ShippedLanguages.all,

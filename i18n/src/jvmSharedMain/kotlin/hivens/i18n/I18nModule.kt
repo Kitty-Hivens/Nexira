@@ -39,6 +39,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.nio.file.Path
+import java.util.Locale
 
 /**
  * The language module as the application carries it: compiled in, and brought in by a
@@ -77,6 +78,23 @@ object I18nSettingsDomain : SettingsDomain<I18nSettings>("i18n", I18nSettings.se
     private const val LEGACY_FIELD = "locale"
 
     override fun defaults(): I18nSettings = I18nSettings()
+
+    /** The machine's own language where the launcher ships it, so the first window speaks it. */
+    override fun firstRun(): I18nSettings = I18nSettings(firstLanguage(Locale.getDefault()))
+
+    /**
+     * The shipped language closest to [system]: its language when the launcher ships it, English
+     * otherwise.
+     *
+     * Matched on the language alone, so ru_UA, ru_KZ and ru_RU all land on Russian: the region decides
+     * date formats, not which words a person reads. An unshipped language falls back to English rather
+     * than to a neighbouring one: German serves a German-speaking Swiss person, nothing here serves a
+     * Polish one, and guessing at that is worse than the language the launcher is documented in.
+     */
+    internal fun firstLanguage(system: Locale, shipped: Set<String> = ShippedLanguages.tags): String {
+        val language = system.language.lowercase(Locale.ROOT)
+        return if (language in shipped) language else ENGLISH
+    }
 
     override fun imported(legacy: JsonObject, current: I18nSettings?): I18nSettings? =
         (legacy[LEGACY_FIELD] as? JsonPrimitive)?.contentOrNull?.trim()?.takeIf { it.isNotEmpty() }?.let { language ->

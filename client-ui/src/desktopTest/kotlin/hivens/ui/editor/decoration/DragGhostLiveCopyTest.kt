@@ -21,7 +21,7 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.layout.LayoutGraphRepository
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.LayoutGraph
@@ -78,7 +78,7 @@ class DragGhostLiveCopyTest {
         var sawDrag = false
 
         val scene = ImageComposeScene(width = 300, height = 300, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize()) {
                     Column {
                         EditableWidgetChrome(

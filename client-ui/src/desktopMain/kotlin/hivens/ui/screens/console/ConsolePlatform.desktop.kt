@@ -27,7 +27,6 @@ import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
 import java.awt.datatransfer.StringSelection
 import java.io.File
 
@@ -35,13 +34,14 @@ import java.io.File
 internal actual fun ConsoleContextMenu(entries: () -> List<ConsoleMenuEntry>, content: @Composable () -> Unit) {
     // Themed right-click popup (Compose-drawn, not the dated Swing default),
     // cut from the top step the way a popup is.
-    val colours = NxTheme.colours
-    val menuRepresentation = remember(colours) {
-        val top = colours.step(colours.topStep)
+    val top = NxColor.depth(NxColor.floating)
+    val text = NxInk.main
+    val lead = NxColor.lead()
+    val menuRepresentation = remember(top, text, lead) {
         DefaultContextMenuRepresentation(
             backgroundColor = top,
-            textColor       = colours.inkMain,
-            itemHoverColor  = lerp(top, colours.lead, 0.14f),
+            textColor       = text,
+            itemHoverColor  = lerp(top, lead, 0.14f),
         )
     }
     CompositionLocalProvider(LocalContextMenuRepresentation provides menuRepresentation) {

@@ -4,7 +4,7 @@ import hivens.themes.Themes
 import hivens.ui.TypingScene
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -18,7 +18,7 @@ class NumberRowTypingTest {
         val changes = mutableListOf<JsonElement>()
         TypingScene(400, 80) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = true) {
+                NxThemed(Themes.default, dark = true) {
                     PropFieldRow(
                         label = "Size",
                         element = Long.serializer().descriptor,

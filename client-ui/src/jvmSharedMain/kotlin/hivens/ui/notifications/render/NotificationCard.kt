@@ -87,7 +87,7 @@ fun NotificationCard(
     // appears already opened into stale history.
     var expanded by remember(group.sourceKey, group.count) { mutableStateOf(false) }
     // Read here, not inside the drag coroutine: a role needs composition.
-    val swipeSpec = Motion.panelSlide.of<Float>()
+    val swipeSpec = Motion.dismiss.of<Float>()
     val accentStatus = severityStatus(group.severity, group.kind)
     // Critical pulses; everything else holds a steady accent. A State, read only in
     // the stripe's draw below, as NxSurface and NxRow hold theirs: read here it
@@ -348,7 +348,7 @@ private fun HistoryRow(event: NotificationEvent, now: Instant) {
 
 @Composable
 private fun criticalPulse(): State<Float> {
-    val pulseRhythm = Motion.ownRhythm(CRITICAL_PULSE_MS)
+    val pulseRhythm = Motion.ambient(CRITICAL_PULSE_MS)
     val transition = rememberInfiniteTransition(label = "critical-pulse")
     return transition.animateFloat(
         initialValue = 0.55f,

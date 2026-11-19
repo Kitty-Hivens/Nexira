@@ -10,11 +10,14 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -29,13 +32,20 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hivens.ui.effects.pixelArtBackground
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxThemed
+import hivens.look.colour.api.Fill
+import hivens.look.colour.api.Ink
 import kotlinx.serialization.Serializable
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -120,7 +130,7 @@ fun PlayButton(
         Row(
             modifier = modifier,
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(Spacing.s12),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text(
                 text       = label,
@@ -208,8 +218,8 @@ private fun Plate(
     val pad = when {
         !words && compact -> PaddingValues(7.dp)
         !words            -> PaddingValues(9.dp)
-        compact           -> PaddingValues(horizontal = Spacing.s14, vertical = Spacing.s6)
-        else              -> PaddingValues(horizontal = Spacing.s20, vertical = 9.dp)
+        compact           -> PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+        else              -> PaddingValues(horizontal = 20.dp, vertical = 9.dp)
     }
     val showFigures = figures && tone == PlayTone.Waiting && progress != null
 
@@ -288,7 +298,6 @@ private class PlayInks(
 
 @Composable
 private fun playInks(ground: PlayGround): PlayInks {
-    val scheme = NxTheme.colours.scheme
     val dark = NxTheme.isDark
     return when (ground) {
         PlayGround.Media -> PlayInks(
@@ -302,11 +311,12 @@ private fun playInks(ground: PlayGround): PlayInks {
             warn      = MEDIA_WARN,
             caption   = Color.White.copy(alpha = 0.82f),
         )
-        // The theme's two ends, crossed: the plate is its main ink and the word on it
-        // is its page, so the control is the strongest contrast the theme has.
+        // The look turned over: the plate is the inverse fill and the word on it the
+        // inverse ink, which for nx is its main ink and its page, so the control is the
+        // strongest contrast the theme has.
         PlayGround.Surface -> PlayInks(
-            plate     = scheme.inks[0],
-            onPlate   = scheme.steps[0],
+            plate     = Fill.inverse,
+            onPlate   = Ink.inverse,
             quiet     = NxInk.quiet,
             quietLine = NxInk.quiet.copy(alpha = 0.35f),
             warn      = NxColor.status(Status.Warning),
@@ -320,3 +330,66 @@ private val MEDIA_WARN = Color(0xFFE0B341)
 
 /** The width of the plain Play plate at the longest shipped verb, measured off a render. */
 private val PLATE_MIN_WIDTH = 116.dp
+
+@Preview
+@Composable
+private fun PlayButtonDarkPreview() = PlayButtonGrounds(dark = true)
+
+@Preview
+@Composable
+private fun PlayButtonLightPreview() = PlayButtonGrounds(dark = false)
+
+@Composable
+private fun PlayButtonGrounds(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(760.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(
+                modifier            = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .pixelArtBackground("play-button", Color(0xFF2E4A6B), Color(0xFF6B3E5C))
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                PlayButtonTones(PlayGround.Media)
+            }
+            NxSurface(SurfaceKind.Card) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    PlayButtonTones(PlayGround.Surface)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayButtonTones(ground: PlayGround) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        PlayButton("Play", onClick = {}, ground = ground)
+        PlayButton("Preparing", onClick = {}, ground = ground, tone = PlayTone.Waiting, progress = 0.4f)
+        PlayButton("Preparing", onClick = {}, ground = ground, tone = PlayTone.Waiting)
+        PlayButton("Busy", onClick = {}, ground = ground, tone = PlayTone.Unavailable, icon = NxIcon.HourglassEmpty)
+        PlayButton("Broken", onClick = {}, ground = ground, tone = PlayTone.Problem, icon = NxIcon.Warning)
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        PlayButton("Stop", onClick = {}, ground = ground, icon = NxIcon.Stop)
+        PlayButton("Play", onClick = {}, ground = ground, compact = true)
+        PlayButton("Play", onClick = {}, ground = ground, iconOnly = true)
+        PlayButton("Play", onClick = {}, ground = ground, iconOnly = true, compact = true)
+        PlayButton(
+            label    = "Another game is running",
+            onClick  = {},
+            ground   = ground,
+            tone     = PlayTone.Unavailable,
+            layout   = PlayLayout.Caption,
+            icon     = NxIcon.Block,
+        )
+    }
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        PlayButton("Downloading files", onClick = {}, ground = ground, tone = PlayTone.Waiting, progress = 0.62f, layout = PlayLayout.Caption)
+        PlayButton("Files are damaged", onClick = {}, ground = ground, tone = PlayTone.Problem, layout = PlayLayout.Caption, icon = NxIcon.Warning)
+    }
+}

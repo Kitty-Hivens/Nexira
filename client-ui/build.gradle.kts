@@ -171,14 +171,29 @@ kotlin {
                 // nothing of either but their CompiledModule.
                 implementation(project(":i18n-api"))
                 implementation(project(":i18n"))
-                implementation(project(":themes-api"))
-                implementation(project(":themes"))
+                implementation(project(":look:colour-nx-api"))
+                implementation(project(":look:colour-nx"))
                 // The look manager, the same way: its API for the one key the shell reads the
                 // look through, the module compiled in.
                 implementation(project(":look:manager-api"))
                 implementation(project(":look:manager"))
+                // The axes of the look and the packs that ship, compiled in for the manager to
+                // take whether a document names them or not. The shell compiles against none of
+                // them beyond listing their CompiledModule.
+                implementation(project(":look:colour-api"))
+                implementation(project(":look:motion-api"))
+                implementation(project(":look:shape-api"))
+                implementation(project(":look:packs"))
+                // The nx motion and shape providers, compiled in like the colour one.
+                implementation(project(":look:motion-nx"))
+                implementation(project(":look:shape-nx"))
+                // The nx providers' controls, compiled in like the providers: the shell names
+                // nothing of them beyond their CompiledModule, and draws their widgets by kind.
+                implementation(project(":look:colour-nx-controls"))
+                implementation(project(":look:motion-nx-controls"))
                 implementation(project(":nx-ui"))
                 implementation(project(":ui-layers"))
+                implementation(project(":ui-puppet"))
                 implementation(project(":client-i18n"))
                 implementation(project(":client-render3d"))
                 implementation(project(":client-easter"))

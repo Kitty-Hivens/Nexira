@@ -20,13 +20,14 @@ import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
 import hivens.ui.settings.SettingsDomainFiles
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.WidgetSurface
-import hivens.ui.widgets.themepicker.ThemeSelectionSource
+import hivens.ui.widgets.themepicker.bringInControls
+import hivens.ui.widgets.themepicker.launcherAndControls
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
@@ -39,9 +40,9 @@ import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
 import hivens.widget.api.registerModuleKeys
-import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.ScopeLevel
+import hivens.widget.model.SourceKey
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -80,6 +81,9 @@ class PalettePreviewSamplesTest {
         // answered wherever a widget stands, so only the page's keys are left for the
         // samples to stand in for.
         registerModuleKeys(ThemesApi.ID, ThemesKeysContribution, sampled, commands, ContributedServices(), trusted = true)
+        // The colour provider's controls, whose page key the picker's widgets read, and the look's
+        // state with nx drawing the colour, which they draw under.
+        bringInControls(sampled, commands)
     }
 
     /** Where the themes module's manager, which those keys are answered over, keeps its files. */
@@ -102,7 +106,7 @@ class PalettePreviewSamplesTest {
     private val bare = WidgetDataRegistry().apply {
         register(ThemesKeys.Offered, flowSource(MutableStateFlow(Themes.all)))
         register(ThemesKeys.Dark, flowSource(MutableStateFlow(true)))
-        declare(ThemeSelectionSource)
+        declare(SourceKey<Any>("theme.picker.selection", ScopeLevel.Page))
     }
 
     /** What the gallery makes of [kind], drawn the way the palette draws it, under a composition like the editor's. */
@@ -120,12 +124,12 @@ class PalettePreviewSamplesTest {
             var host: OffscreenPreviewHost? = null
             val scene = ImageComposeScene(400, 400, density = Density(1f)) {
                 ShippedLanguageProvider("en") {
-                    NxTheme(Themes.default, dark = true) {
+                    NxThemed(Themes.default, dark = true) {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides commands,
                             LocalScope provides app,
-                            LocalWidgetRegistry provides GeneratedWidgetRegistry,
+                            LocalWidgetRegistry provides launcherAndControls,
                             LocalLayoutGraph provides DefaultLayout.load(),
                             LocalWidgetSurfaceRenderer provides { spec, body -> WidgetSurface(spec, body) },
                         ) {
@@ -140,7 +144,7 @@ class PalettePreviewSamplesTest {
                 scene.render().close()
                 val gallery = checkNotNull(host)
                 try {
-                    runBlocking { gallery.draw(widget, checkNotNull(GeneratedWidgetRegistry[widget])) }
+                    runBlocking { gallery.draw(widget, checkNotNull(launcherAndControls[widget])) }
                     gallery.peek(widget)
                 } finally {
                     gallery.close()

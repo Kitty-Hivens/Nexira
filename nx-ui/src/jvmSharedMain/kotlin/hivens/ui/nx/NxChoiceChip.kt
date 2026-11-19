@@ -3,7 +3,10 @@ package hivens.ui.nx
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -11,10 +14,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.OnFill
-import hivens.ui.theme.Spacing
 
 /**
  * A small selectable chip (e.g. regex / bold). Selected = a wash of the theme's lead
@@ -31,7 +38,7 @@ fun NxChoiceChip(
     enabled: Boolean = true,
     onToggle: () -> Unit,
 ) {
-    val shape = MaterialTheme.shapes.small
+    val shape = Shape.control
     val alpha = if (enabled) 1f else 0.4f
     val bg = if (selected) NxColor.wash(NxColor.lead(), 0.18f * alpha)
              else NxColor.wash(NxInk.quiet, 0.08f * alpha)
@@ -56,7 +63,30 @@ fun NxChoiceChip(
                     enabled           = enabled,
                     onClick           = onToggle,
                 )
-                .padding(horizontal = Spacing.s10, vertical = Spacing.s6),
+                .padding(horizontal = 10.dp, vertical = 6.dp),
         )
+    }
+}
+
+@Preview
+@Composable
+private fun NxChoiceChipDarkPreview() = ChoiceChipStates(dark = true)
+
+@Preview
+@Composable
+private fun NxChoiceChipLightPreview() = ChoiceChipStates(dark = false)
+
+@Composable
+private fun ChoiceChipStates(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            NxChoiceChip("Regex", selected = true, onToggle = {})
+            NxChoiceChip("Bold", selected = false, onToggle = {})
+            NxChoiceChip("Locked on", selected = true, enabled = false, onToggle = {})
+            NxChoiceChip("Locked off", selected = false, enabled = false, onToggle = {})
+        }
     }
 }

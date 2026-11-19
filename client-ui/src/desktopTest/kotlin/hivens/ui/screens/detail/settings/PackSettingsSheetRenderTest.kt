@@ -23,7 +23,7 @@ import hivens.launcher.sources.EngineSources
 import hivens.themes.Themes
 import hivens.ui.components.loadedSources
 import hivens.ui.host.HostKoin
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.widget.api.LocalWidgetDataRegistry
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -125,7 +125,7 @@ class PackSettingsSheetRenderTest {
             HostKoin(app) {
                 // The sheet names the pack's source among the ones brought in, as a host lists them.
                 CompositionLocalProvider(LocalWidgetDataRegistry provides loadedSources()) {
-                    NxTheme(Themes.default, dark = true) {
+                    NxThemed(Themes.default, dark = true) {
                         // A vivid backdrop so any bleed-through of the sheet shows up as a
                         // pink tint, which proves the sheet is opaque and the page beside it is not.
                         Box(Modifier.fillMaxSize().background(Color(BACKDROP))) {

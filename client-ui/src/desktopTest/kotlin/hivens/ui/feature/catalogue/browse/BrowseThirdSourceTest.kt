@@ -20,7 +20,7 @@ import hivens.source.mirror.MirrorSourceModule
 import hivens.themes.Themes
 import hivens.ui.icons.NxIcon
 import hivens.ui.puppet.PuppetRegistry
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.HostApi
@@ -115,7 +115,7 @@ class BrowseThirdSourceTest {
             LocalWidgetRegistry provides GeneratedWidgetRegistry,
             LocalScope provides window,
         ) {
-            ModuleLanguageProvider("en", listOf(MirrorSourceModule, ShelfModule)) { NxTheme(Themes.default, dark = true) { content() } }
+            ModuleLanguageProvider("en", listOf(MirrorSourceModule, ShelfModule)) { NxThemed(Themes.default, dark = true) { content() } }
         }
     }.also { scenes += it }
 

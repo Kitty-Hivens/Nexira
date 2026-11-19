@@ -6,7 +6,6 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -70,7 +69,6 @@ import hivens.ui.nx.NxTabRow
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.feature.catalogue.project.loaderLabel
-import hivens.ui.customization.LocalCustomization
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -243,24 +241,24 @@ fun PackSettingsSheet(
         // The section being left goes first, fading where it stands, and the next one
         // comes in a moment later from the side its tab is on. Moving both at once laid
         // two panes over each other for the length of the move.
-        val still = LocalCustomization.current.reduceMotion
-        val slide = Motion.panelSlide
+        // Null where the look holds decoration still: the section then changes at once.
+        val slide = Motion.decoration(Motion.panelSlide)
         val fade = Motion.fade
         val leave = Motion.tap
         AnimatedContent(
             targetState = selected,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             transitionSpec = {
-                if (still) {
+                if (slide == null) {
                     EnterTransition.None togetherWith ExitTransition.None
                 } else {
                     val forward = categories.indexOf(targetState) > categories.indexOf(initialState)
                     val towards = if (forward) 1 else -1
                     val after = leave.durationMs
                     (
-                        slideInHorizontally(tween(slide.durationMs, after, slide.easing)) { it / SECTION_TRAVEL * towards } +
-                            fadeIn(tween(fade.durationMs, after, fade.easing))
-                        ) togetherWith fadeOut(tween(leave.durationMs, easing = leave.easing))
+                        slideInHorizontally(slide.of(delayMs = after)) { it / SECTION_TRAVEL * towards } +
+                            fadeIn(fade.of(delayMs = after))
+                        ) togetherWith fadeOut(leave.of())
                 }
             },
             label = "packSettingsSection",

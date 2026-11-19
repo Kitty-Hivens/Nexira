@@ -9,7 +9,6 @@ import hivens.ui.feature.catalogue.project.ProjectPageSource
 import hivens.ui.screens.custom.ScreenIcons
 import hivens.ui.widgets.about.AboutUpdateSource
 import hivens.ui.widgets.about.OpenUpdateDialog
-import hivens.ui.widgets.themepicker.ThemeSelectionSource
 import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScreenSpec
@@ -148,8 +147,17 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.text("editorSurfTheme") },
             shortName = { it.text("editorSurfShortTheme") },
-            provides  = setOf(ThemeSelectionSource.id),
             mountedOn = { screen -> screen == Screen.ThemePicker },
+            ownerRegion = "appshell.region.center",
+        ),
+        // The slots the settings screen leaves in its Appearance section, for the colour
+        // provider's controls, while the rest of the screen is not a widget surface yet.
+        EditorSurfaceSpec(
+            id        = SurfaceId("settings.appearance"),
+            icon      = NxIcon.Home,
+            name      = { it.text("editorSurfSettingsAppearance") },
+            shortName = { it.text("editorSurfShortSettingsAppearance") },
+            mountedOn = { screen -> screen == Screen.Settings },
             ownerRegion = "appshell.region.center",
         ),
     )

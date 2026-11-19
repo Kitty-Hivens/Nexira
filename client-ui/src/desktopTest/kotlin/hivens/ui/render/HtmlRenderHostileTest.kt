@@ -7,7 +7,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import hivens.themes.Themes
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import hivens.ui.theme.NxColor
@@ -26,7 +26,7 @@ class HtmlRenderHostileTest {
     private fun layOut(markdown: String): Long {
         val started = System.nanoTime()
         val scene = ImageComposeScene(600, 400, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 Box(Modifier.fillMaxSize().background(NxColor.page)) {
                     MarkdownHtml(markdown = markdown, onLink = {})
                 }

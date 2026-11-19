@@ -9,7 +9,7 @@ plugins {
 dependencies {
     api(project(":widget-model"))
     api(project(":widget-api"))
-    implementation(project(":themes-api"))
+    implementation(project(":look:colour-nx-api"))
     implementation(libs.compose.runtime)
     implementation(libs.compose.ui)
 

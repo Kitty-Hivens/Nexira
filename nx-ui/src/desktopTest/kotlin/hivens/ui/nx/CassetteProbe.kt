@@ -42,8 +42,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -96,9 +95,9 @@ class CassetteProbe {
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
         val d = 3f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -135,13 +134,13 @@ class CassetteProbe {
                 if (repeatOn) accent.copy(alpha = 0.22f) else plate,
                 if (repeatOn) accent else tint,
             )
-            Spacer(Modifier.width(Spacing.s8))
+            Spacer(Modifier.width(8.dp))
             Key(NxIcon.QueueMusic, plate, tint)
             Spacer(Modifier.weight(1f))
             Key(NxIcon.SkipPrevious, plate, tint)
-            Spacer(Modifier.width(Spacing.s6))
+            Spacer(Modifier.width(6.dp))
             Key(NxIcon.Pause, accent, onAccent, width = 46, glyph = 20)
-            Spacer(Modifier.width(Spacing.s6))
+            Spacer(Modifier.width(6.dp))
             Key(NxIcon.SkipNext, plate, tint)
             Spacer(Modifier.weight(1f))
             Key(NxIcon.MoreVert, plate, tint)
@@ -386,7 +385,7 @@ class CassetteProbe {
                             album, style = MaterialTheme.typography.labelSmall, color = inkSoft,
                             maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, false),
                         )
-                        Spacer(Modifier.width(Spacing.s8))
+                        Spacer(Modifier.width(8.dp))
                         Text(
                             "$elapsed / $total", style = MaterialTheme.typography.labelSmall,
                             color = inkSoft, maxLines = 1,
@@ -427,10 +426,10 @@ class CassetteProbe {
             SurfaceKind.Card, Modifier.width(340.dp),
             shape = MaterialTheme.shapes.medium,
         ) {
-            Column(Modifier.fillMaxWidth().padding(Spacing.s12)) {
+            Column(Modifier.fillMaxWidth().padding(12.dp)) {
                 Cassette(fraction, scrubbing, spool, inside, repeatOn, paper, ink, inkSoft)
                 if (!inside) {
-                    Spacer(Modifier.height(Spacing.s12))
+                    Spacer(Modifier.height(12.dp))
                     Controls(
                         plate = Color.White.copy(alpha = 0.07f),
                         tint = c.quiet,
@@ -447,9 +446,9 @@ class CassetteProbe {
     private fun SpoolSheet() {
         val c = probeInks()
         val shell = lerp(c.top, Color.Black, 0.45f)
-        Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.s12)) {
+        Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(12.dp)) {
             Spool.entries.chunked(2).forEach { pair ->
-                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.s16)) {
+                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(16.dp)) {
                     pair.forEach { spool ->
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Box(
@@ -459,7 +458,7 @@ class CassetteProbe {
                             ) {
                                 Window(107f / 295f, false, spool, Modifier.width(196.dp).height(60.dp))
                             }
-                            Spacer(Modifier.height(Spacing.s6))
+                            Spacer(Modifier.height(6.dp))
                             Text(
                                 spool.label, style = MaterialTheme.typography.labelMedium,
                                 color = c.quiet,

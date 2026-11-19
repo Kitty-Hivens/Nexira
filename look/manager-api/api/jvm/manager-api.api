@@ -211,3 +211,13 @@ public abstract interface class hivens/look/manager/api/LookView {
 	public abstract fun getState ()Lkotlinx/coroutines/flow/StateFlow;
 }
 
+public final class hivens/look/manager/api/Status : java/lang/Enum {
+	public static final field Error Lhivens/look/manager/api/Status;
+	public static final field Info Lhivens/look/manager/api/Status;
+	public static final field Success Lhivens/look/manager/api/Status;
+	public static final field Warning Lhivens/look/manager/api/Status;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lhivens/look/manager/api/Status;
+	public static fun values ()[Lhivens/look/manager/api/Status;
+}
+

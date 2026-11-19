@@ -108,27 +108,22 @@ is what stops them coming back.
   (`EmptySlotPlaceholder.kt:71-77`). Dropping lower hit-tests to null and is
   discarded in silence (`PaletteItem.kt:103`).
 
-## 5. Styles have more freedom than the components survive
+## 5. Components that step outside the look
 
-- **Brut's headline difference never arrives.** `cardBorder = 1.dp`
-  (`StyleSpec.kt:162`) is read by exactly one composable in the tree,
-  `NotificationCard.kt:114`. `cardSurface = Flat` (`:163`) is read only by an
-  AprilFools flag. Settings consumes neither, so under Brut it is not flat and
-  has no hard borders.
-- **Settings stays a glass page under Brut.** `SettingsScreen.kt:71-74` keeps
-  `glass = true`, so a wallpaper blur is still requested.
-- **Three editor panels animate under a style that says not to.**
-  `WidgetPalettePanel.kt:95-96`, `WidgetPropPanel.kt:103-104`,
-  `SurfacePropertiesPanel.kt:82-83` use raw `spring()`, which is not
-  duration-based and never reads `animationDurationMs`. Under Brut
-  (`animationMultiplier = 0`) they still slide and fade. The pill and the
-  vignette route through `Motion` correctly, so the editor's motion is half
-  tokenised and the visible half is the wrong one.
-- **A panel with no edge.** Under Brut `panelElevation` is 0, and the editor
-  hand-rolls `shadow + clip + background` instead of `NxSurface(Floating)` --
-  which would give it a luminance-derived bevel hairline that survives elevation
-  going to zero. `NxContextMenu` and `NxPopoverPanel` already go through
-  `NxSurface` and stay legible; the editor panels are the outliers.
+The Brut style these findings were first written against is gone, with the
+style spec it lived in. What follows still holds without it.
+
+- **Three editor panels animate outside the motion roles.**
+  `WidgetPalettePanel.kt:127-128`, `WidgetPropPanel.kt:125-126`,
+  `SurfacePropertiesPanel.kt:113-114` use raw `spring()`, which no motion role
+  and no reduce-motion setting reaches. The pill and the vignette route through
+  `Motion` correctly, so the editor's motion is half tokenised and the visible
+  half is the wrong one.
+- **A panel with no edge of its own.** The editor panels hand-roll
+  `shadow + clip + background` instead of `NxSurface(Floating)`, which would give
+  them a luminance-derived bevel hairline that holds when the shadow is gone.
+  `NxContextMenu` and `NxPopoverPanel` already go through `NxSurface`; the editor
+  panels are the outliers.
 - **The context menu and the plane it opens over share a tonal role.** Both
   resolve to `SurfaceContainerHigh` (`NxSurface.kt:37`, `NxContextMenu.kt:111`),
   no cast shadow is requested, and separation is one hairline at 8% delta.

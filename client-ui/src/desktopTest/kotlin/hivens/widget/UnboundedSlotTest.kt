@@ -19,19 +19,19 @@ import androidx.compose.ui.unit.dp
 import hivens.themes.Themes
 import hivens.themes.api.ThemesKeys
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.WidgetSurface
-import hivens.ui.widgets.themepicker.ThemeSelection
-import hivens.ui.widgets.themepicker.ThemeSelectionSource
+import hivens.ui.widgets.themepicker.bringInControls
+import hivens.ui.widgets.themepicker.launcherAndControls
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
-import hivens.widget.api.ProvideScoped
 import hivens.widget.api.SlotRenderer
+import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
@@ -46,7 +46,6 @@ import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
-import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.WidgetSizing
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -187,12 +186,14 @@ class UnboundedSlotTest {
      * height to give.
      */
     // What the theme grid reads: the themes module's app keys, answered here as the app's
-    // own values, and the picker page's choice, declared where the launcher declares it,
-    // so the grid below draws itself rather than the placeholder for a widget missing them.
+    // own values, and the picker page's choice, the colour provider's controls' own, with
+    // nx drawing the colour, so the grid below draws itself rather than the placeholder for
+    // a widget missing them.
     private val data = WidgetDataRegistry().apply {
         register(ThemesKeys.Offered, flowSource(MutableStateFlow(Themes.all)))
+        register(ThemesKeys.Active, flowSource(MutableStateFlow(Themes.default)))
         register(ThemesKeys.Dark, flowSource(MutableStateFlow(true)))
-        declare(ThemeSelectionSource)
+        bringInControls(this, WidgetCommandRegistry())
     }
 
     private val app: WidgetScope = koinApplication {
@@ -209,20 +210,18 @@ class UnboundedSlotTest {
         return runCatching {
             scene.setContent {
                 ShippedLanguageProvider("en") {
-                    NxTheme(Themes.default, dark = true) {
+                    NxThemed(Themes.default, dark = true) {
                         CompositionLocalProvider(
                             LocalLayoutGraph provides graph,
-                            LocalWidgetRegistry provides GeneratedWidgetRegistry,
+                            LocalWidgetRegistry provides launcherAndControls,
                             LocalWidgetSurfaceRenderer provides { spec, inner -> WidgetSurface(spec, inner) },
                             LocalWidgetDataRegistry provides data,
                             LocalScope provides app,
                         ) {
                             ChildLevel(ScopeLevel.Composition) {
                                 ChildLevel(ScopeLevel.Page) {
-                                    ProvideScoped(ThemeSelectionSource, ThemeSelection(Themes.default)) {
-                                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                                            SlotRenderer(surface, slot, Modifier.fillMaxWidth())
-                                        }
+                                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                                        SlotRenderer(surface, slot, Modifier.fillMaxWidth())
                                     }
                                 }
                             }

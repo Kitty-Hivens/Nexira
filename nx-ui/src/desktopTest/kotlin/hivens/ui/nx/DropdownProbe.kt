@@ -23,8 +23,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -84,8 +83,8 @@ class DropdownProbe {
             // The window's layers at the root, where the shell mounts them: every
             // popup on these sheets is one of them.
             LayerHost(rememberWindowLayers(), Modifier.fillMaxSize()) {
-                NxTheme(TestTheme, dark = dark) {
-                    Box(Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16)) { body() }
+                NxThemed(TestTheme, dark = dark) {
+                    Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) { body() }
                 }
             }
         }
@@ -247,7 +246,7 @@ class DropdownProbe {
             sheet("select-closed-${if (dark) "dark" else "light"}", 320, 120, dark = dark) {
                 Column {
                     Text("Home view", color = NxInk.quiet)
-                    Spacer(Modifier.height(Spacing.s6))
+                    Spacer(Modifier.height(6.dp))
                     NxSelect(
                         options = listOf("New", "Classic"),
                         selected = "New",
@@ -270,7 +269,7 @@ class DropdownProbe {
             ) {
                 Column {
                     Text("Language", color = NxInk.quiet)
-                    Spacer(Modifier.height(Spacing.s6))
+                    Spacer(Modifier.height(6.dp))
                     NxSelect(
                         options  = listOf("English", "Русский", "Deutsch", "日本語 (alpha)"),
                         selected = "Deutsch",
@@ -298,7 +297,7 @@ class DropdownProbe {
         sheet("select-footer", 320, 380, click = Offset(126f, 64f)) {
             Column {
                 Text("Minecraft", color = NxInk.quiet)
-                Spacer(Modifier.height(Spacing.s6))
+                Spacer(Modifier.height(6.dp))
                 NxSelect(
                     options   = (0 until 40).map { "1.$it.1" },
                     selected  = "1.31.1",
@@ -316,7 +315,7 @@ class DropdownProbe {
         sheet("select-long", 320, 340, click = Offset(126f, 64f)) {
             Column {
                 Text("Minecraft", color = NxInk.quiet)
-                Spacer(Modifier.height(Spacing.s6))
+                Spacer(Modifier.height(6.dp))
                 NxSelect(
                     options   = (0 until 40).map { "1.$it.1" },
                     selected  = "1.31.1",

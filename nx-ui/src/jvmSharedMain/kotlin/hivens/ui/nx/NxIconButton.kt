@@ -1,29 +1,38 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Status
 
 /**
- * Icon-only clickable with a shape-correct CIRCULAR state layer: the hover/press
- * tint is a round disc matching the round hit target, not a mismatched rectangle
- * ripple (Rule 5/D28). The first consumer of [ShapedStateLayer]'s Shape overload --
- * it hands the layer the host's actual [CircleShape].
+ * Icon-only clickable with a shape-correct state layer: the hover/press tint takes
+ * the round hit target's own outline, the look's capsule, not a mismatched rectangle
+ * ripple (Rule 5/D28). The first consumer of [ShapedStateLayer]'s Shape overload,
+ * it hands the layer the host's actual shape.
  *
  * A glyph is not a name, so [contentDescription] is also raised as a tooltip on
  * hover. It is the same string either way -- every call site already passes the
@@ -58,6 +67,7 @@ fun NxIconButton(
 ) {
     val interaction = remember { MutableInteractionSource() }
     val shownTint = if (enabled) tint else tint.copy(alpha = 0.4f)
+    val shape = Shape.capsule
     NxTooltip(
         behaviour = NxTooltipBehaviour.LabelCentred,
         text     = contentDescription.orEmpty(),
@@ -66,18 +76,45 @@ fun NxIconButton(
     ) {
         Box(
             modifier = Modifier
-                .clip(CircleShape)
+                .clip(shape)
                 .layerTrigger()
                 .clickable(
                     interactionSource = interaction,
-                    indication        = ShapedStateLayer(CircleShape, shownTint),
+                    indication        = ShapedStateLayer(shape, shownTint),
                     enabled           = enabled,
                     onClick           = onClick,
                 )
-                .padding(Spacing.s6),
+                .padding(6.dp),
             contentAlignment = Alignment.Center,
         ) {
             Symbol(icon, contentDescription, tint = shownTint, fill = fill, weight = weight, size = iconSize)
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxIconButtonDarkPreview() = IconButtonStates(dark = true)
+
+@Preview
+@Composable
+private fun NxIconButtonLightPreview() = IconButtonStates(dark = false)
+
+@Composable
+private fun IconButtonStates(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment     = Alignment.CenterVertically,
+        ) {
+            NxIconButton(NxIcon.Settings, "Settings", onClick = {})
+            NxIconButton(NxIcon.Refresh, "Refresh", onClick = {}, tint = NxInk.main)
+            NxIconButton(NxIcon.Favorite, "Favourite", onClick = {}, tint = NxColor.lead(), fill = 1f)
+            NxIconButton(NxIcon.Delete, "Delete", onClick = {}, tint = NxColor.status(Status.Error))
+            NxIconButton(NxIcon.Upload, "Upload", onClick = {}, enabled = false)
+            NxIconButton(NxIcon.Pause, "Pause", onClick = {}, tint = NxInk.main, iconSize = 28.dp, fill = 1f, weight = 600)
+            NxIconButton(NxIcon.Close, null, onClick = {}, iconSize = 14.dp)
         }
     }
 }

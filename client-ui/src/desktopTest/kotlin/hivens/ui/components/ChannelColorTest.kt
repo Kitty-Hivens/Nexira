@@ -7,7 +7,7 @@ import androidx.compose.ui.unit.Density
 import hivens.core.data.ReleaseChannel
 import hivens.core.update.VersionChannel
 import hivens.themes.Themes
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -35,7 +35,7 @@ class ChannelColorTest {
         val pack = LinkedHashMap<VersionChannel, Color>()
         val app = LinkedHashMap<ReleaseChannel, Color>()
         val scene = ImageComposeScene(width = 8, height = 8, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 VersionChannel.entries.forEach { pack[it] = channelColor(it) }
                 ReleaseChannel.entries.forEach { app[it] = channelColor(it) }
             }

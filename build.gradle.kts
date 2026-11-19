@@ -221,6 +221,11 @@ subprojects {
         systemProperty("junit.jupiter.execution.timeout.default", "2m")
         systemProperty("junit.jupiter.execution.timeout.thread.mode.default", "SEPARATE_THREAD")
 
+        // The themes module reads the system's colour scheme as it starts, which on a desktop asks the
+        // session bus or the registry. A test asks nothing of the machine it runs on, and its dark flag
+        // does not follow the desktop of whoever runs it: the scheme reads as not readable.
+        systemProperty("nexira.systemScheme", "off")
+
         // Probe switches reach the test worker. Gradle does not forward -D to a
         // forked test JVM, so the invocation the probes document in their own
         // KDoc was true only through the environment-variable half of it, and a

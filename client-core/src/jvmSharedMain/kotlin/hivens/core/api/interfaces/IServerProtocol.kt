@@ -45,7 +45,7 @@ interface IServerProtocol {
      *
      * On [hivens.core.api.protocol.ProtocolStatus.UPDATE] the impl
      * should have already self-recovered via
-     * [hivens.core.api.protocol.LauncherHashCache]; if this method
+     * [hivens.launcher.protocol.LauncherHashCache]; if this method
      * returns UPDATE the cache also failed (no network, or hash refresh
      * exhausted retries) and the caller should surface the error.
      */

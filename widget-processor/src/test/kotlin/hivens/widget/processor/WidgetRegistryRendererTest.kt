@@ -435,3 +435,53 @@ class WidgetNeedsDeclarationTest {
         assertFalse("app.state" in fault, fault)
     }
 }
+
+/** The source a widget is shown under reaches the descriptor, and a malformed one never builds. */
+class WidgetShownWhenDeclarationTest {
+
+    private fun widget(id: String, shownWhen: String?) = WidgetModel(
+        id = id,
+        displayName = "Display",
+        removable = true,
+        drawsOwnSurface = false,
+        slots = emptyList(),
+        propsClassFqn = null,
+        functionFqn = "hivens.ui.widgets.Sample",
+        shownWhen = shownWhen,
+    )
+
+    @Test
+    fun `a declared condition is emitted as the id it names`() {
+        val src = renderRegistry(listOf(widget("theme.daynight", shownWhen = "theme.nx.drawing")))
+        assertContains(src, """override val shownWhen: String? = "theme.nx.drawing"""")
+    }
+
+    @Test
+    fun `a widget shown everywhere emits nothing about it`() {
+        val src = renderRegistry(listOf(widget("home.clock", shownWhen = null)))
+        assertFalse("shownWhen" in src, src)
+    }
+
+    @Test
+    fun `the id is escaped into its literal`() {
+        val src = renderRegistry(listOf(widget("x", shownWhen = "a\"b${'$'}c")))
+        assertContains(src, """override val shownWhen: String? = "a\"b\${'$'}c"""")
+    }
+
+    @Test
+    fun `no condition and a named one pass`() {
+        assertNull(WidgetValidator.shownWhenFault("", emptyList()))
+        assertNull(WidgetValidator.shownWhenFault("theme.nx.drawing", listOf("theme.active")))
+    }
+
+    @Test
+    fun `a blank condition is refused, because it names no key and hides the widget everywhere`() {
+        assertNotNull(WidgetValidator.shownWhenFault("  ", emptyList()))
+    }
+
+    @Test
+    fun `a condition also listed as a need is refused and named`() {
+        val fault = assertNotNull(WidgetValidator.shownWhenFault("theme.nx.drawing", listOf("theme.active", "theme.nx.drawing")))
+        assertContains(fault, "'theme.nx.drawing'")
+    }
+}

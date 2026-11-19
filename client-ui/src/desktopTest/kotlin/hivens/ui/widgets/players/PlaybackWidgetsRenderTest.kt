@@ -20,7 +20,7 @@ import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.widgets.players.ReadoutPlayerCard
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -69,7 +69,7 @@ class PlaybackWidgetsRenderTest {
             height  = (height * scale).toInt(),
             density = Density(scale),
         ) {
-            NxTheme(Themes.default, dark = dark) {
+            NxThemed(Themes.default, dark = dark) {
                 CompositionLocalProvider(
                     LocalTranslator provides NexiraStrings.translator("en"),
                 ) {

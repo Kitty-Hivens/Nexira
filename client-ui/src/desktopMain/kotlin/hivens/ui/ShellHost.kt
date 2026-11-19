@@ -29,6 +29,7 @@ import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.screens.ConsoleWindow
+import hivens.ui.theme.NxTheme
 import hivens.ui.threshold.BootOutcome
 import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.ThresholdOverlay
@@ -70,8 +71,9 @@ class WindowChromeHooks(defaultClose: () -> Unit) {
  *
  * Window-creation-time values that normally live behind Koin come from before
  * it: undecorated chrome from the pre-Koin [GuiBootstrap.PreBoot.peek], and the
- * words, the theme and whether it is dark from what the modules compiled in
- * answered before the boot ([GuiBootstrap.PreBoot.boot]). Once the boot is ready,
+ * words and the look from what the modules compiled in answered before the boot
+ * ([GuiBootstrap.PreBoot.boot]). The boot screen is drawn day or night as that look
+ * answers whether it is dark. Once the boot is ready,
  * the shell and the console each draw themselves inside the boot's own Koin,
  * which is never registered globally.
  *
@@ -135,9 +137,8 @@ fun ApplicationScope.ShellHost(
     // this thread (see PreBoot.boot), and the shell's fallbacks for what none answered.
     val boot = remember { pre.boot.join() }
     val bootWords = remember(boot) { ShellLookValues.Words.atBoot(boot) }
-    val bootDark = remember(boot) { ShellLookValues.Dark.atBoot(boot) }
     val thresholdStrings = remember(bootWords) { bootWords.strings(NexiraStrings.NAMESPACE) }
-    val look = remember { ShellLook(theme = ShellLookValues.Theme.atBoot(boot), dark = bootDark, words = bootWords) }
+    val look = remember { ShellLook(words = bootWords) }
     // The look the boot window opens in, the person's choice as the look manager answered it before
     // the boot. The shell's own look takes its place inside once it mounts.
     val bootLook = remember(boot) { ShellLookValues.Look.atBoot(boot) }
@@ -169,12 +170,6 @@ fun ApplicationScope.ShellHost(
         onPreviewKeyEvent = { chrome.onPreviewKey(it) },
         onKeyEvent        = { chrome.onKey(it) },
     ) {
-        // What shows where Skia has not drawn yet, until the shell's theme takes
-        // over (see AppShell): the boot screen's own background, not white.
-        LaunchedEffect(Unit) {
-            val field = (if (bootDark) ThresholdPalette.Dark else ThresholdPalette.Light).field
-            window.fillUnpainted(AwtColor(field.toArgb(), false))
-        }
         if (maximizeFromInside) {
             LaunchedEffect(Unit) {
                 window.maximizedBounds = screenWorkArea(window.graphicsConfiguration)
@@ -185,6 +180,14 @@ fun ApplicationScope.ShellHost(
             }
         }
         bootLook.Provide {
+            // Day or night for the boot screen, as the look answered it before the boot.
+            val bootDark = NxTheme.isDark
+            // What shows where Skia has not drawn yet, until the shell's theme takes
+            // over (see AppShell): the boot screen's own background, not white.
+            LaunchedEffect(Unit) {
+                val field = (if (bootDark) ThresholdPalette.Dark else ThresholdPalette.Light).field
+                window.fillUnpainted(AwtColor(field.toArgb(), false))
+            }
             Box(Modifier.fillMaxSize()) {
                 (outcome as? BootOutcome.Ready)?.let { ready ->
                     AppShellContent(

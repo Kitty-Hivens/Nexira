@@ -3,9 +3,9 @@ package hivens.ui.nx
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import hivens.look.colour.api.Paint
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
 
 /**
  * The colours the concept probes draw with, resolved once in composition so their draw
@@ -33,16 +33,15 @@ internal class ProbeInks(
 
 @Composable
 internal fun probeInks(): ProbeInks {
-    val colours = NxTheme.colours
     val lead = NxColor.lead()
     return ProbeInks(
         lead = lead,
         onLead = NxColor.on(lead),
         main = NxInk.main,
         quiet = NxInk.quiet,
-        top = colours.step(colours.topStep),
-        raised = colours.step(colours.topStep - 1),
+        top = NxColor.depth(NxColor.floating),
+        raised = NxColor.depth(NxColor.floating - 1),
         leadWash = NxColor.wash(lead, 0.3f),
-        third = colours.scheme.colors.getOrElse(2) { lead },
+        third = Paint.palette.getOrElse(2) { lead },
     )
 }

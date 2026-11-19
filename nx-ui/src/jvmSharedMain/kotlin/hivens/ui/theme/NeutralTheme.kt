@@ -3,13 +3,13 @@ package hivens.ui.theme
 import androidx.compose.ui.graphics.Color
 
 /**
- * What a window is drawn in where nothing hands it a theme: a launcher whose document brings in no
- * themes module, or a value the boot window needs that no module answered.
+ * The theme nx-ui's own previews and renders are drawn in ([NxThemed]), and what stands in for a theme
+ * where one is asked for and none is there.
  *
- * nx-ui ships no theme a person chooses, those are the themes module's. This one is the floor under
- * them, and neutral on purpose: a grey ladder, grey inks and one grey colour, so a window drawn in it
- * reads as drawn in no theme rather than in one somebody picked. Both modes, so the day and night
- * switch still has something to switch.
+ * nx-ui ships no theme a person chooses, those are the themes module's. This one is neutral on
+ * purpose: a grey ladder, grey inks and one grey colour, so a component drawn in it reads as drawn in
+ * no theme rather than in one somebody picked. Both modes, so a preview shows either. A window drawn
+ * with no colour provider is drawn in the colour axis's base answers instead, not in this.
  */
 val NeutralTheme: Theme = Theme(
     id = "neutral",

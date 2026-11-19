@@ -27,7 +27,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.layers.Layer
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.WindowLayers
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -46,7 +46,7 @@ class RailFocusReturnTest {
         var open by mutableStateOf(false)
         var focusManager: FocusManager? = null
         val scene = ImageComposeScene(300, 300, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 LayerHost(layers, Modifier.fillMaxSize()) {
                     focusManager = LocalFocusManager.current
                     Column(Modifier.width(64.dp).focusGroup()) {

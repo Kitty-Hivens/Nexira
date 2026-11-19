@@ -1,7 +1,6 @@
 package hivens.ui.nx
 
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.HorizontalScrollbar
 import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.ScrollState
@@ -9,12 +8,11 @@ import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.rememberScrollbarAdapter
 import androidx.compose.foundation.v2.ScrollbarAdapter
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxInk
 
@@ -69,22 +67,18 @@ fun NxHorizontalScrollbar(
 private fun autoHideStyle(revealed: Boolean): ScrollbarStyle {
     val base  = NxInk.quiet
     // Reveal fades in at once; hiding waits out the idle pause, then fades. The corner
-    // follows buttonCorner so the bar agrees with the buttons beside it.
+    // is the look's scrollbar thumb.
     val alpha by animateFloatAsState(
         targetValue   = if (revealed) 1f else 0f,
         // Duration and curve come from the fade role; the idle pause before
         // hiding is UX pacing rather than motion, so it is not scaled with it.
-        animationSpec = tween(
-            durationMillis = Motion.fade.durationMs,
-            delayMillis    = if (revealed) 0 else IdleFadeDelayMs,
-            easing         = Motion.fade.easing,
-        ),
+        animationSpec = Motion.fade.of(delayMs = if (revealed) 0 else IdleFadeDelayMs),
         label = "nxScrollbarAlpha",
     )
     return ScrollbarStyle(
         minimalHeight       = MinLength,
         thickness           = Thickness,
-        shape               = MaterialTheme.shapes.small,
+        shape               = Shape.thumb,
         hoverDurationMillis = Motion.colorShift.durationMs,
         unhoverColor        = base.copy(alpha = 0.40f * alpha),
         hoverColor          = base.copy(alpha = 0.75f * alpha),

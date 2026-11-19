@@ -1,9 +1,22 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.layout.SubcomposeLayout
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.dp
+import hivens.ui.icons.NxIcon
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 
 /**
  * Shows [content] when it fits and [compact] when it does not.
@@ -53,3 +66,38 @@ fun NxFit(
 }
 
 private enum class FitSlot { Preferred, Compact }
+
+@Preview
+@Composable
+private fun NxFitDarkPreview() = FitWidths(dark = true)
+
+@Preview
+@Composable
+private fun NxFitLightPreview() = FitWidths(dark = false)
+
+@Composable
+private fun FitWidths(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(480.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            for (room in listOf(440.dp, 200.dp)) {
+                NxFit(
+                    modifier = Modifier.width(room),
+                    compact  = {
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            NxIconButton(NxIcon.FolderOpen, "Open folder", onClick = {}, tint = NxInk.main)
+                            NxIconButton(NxIcon.Refresh, "Refresh", onClick = {}, tint = NxInk.main)
+                        }
+                    },
+                ) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        NxButton("Open folder", onClick = {}, style = NxButtonStyle.Secondary, icon = NxIcon.FolderOpen, compact = true)
+                        NxButton("Refresh", onClick = {}, style = NxButtonStyle.Secondary, icon = NxIcon.Refresh, compact = true)
+                    }
+                }
+            }
+        }
+    }
+}

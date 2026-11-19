@@ -30,8 +30,8 @@ import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
-import hivens.ui.nx.NxCalloutBanner
-import hivens.ui.nx.NxCalloutTone
+import hivens.ui.nx.CalloutBanner
+import hivens.ui.nx.CalloutTone
 import hivens.ui.nx.rememberFieldState
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
@@ -150,8 +150,8 @@ fun LoginPanel(
 
         // ── 2FA unsupported banner ────────────────────────────────────────
         if (twoFactorUnsupported) {
-            NxCalloutBanner(
-                tone  = NxCalloutTone.Warning,
+            CalloutBanner(
+                tone  = CalloutTone.Warning,
                 title = s.text("auth2faUnsupportedTitle"),
                 body  = s.text("auth2faUnsupportedBody"),
             ) {

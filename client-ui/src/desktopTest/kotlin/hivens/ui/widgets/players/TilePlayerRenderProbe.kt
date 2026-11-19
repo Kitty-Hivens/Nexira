@@ -19,8 +19,7 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
@@ -63,9 +62,9 @@ class TilePlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = dark) {
+                NxThemed(Themes.default, dark = dark) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.TopStart,
                     ) { body() }
                 }
@@ -111,7 +110,7 @@ class TilePlayerRenderProbe {
     fun probe() {
         for (dark in listOf(true, false)) {
             sheet("b-${if (dark) "dark" else "light"}", 900, 260, dark) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(Modifier.width(196.dp)) { tile(track, chrome = false) }
                     Box(Modifier.width(196.dp)) { tile(track, chrome = true) }
                     Box(Modifier.width(196.dp)) {
@@ -128,7 +127,7 @@ class TilePlayerRenderProbe {
     fun tokens() {
         for (dark in listOf(true, false)) {
             sheet("d-${if (dark) "dark" else "light"}", 520, 160, dark) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(Modifier.width(96.dp)) { token(track, chrome = false) }
                     Box(Modifier.width(96.dp)) { token(track, chrome = true) }
                     Box(Modifier.width(96.dp)) { token(track, chrome = false, showCover = true) }
@@ -149,7 +148,7 @@ class TilePlayerRenderProbe {
     @Test
     fun capped() {
         sheet("capped", 700, 320, dark = true) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 tile(track, chrome = false)
                 token(track, chrome = false)
             }
@@ -164,18 +163,18 @@ class TilePlayerRenderProbe {
         // the whole page and the sweep read as a widget defect rather than as a
         // probe that asked for more room than it had.
         sheet("sizes", 700, 660, dark = true) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s10), verticalAlignment = Alignment.Top) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                     listOf(240, 196, 160).forEach { w ->
                         Box(Modifier.width(w.dp)) { tile(track, chrome = false) }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s10), verticalAlignment = Alignment.Top) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                     listOf(132, 112, 96, 80).forEach { w ->
                         Box(Modifier.width(w.dp)) { tile(track, chrome = false) }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s10), verticalAlignment = Alignment.Top) {
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                     listOf(140, 112, 96, 84, 72, 56).forEach { w ->
                         Box(Modifier.width(w.dp)) { token(track, chrome = true) }
                     }

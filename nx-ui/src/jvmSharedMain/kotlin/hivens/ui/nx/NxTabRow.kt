@@ -13,7 +13,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -28,11 +30,14 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 
 /**
  * Sections of one thing, as words with a mark under the current one.
@@ -83,7 +88,7 @@ fun NxTabRow(
     val scroll = rememberScrollState()
     val span = spans[selected]
     val viewport = scroll.viewportSize
-    val scrollSpec = Motion.track.of<Float>()
+    val scrollSpec = Motion.scroll.of<Float>()
     LaunchedEffect(span, viewport) {
         val tab = span ?: return@LaunchedEffect
         if (viewport <= 0) return@LaunchedEffect
@@ -150,3 +155,25 @@ fun NxTabRow(
 /** The underline: a mark under the word rather than a rule the width of it. */
 private val MARK_WIDTH = 26.dp
 private val MARK_HEIGHT = 2.dp
+
+@Preview
+@Composable
+private fun NxTabRowDarkPreview() = TabRows(dark = true)
+
+@Preview
+@Composable
+private fun NxTabRowLightPreview() = TabRows(dark = false)
+
+@Composable
+private fun TabRows(dark: Boolean) {
+    val tabs = listOf("Overview", "Content", "Versions", "Settings", "Logs")
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(480.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            NxTabRow(tabs, selected = 1, onSelect = {})
+            NxTabRow(tabs, selected = 4, onSelect = {}, modifier = Modifier.width(220.dp))
+        }
+    }
+}

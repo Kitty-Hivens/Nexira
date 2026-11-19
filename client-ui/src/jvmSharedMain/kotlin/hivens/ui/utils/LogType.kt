@@ -11,7 +11,7 @@ import java.util.Date
 enum class LogType { INFO, ERROR, WARN, DIVIDER }
 
 /**
- * One captured line in [GameConsoleService.logs]. The default-value
+ * One captured line in [GameConsoleService.snapshot]. The default-value
  * `timestamp` allocates a fresh SimpleDateFormat per construction so
  * per-line wall-clock stamps stay correct even when the entry is built
  * off-thread; the format is intentionally short (HH:mm:ss) because the

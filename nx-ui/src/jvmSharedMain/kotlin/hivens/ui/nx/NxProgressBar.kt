@@ -6,9 +6,14 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -16,11 +21,14 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Status
 
 /**
@@ -108,3 +116,27 @@ fun NxProgressBar(
 
 /** Share of the track the indeterminate segment covers. */
 private const val INDETERMINATE_SPAN = 0.28f
+
+@Preview
+@Composable
+private fun NxProgressBarDarkPreview() = ProgressBars(dark = true)
+
+@Preview
+@Composable
+private fun NxProgressBarLightPreview() = ProgressBars(dark = false)
+
+@Composable
+private fun ProgressBars(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(360.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            NxProgressBar(progress = 0f)
+            NxProgressBar(progress = 0.35f)
+            NxProgressBar(progress = 1f)
+            NxProgressBar(progress = null)
+            NxProgressBar(progress = 0.6f, height = 10.dp, color = NxColor.status(Status.Success))
+        }
+    }
+}

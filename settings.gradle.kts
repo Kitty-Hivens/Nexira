@@ -121,6 +121,9 @@ include(":nx-ui")
 // Layer ordering and the dismiss stack of a window, with no visuals. Below both
 // nx-ui and the widget kernel, and depends on neither.
 include(":ui-layers")
+// The puppet hooks a control registers itself with for the puppet's HTTP control surface, and their
+// registry. A development seam with no visuals, used by client-ui and the modules compiled into it.
+include(":ui-puppet")
 // The launcher's own words: the tables of the `nexira` namespace the language module
 // answers, and the composable that reads them. Carved out of
 // client-ui, where it was the single largest package and imported by 150
@@ -187,18 +190,32 @@ include(":source-modrinth")
 // the module answers its words before the host is up as well.
 include(":i18n-api")
 include(":i18n")
-// The themes module: the themes that ship, the one made from the wallpaper, the ones modules
-// bring and the person's own, which is in use and what decides dark and light, and where the
-// choice is kept. Drawing stays in nx-ui, which is handed the theme to draw. Like the language
-// module, it answers the theme before the host is up, since the boot window is drawn in the
-// person's theme.
-include(":themes-api")
-include(":themes")
 // The look: a manager that picks one provider per axis of the look from the person's choice
 // and hands their answers to the composition, knowing no axis itself. The axes, their providers
 // and the packs naming them are modules of their own under look/, built by the nexira.look
 // convention plugin in buildSrc, their suites run together by :look:allTests.
 include(":look:manager-api")
 include(":look:manager")
+include(":look:colour-api")
+include(":look:packs")
+// The nx colour provider, which is the themes module: the themes that ship, the one made from the
+// wallpaper, the ones modules bring and the person's own, which is in use and what decides dark and
+// light, and where the choice is kept. Its module id, settings and files are still the themes
+// module's, nexira.themes and themes.json, so no choice a person made is lost. Like the language
+// module, it answers the theme before the host is up, since the boot window is drawn in the
+// person's theme.
+include(":look:colour-nx-api")
+include(":look:colour-nx")
+// The UI that steers the nx colour provider: the day and night switch, the mode, the theme picker.
+include(":look:colour-nx-controls")
+include(":look:motion-api")
+// The nx motion provider: nx's durations and curves, and the person's reduce motion, kept in its
+// own settings.
+include(":look:motion-nx")
+// The UI that steers the nx motion provider: the reduce motion switch.
+include(":look:motion-nx-controls")
+include(":look:shape-api")
+// The nx shape provider: nx's corners, with no settings of its own.
+include(":look:shape-nx")
 include(":profiler-agent")
 include(":authlib-agent")

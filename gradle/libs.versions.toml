@@ -9,7 +9,7 @@
 # A beta on purpose: 2.5.0-Beta1 is the first Kotlin line with JvmTarget.JVM_27,
 # and the build targets Java 27 bytecode. Every 2.4.x stops at JVM_26. Move to
 # 2.5.0 when it ships stable.
-kotlin            = "2.5.0-Beta2"
+kotlin            = "2.5.0-RC"
 compose           = "1.13.0-beta02"
 buildconfigPlugin = "6.1.2"
 versionsPlugin    = "0.67.0"
@@ -17,7 +17,7 @@ versionsPlugin    = "0.67.0"
 # on the Analysis API it bundles, so it does not need to match the Kotlin minor
 # (:widget-processor / :client-ui kspKotlinDesktop are the check). Bump when a
 # newer KSP ships.
-ksp               = "2.3.12"
+ksp               = "2.3.14"
 # Android Gradle Plugin, KMP library flavour. Only the Android target of shared
 # modules uses it; the desktop launcher does not depend on it.
 agp               = "9.5.0"
@@ -34,7 +34,7 @@ ktor              = "3.6.1"
 okhttp            = "5.5.1"
 koin              = "4.2.2"
 xodus             = "2.0.1"
-serialization     = "1.12.0"
+serialization     = "1.13.0"
 coroutines        = "1.11.0"
 
 # ── UI / Compose ecosystem ───────────────────────────────────────────────────
@@ -158,7 +158,7 @@ libsound          = "0.2.0"
 # their test compilation inherited release 8 from the shipped-agent pin; only the
 # agent classes need Java 8 bytecode, so that pin is now scoped to compileJava and
 # 6.x resolves on every test classpath.
-mockk             = "1.14.11"
+mockk             = "1.14.12"
 junit             = "6.1.3"
 
 [libraries]
@@ -198,9 +198,12 @@ koin-compose                    = { group = "io.insert-koin", name = "koin-compo
 # Compose (explicit refs in addition to plugin DSL accessors)
 compose-runtime                 = { group = "org.jetbrains.compose.runtime",    name = "runtime",             version.ref = "compose" }
 compose-foundation              = { group = "org.jetbrains.compose.foundation", name = "foundation",          version.ref = "compose" }
+compose-animation               = { group = "org.jetbrains.compose.animation",  name = "animation",           version.ref = "compose" }
 compose-material3               = { group = "org.jetbrains.compose.material3",  name = "material3",           version.ref = "composeMaterial3" }
 compose-ui                      = { group = "org.jetbrains.compose.ui",         name = "ui",                  version.ref = "compose" }
 compose-components-resources    = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "compose" }
+compose-ui-tooling-preview      = { group = "org.jetbrains.compose.ui",         name = "ui-tooling-preview",  version.ref = "compose" }
+compose-ui-tooling              = { group = "org.jetbrains.compose.ui",         name = "ui-tooling",          version.ref = "compose" }
 navigationevent-compose         = { group = "org.jetbrains.androidx.navigationevent", name = "navigationevent-compose", version.ref = "navigationEvent" }
 
 # UI add-ons

@@ -53,10 +53,9 @@ object ThemeStateLayer : IndicationNodeFactory {
  * mismatch the container the way M3 1.11-alpha07's default ripple did. Two ways
  * to hand it that shape:
  *
- *  - `ShapedStateLayer(cornerDp, color)` -- a uniform rounded rect at [cornerDp]
- *    (the button path: matches MaterialTheme.shapes.small).
- *  - `ShapedStateLayer(shape, color)` -- the host's actual [Shape] outline
- *    (circle, pill, per-corner radii), for non-button hosts.
+ *  - `ShapedStateLayer(cornerDp, color)`: a uniform rounded rect at [cornerDp].
+ *  - `ShapedStateLayer(shape, color)`: the host's actual [Shape] outline
+ *    (a button's, a circle, a pill, per-corner radii).
  *
  * Alphas follow the M3 state-layer scale (hover ~8%, press ~12%) over [color] --
  * pass the host's content color.

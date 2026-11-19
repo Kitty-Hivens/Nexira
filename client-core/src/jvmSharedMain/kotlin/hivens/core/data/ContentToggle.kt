@@ -9,10 +9,11 @@ import kotlinx.serialization.Serializable
  *
  * Stored as a list (not a map keyed by [entryId]) so the wire format
  * preserves order. The UI groups by `display.category` from the
- * manifest's [DisplayBlock], but within a category the user-set
- * priority should match what they chose; map-based JSON doesn't
- * guarantee that. The list is also smaller diffs in version control
- * if the file ever lands in a profile-sharing flow.
+ * manifest's [hivens.core.api.dto.smrt.SmrtDisplay], but within a
+ * category the user-set priority should match what they chose;
+ * map-based JSON doesn't guarantee that. The list is also smaller
+ * diffs in version control if the file ever lands in a
+ * profile-sharing flow.
  */
 @Serializable
 data class ContentToggle(

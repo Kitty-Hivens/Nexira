@@ -13,7 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
@@ -63,7 +63,7 @@ class SurfaceOpacityRenderTest {
     @OptIn(ExperimentalComposeUiApi::class)
     private fun greenAt(dark: Boolean, opacity: Float?): Int {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
-            NxTheme(TestTheme, dark = dark) {
+            NxThemed(TestTheme, dark = dark) {
                 Box(Modifier.fillMaxSize().background(GROUND)) { Plate(opacity) }
             }
         }

@@ -19,8 +19,7 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
@@ -48,9 +47,9 @@ class ReadoutPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = dark) {
+                NxThemed(Themes.default, dark = dark) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.TopCenter,
                     ) { body() }
                 }
@@ -87,7 +86,7 @@ class ReadoutPlayerRenderProbe {
     fun probe() {
         for (dark in listOf(true, false)) {
             sheet("states-${if (dark) "dark" else "light"}", 360, 460, dark) {
-                Column(verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     // Tagged, untagged, and nothing loaded. None of the three is a
                     // degraded version of another: they are the same card.
                     card(playing(107_000L), TrackInfo("Higurashi no Naku Koro ni", "Shimamiya Eiko", null, null))
@@ -102,7 +101,7 @@ class ReadoutPlayerRenderProbe {
     @Test
     fun clock() {
         sheet("clock", 360, 460, dark = true) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 card(playing(9_000L), TrackInfo("Nine seconds in", null, null, null))
                 card(playing(59_000L), TrackInfo("Just before the minute", null, null, null))
                 card(playing(599_000L, 3_600_000L), TrackInfo("Just before ten minutes", null, null, null))
@@ -115,7 +114,7 @@ class ReadoutPlayerRenderProbe {
     fun widths() {
         val widths = listOf(360, 320, 300, 280, 240, 200, 160)
         sheet("widths", 400, 1000, dark = true) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.s10)) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 widths.forEach { w ->
                     card(
                         playing(107_000L),

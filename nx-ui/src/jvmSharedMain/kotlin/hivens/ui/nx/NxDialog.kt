@@ -11,17 +11,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.AlertDialogDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -35,11 +39,23 @@ import androidx.compose.ui.semantics.dialog
 import androidx.compose.ui.semantics.paneTitle
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.layers.Layer
+import hivens.ui.layers.LayerHost
 import hivens.ui.layers.layerBody
+import hivens.ui.layers.rememberWindowLayers
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
+import hivens.look.shape.api.Shape as ShapeAxis
 
 /**
  * A modal dialog in the window: [content] centred over a scrim that blocks
@@ -155,7 +171,7 @@ fun NxAlertDialog(
     icon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
-    shape: Shape = AlertDialogDefaults.shape,
+    shape: Shape = ShapeAxis.dialog,
     containerColor: Color = AlertDialogDefaults.containerColor,
     iconContentColor: Color = AlertDialogDefaults.iconContentColor,
     titleContentColor: Color = AlertDialogDefaults.titleContentColor,
@@ -223,3 +239,58 @@ private val DIALOG_SCRIM = Color.Black.copy(alpha = 0.6f)
 private val ALERT_MIN_WIDTH = 280.dp
 private val ALERT_MAX_WIDTH = 560.dp
 private val ALERT_PADDING = 24.dp
+
+@Preview
+@Composable
+private fun NxDialogDarkPreview() = Dialogs(dark = true)
+
+@Preview
+@Composable
+private fun NxDialogLightPreview() = Dialogs(dark = false)
+
+/**
+ * Each dialog in a window of its own, a [LayerHost] that draws its layers in place, so the
+ * dialog, its scrim and the page under it are one picture. A dialog fades in as it opens, so
+ * a static frame of the IDE may catch the start of that and the off-screen test the end of it.
+ */
+@Composable
+private fun Dialogs(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(1000.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            LayerHost(rememberWindowLayers(), Modifier.size(476.dp, 340.dp)) {
+                DialogPageBehind()
+                NxAlertDialog(
+                    onDismissRequest = {},
+                    confirmButton    = { NxButton("Delete", onClick = {}, style = NxButtonStyle.Destructive) },
+                    dismissButton    = { NxButton("Cancel", onClick = {}, style = NxButtonStyle.Tertiary) },
+                    icon             = { Symbol(NxIcon.Delete, null) },
+                    title            = { Text("Delete this pack?") },
+                    text             = { Text("Its worlds and settings go with it.") },
+                )
+            }
+            LayerHost(rememberWindowLayers(), Modifier.size(476.dp, 340.dp)) {
+                DialogPageBehind()
+                NxDialog(onDismissRequest = null) {
+                    NxSurface(SurfaceKind.Dialog, shape = MaterialTheme.shapes.large) {
+                        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Text("A dialog with its own body", style = MaterialTheme.typography.titleMedium, color = NxInk.main)
+                            Text("Only its own buttons close it.", style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
+                            NxButton("Done", onClick = {}, modifier = Modifier.align(Alignment.End))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DialogPageBehind() {
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        NxSectionHeader("Page behind")
+        repeat(6) { Text("A line of the page the dialog covers", color = NxInk.main) }
+    }
+}

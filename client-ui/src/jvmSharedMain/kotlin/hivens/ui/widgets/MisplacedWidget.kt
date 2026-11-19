@@ -72,12 +72,13 @@ fun SampledWidget(descriptor: WidgetDescriptor, instance: WidgetInstance) {
                 }
             }
         }
-        SampleMark(Modifier.align(Alignment.TopEnd).padding(6.dp))
+        DimMark(nexiraStrings().text("editorNotAvailableHere"), Modifier.align(Alignment.TopEnd).padding(6.dp))
     }
 }
 
+/** The mark over a dimmed widget, saying in [text] why it is not drawn as it would be in use. */
 @Composable
-private fun SampleMark(modifier: Modifier) {
+internal fun DimMark(text: String, modifier: Modifier) {
     NxSurface(SurfaceKind.Card, modifier, shape = MaterialTheme.shapes.small) {
         Row(
             modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
@@ -85,13 +86,13 @@ private fun SampleMark(modifier: Modifier) {
             horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Symbol(NxIcon.VisibilityOff, contentDescription = null, tint = NxInk.quiet, size = 12.dp)
-            Text(nexiraStrings().text("editorNotAvailableHere"), style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
+            Text(text, style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)
         }
     }
 }
 
 /** How strongly a widget on samples is dimmed: present enough to recognise, faint enough not to pass for live. */
-private const val SAMPLE_ALPHA = 0.45f
+internal const val SAMPLE_ALPHA = 0.45f
 
 /**
  * Drawn in the editor in place of a widget needing a key that has no sample, so it

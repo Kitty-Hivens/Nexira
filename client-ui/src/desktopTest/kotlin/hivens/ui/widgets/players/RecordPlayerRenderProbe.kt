@@ -19,8 +19,7 @@ import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.audio.Waveform
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
@@ -66,9 +65,9 @@ class RecordPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = dark) {
+                NxThemed(Themes.default, dark = dark) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.TopStart,
                     ) { body() }
                 }
@@ -99,7 +98,7 @@ class RecordPlayerRenderProbe {
     fun probe() {
         for (dark in listOf(true, false)) {
             sheet("card-${if (dark) "dark" else "light"}", 560, 220, dark) {
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     Box(Modifier.width(168.dp)) { card(playing(107_000L), track) }
                     Box(Modifier.width(168.dp)) {
                         card(playing(107_000L), TrackInfo("audio", null, null, null))
@@ -114,7 +113,7 @@ class RecordPlayerRenderProbe {
     @Test
     fun states() {
         sheet("states", 380, 220, dark = true) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.width(168.dp)) { card(PlaybackState.Idle, null, waveform = null) }
                 Box(Modifier.width(168.dp)) { card(playing(107_000L), track, waveform = null) }
             }
@@ -129,7 +128,7 @@ class RecordPlayerRenderProbe {
     fun widths() {
         val sizes = listOf(240, 196, 168, 140, 112, 88, 64)
         sheet("widths", 1100, 300, dark = true) {
-            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.s10), verticalAlignment = Alignment.Top) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top) {
                 sizes.forEach { w ->
                     Box(Modifier.width(w.dp)) { card(playing(107_000L), track) }
                 }

@@ -2,12 +2,14 @@ package hivens.ui.nx
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -46,16 +48,19 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 import hivens.ui.surface.SurfaceKind
 
 /**
@@ -145,16 +150,16 @@ fun <T> NxSelect(
             // Inside the field, so the inks are the ones that read on it.
             val ink = if (enabled) NxInk.main else NxInk.off
             Row(
-                modifier          = Modifier.fillMaxWidth().padding(start = Spacing.s12, end = Spacing.s8, top = 9.dp, bottom = 9.dp),
+                modifier          = Modifier.fillMaxWidth().padding(start = 12.dp, end = 8.dp, top = 9.dp, bottom = 9.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 prefix?.let {
                     Text(it, style = MaterialTheme.typography.bodyMedium, color = NxInk.quiet, fontWeight = FontWeight.SemiBold, maxLines = 1)
-                    Spacer(Modifier.width(Spacing.s6))
+                    Spacer(Modifier.width(6.dp))
                 }
                 selected?.let(icon)?.let {
                     Symbol(it, contentDescription = null, tint = ink, size = 18.dp)
-                    Spacer(Modifier.width(Spacing.s8))
+                    Spacer(Modifier.width(8.dp))
                 }
                 Text(
                     text       = selected?.let(label) ?: placeholder,
@@ -167,7 +172,7 @@ fun <T> NxSelect(
                     // short the answer is, where the eye looks for "this opens".
                     modifier   = Modifier.weight(1f),
                 )
-                Spacer(Modifier.width(Spacing.s8))
+                Spacer(Modifier.width(8.dp))
                 Symbol(
                     icon               = NxIcon.ExpandMore,
                     contentDescription = null,
@@ -231,7 +236,7 @@ private fun <T> SelectList(
 
     NxSurface(
         kind     = SurfaceKind.Popup,
-        shape    = MaterialTheme.shapes.large,
+        shape    = Shape.menu,
         modifier = Modifier
             .widthIn(min = CHOICE_MIN_WIDTH)
             .width(if (width > 0.dp) width else CHOICE_MIN_WIDTH)
@@ -274,7 +279,7 @@ private fun <T> SelectList(
                         NxVerticalScrollbar(
                             state    = listState,
                             revealed = hovered || listState.isScrollInProgress,
-                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = Spacing.s6),
+                            modifier = Modifier.align(Alignment.CenterEnd).fillMaxHeight().padding(vertical = 6.dp),
                         )
                     }
                 }
@@ -305,5 +310,45 @@ private suspend fun LazyListState.revealItem(index: Int) {
     when {
         overshootTop > 0    -> animateScrollBy(-overshootTop.toFloat())
         overshootBottom > 0 -> animateScrollBy(overshootBottom.toFloat())
+    }
+}
+
+@Preview
+@Composable
+private fun NxSelectDarkPreview() = Selects(dark = true)
+
+@Preview
+@Composable
+private fun NxSelectLightPreview() = Selects(dark = false)
+
+/** Closed triggers in their states, and beside them the list as it stands once open, drawn as the menu's preview draws its body. */
+@Composable
+private fun Selects(dark: Boolean) {
+    val sorts = listOf("Name", "Last played", "Size")
+    NxThemed(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(560.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Column(Modifier.width(240.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                NxSelect(sorts, selected = "Name", onSelect = {}, label = { it })
+                NxSelect(sorts, selected = "Size", onSelect = {}, label = { it }, prefix = "Sort by")
+                NxSelect(sorts, selected = "Last played", onSelect = {}, label = { it }, icon = { NxIcon.History })
+                NxSelect(sorts, selected = null, onSelect = {}, label = { it }, placeholder = "Pick one")
+                NxSelect(sorts, selected = "Name", onSelect = {}, label = { it }, enabled = false)
+            }
+            SelectList(
+                options   = sorts,
+                selected  = "Last played",
+                label     = { it },
+                icon      = { if (it == "Last played") NxIcon.History else null },
+                hint      = { if (it == "Size") "Slow" else null },
+                width     = 240.dp,
+                maxHeight = 320.dp,
+                footer    = null,
+                onPick    = {},
+                onDismiss = {},
+            )
+        }
     }
 }

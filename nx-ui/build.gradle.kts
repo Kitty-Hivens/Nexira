@@ -2,8 +2,9 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 // Leaf design-system module (NxUI). Holds tokens, primitives, surfaces and the
-// Flexible decorator layer that the rest of the UI builds on. Depends on nothing
-// in-tree but ui-layers, which draws nothing. client-ui depends on it one-way.
+// Flexible decorator layer that the rest of the UI builds on. Depends in-tree on
+// ui-layers, which draws nothing, and on the colour axis's contract, whose answers
+// its colours are read from. client-ui depends on it one-way.
 // No application/packaging here, no puppet source-set, no client-core: this is
 // the bottom of the UI graph.
 plugins {
@@ -49,6 +50,13 @@ kotlin {
                 // Where popups, tooltips and dialogs stand and what closes them. This
                 // module draws them and asks ui-layers to place them.
                 implementation(project(":ui-layers"))
+                // What every colour here is read from: the colour axis's answers, provided by
+                // whatever answers the axis around the composition, and its base answers outside any.
+                api(project(":look:colour-api"))
+                // What every movement here is read from: the motion axis's answers, the same way.
+                api(project(":look:motion-api"))
+                // What every corner here is read from: the shape axis's answers, the same way.
+                api(project(":look:shape-api"))
             }
         }
 
@@ -59,6 +67,8 @@ kotlin {
                 implementation(libs.compose.material3)
                 implementation(libs.compose.ui)
                 implementation(libs.compose.components.resources)
+                // The @Preview annotation the IDE draws components from. Annotation only.
+                implementation(libs.compose.ui.tooling.preview)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.material.color.utilities)
@@ -111,6 +121,12 @@ val listSharedClasses = tasks.register("listSharedClasses") {
     }
 }
 kotlin.sourceSets.getByName("desktopMain").resources.srcDir(files(sharedClassListDir).builtBy(listSharedClasses))
+
+// What the IDE draws a @Preview with on the Android side. On this module's own runtime class
+// path only, so it reaches neither the published artifact nor the app.
+dependencies {
+    "androidRuntimeClasspath"(libs.compose.ui.tooling)
+}
 
 compose.resources {
     publicResClass = true

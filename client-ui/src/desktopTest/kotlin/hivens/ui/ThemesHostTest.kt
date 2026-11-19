@@ -19,10 +19,12 @@ import hivens.themes.api.ThemeSettings
 import hivens.themes.api.ThemesApi
 import hivens.themes.api.ThemesKeys
 import hivens.ui.bootstrap.bootValues
+import hivens.ui.bootstrap.documentModules
 import hivens.ui.host.launcherServices
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.settings.SettingsDomainFiles
 import hivens.ui.theme.Theme
+import hivens.ui.widgets.modules.CompiledModules
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.modules.WidgetModules.Contributed
 import hivens.widget.api.get
@@ -246,12 +248,15 @@ class ThemesHostTest {
     }
 
     @Test
-    fun `a theme file a newer build wrote is put on record for the notice, under the name the module gives it`() {
+    fun `a theme file a newer build wrote is put on record for the notice as the look starts, under the name the module gives it`() {
         themesJson.writeText("""{"schema_version":99,"selected":"abyssal"}""")
         NewerBuildData.reset()
         try {
-            val shell = shell()
-            shell.app.launcherServices.get<ThemeManager>()
+            // The standard document, and nothing read of the themes module's keys: the look manager's
+            // first pass, which the host runs before the shell first draws, opens the colour provider,
+            // which makes the module's manager.
+            val shell = ModuleAppLevel(dir, CompiledModules, scope, named = documentModules(dir)).also { levels += it }
+            shell.app.prepareLook()
             val recorded = NewerBuildData.modulesWithReason().keys.single()
             assertEquals(ThemesApi.ID, recorded.module)
             assertEquals("the theme", shell.value(I18nKeys.Words).strings(recorded.module).text(recorded.name), "named in the module's own words")

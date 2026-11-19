@@ -18,7 +18,7 @@ import hivens.ui.i18n.NexiraStrings
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityKind
 import hivens.core.activity.ActivityPhase
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.Bitmap
 import kotlin.math.abs
 import kotlin.test.Test
@@ -71,7 +71,7 @@ class PillWidthTest {
         val strings = if (russian) NexiraStrings.shipped("ru") else NexiraStrings.shipped("en")
         val ambient = if (russian) probeAmbient else null
         val scene = ImageComposeScene(width = frame, height = 140, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 CompositionLocalProvider(
                     LocalTranslator provides NexiraStrings.translator(strings.language),
                 ) {

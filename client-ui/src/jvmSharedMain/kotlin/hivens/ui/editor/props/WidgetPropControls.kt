@@ -35,7 +35,6 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.Spacing
 import hivens.ui.widgets.customization.LabeledSlider
 import hivens.ui.widgets.customization.panelLabelWidth
 import hivens.widget.model.PropChoice
@@ -162,7 +161,7 @@ private fun PanelField(
             inputTransformation = inputTransformation,
             modifier      = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = Spacing.s10, vertical = Spacing.s8)
+                .padding(horizontal = 10.dp, vertical = 8.dp)
                 .onFocusChanged { onFocus(it.isFocused) },
         )
     }

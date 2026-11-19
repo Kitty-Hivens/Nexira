@@ -1,8 +1,6 @@
 package hivens.ui.theme
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,11 +45,12 @@ class ThemeRevealController internal constructor(
 
     /**
      * Capture the frame, run [apply] (the actual theme flip), then animate the reveal
-     * out from [origin] over [durationMs]. A non-positive duration (motion off) or a
-     * re-entrant call just applies the change with no animation.
+     * out from [origin] on [role], the look's answer for its own change. A null role
+     * (the look holds its change still) or a re-entrant call just applies the change
+     * with no animation.
      */
-    fun reveal(origin: Offset, durationMs: Int, apply: () -> Unit) {
-        if (durationMs <= 1 || running) {
+    fun reveal(origin: Offset, role: MotionRole?, apply: () -> Unit) {
+        if (role == null || role.durationMs <= 1 || running) {
             apply()
             return
         }
@@ -63,7 +62,7 @@ class ThemeRevealController internal constructor(
                 oldFrame = snapshot
                 progress.snapTo(0f)
                 apply()
-                progress.animateTo(1f, tween(durationMs, easing = FastOutSlowInEasing))
+                progress.animateTo(1f, role.of())
             } finally {
                 oldFrame = null
                 running = false

@@ -14,7 +14,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.themes.Themes
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -84,7 +84,7 @@ class PackListFitTest {
     private fun listHeight(rows: Int, bound: Int?, state: ScrollState = ScrollState(0)): Int {
         var measured = -1
         val scene = ImageComposeScene(width = 600, height = 800, density = Density(1f)) {
-            NxTheme(Themes.Celestia, dark = true) {
+            NxThemed(Themes.Celestia, dark = true) {
                 val parent = if (bound != null) {
                     Modifier.heightIn(max = bound.dp)
                 } else {

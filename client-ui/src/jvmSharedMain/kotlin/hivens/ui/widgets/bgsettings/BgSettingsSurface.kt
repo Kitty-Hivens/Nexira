@@ -11,7 +11,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import hivens.themes.api.ThemeMode
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -20,10 +19,10 @@ import hivens.ui.surface.NxSurface
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
-import hivens.ui.theme.Theme
 import hivens.ui.surface.SurfaceKind
 
-private const val SURFACE = "bg.settings"
+/** The Appearance studio's surface, whose slots both of its islands draw. */
+internal const val BG_SETTINGS_SURFACE = "bg.settings"
 
 // Island widths -- bounded so sliders never run to the monitor edge (Rule 6 / D08)
 // and the live wallpaper breathes in the channel between them (Rule 3 gap).
@@ -34,7 +33,7 @@ private val THEME_PANEL_WIDTH = 320.dp
  * Appearance studio. AppLayout routes Screen.BackgroundSettings here. Two islands over
  * the live wallpaper: the wallpaper controls (the `controls` slot -- enable + image +
  * scale + position + effects + loop + tint + reset widgets) at the start, and the theme
- * axis ([AppearanceThemeIsland]: dark/light, its source, the theme picker) at the end.
+ * island ([AppearanceThemeIsland]: blur, reduced motion and the colour provider's controls) at the end.
  *
  * No in-screen title or back button: the top-bar breadcrumb names the screen and drives
  * navigation, as on the other surfaces. There is also no preview -- the app's
@@ -48,17 +47,8 @@ fun BgSettingsSurface(
     currentSettings: BackgroundSettings,
     onSettingsChanged: (BackgroundSettings.() -> BackgroundSettings) -> Unit,
     onBack: () -> Unit,
-    isDarkTheme: Boolean,
-    onToggleDarkTheme: () -> Unit,
-    themeMode: ThemeMode,
-    onThemeModeChanged: (ThemeMode) -> Unit,
-    systemThemeAvailable: Boolean,
-    activeTheme: Theme?,
     surfaceBlur: Boolean,
     onSurfaceBlurChanged: (Boolean) -> Unit,
-    reduceMotion: Boolean,
-    onReduceMotionChanged: (Boolean) -> Unit,
-    onOpenThemePicker: () -> Unit,
 ) {
     // The shell's value, not a copy taken on the way in. The screen is not the
     // only writer: the player's volume and a transcode that finishes after the
@@ -73,7 +63,6 @@ fun BgSettingsSurface(
         onSettingsChanged { copy(imagePath = null, enabled = false) }
     }
     PuppetToggle("background.surfaceBlur", surfaceBlur, onValueChange = onSurfaceBlurChanged)
-    PuppetToggle("background.reduceMotion", reduceMotion, onValueChange = onReduceMotionChanged)
     PuppetClick("background.reset") { onSettingsChanged { BackgroundSettings() } }
 
     Row(Modifier.fillMaxSize().padding(16.dp)) {
@@ -82,7 +71,7 @@ fun BgSettingsSurface(
             // because this screen wraps it: the kernel is what knows how each
             // widget is measured once the column has no end.
             SlotRenderer(
-                SurfaceId(SURFACE),
+                SurfaceId(BG_SETTINGS_SURFACE),
                 SlotId("controls"),
                 modifier       = Modifier.fillMaxSize(),
                 spacing        = 16.dp,
@@ -93,17 +82,8 @@ fun BgSettingsSurface(
         Spacer(Modifier.weight(1f))
 
         AppearanceThemeIsland(
-            isDarkTheme          = isDarkTheme,
-            onToggleDarkTheme    = onToggleDarkTheme,
-            themeMode            = themeMode,
-            onThemeModeChanged   = onThemeModeChanged,
-            systemThemeAvailable = systemThemeAvailable,
-            activeTheme          = activeTheme,
             surfaceBlur          = surfaceBlur,
             onSurfaceBlurChanged = onSurfaceBlurChanged,
-            reduceMotion         = reduceMotion,
-            onReduceMotionChanged = onReduceMotionChanged,
-            onOpenThemePicker    = onOpenThemePicker,
             modifier             = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
         )
     }

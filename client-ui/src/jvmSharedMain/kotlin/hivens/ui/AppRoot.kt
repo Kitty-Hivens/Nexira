@@ -197,9 +197,8 @@ fun AppRoot(
     val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
     CompositionLocalProvider(LocalWidgetLabels provides widgetLabels) {
     ScreenEffectHost(
-        effects       = effects,
-        settings      = effectSettings,
-        reducedMotion = customization.reduceMotion,
+        effects  = effects,
+        settings = effectSettings,
     ) {
         Box(
             Modifier

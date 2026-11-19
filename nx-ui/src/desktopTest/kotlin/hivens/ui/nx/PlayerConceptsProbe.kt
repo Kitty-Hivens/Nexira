@@ -42,8 +42,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.Canvas as SkCanvas
@@ -88,9 +87,9 @@ class PlayerConceptsProbe {
     private fun sheet(name: String, wDp: Int, hDp: Int, body: @Composable () -> Unit) {
         val d = 3f
         val scene = ImageComposeScene((wDp * d).toInt(), (hDp * d).toInt(), density = Density(d)) {
-            NxTheme(TestTheme, dark = true) {
+            NxThemed(TestTheme, dark = true) {
                 Box(
-                    Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                    Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                     contentAlignment = Alignment.Center,
                 ) { body() }
             }
@@ -125,7 +124,7 @@ class PlayerConceptsProbe {
                         .background(lerp(c.raised, c.lead, 0.22f)),
                 )
                 Row(
-                    Modifier.fillMaxSize().padding(horizontal = Spacing.s14),
+                    Modifier.fillMaxSize().padding(horizontal = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
@@ -133,17 +132,17 @@ class PlayerConceptsProbe {
                             name, style = MaterialTheme.typography.bodyLarge, color = c.main,
                             fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
-                        Spacer(Modifier.height(Spacing.s2))
+                        Spacer(Modifier.height(2.dp))
                         Text(
                             "$artist  ·  $elapsed / $total",
                             style = MaterialTheme.typography.bodySmall, color = c.quiet, maxLines = 1,
                         )
                     }
-                    Spacer(Modifier.width(Spacing.s12))
+                    Spacer(Modifier.width(12.dp))
                     Glyph(NxIcon.SkipPrevious, 18, 0.7f)
-                    Spacer(Modifier.width(Spacing.s10))
+                    Spacer(Modifier.width(10.dp))
                     Glyph(NxIcon.Pause, 22)
-                    Spacer(Modifier.width(Spacing.s10))
+                    Spacer(Modifier.width(10.dp))
                     Glyph(NxIcon.SkipNext, 18, 0.7f)
                 }
             }
@@ -179,7 +178,7 @@ class PlayerConceptsProbe {
                 Row(
                     Modifier.align(Alignment.Center),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.s16),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
                 ) {
                     Glyph(NxIcon.SkipPrevious, 20, 0.85f)
                     Glyph(NxIcon.Pause, 30)
@@ -193,7 +192,7 @@ class PlayerConceptsProbe {
                     Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.72f)),
                 ),
             )
-            Column(Modifier.align(Alignment.BottomStart).padding(Spacing.s12)) {
+            Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
                 Text(
                     title, style = MaterialTheme.typography.bodyMedium, color = Color.White,
                     fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -215,27 +214,27 @@ class PlayerConceptsProbe {
     private fun ConceptReadout() {
         val c = probeInks()
         NxSurface(SurfaceKind.Card, Modifier.width(320.dp), shape = MaterialTheme.shapes.medium) {
-            Column(Modifier.fillMaxWidth().padding(Spacing.s14)) {
+            Column(Modifier.fillMaxWidth().padding(14.dp)) {
                 Text(
                     title, style = MaterialTheme.typography.bodyMedium, color = c.quiet,
                     maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(Spacing.s6))
+                Spacer(Modifier.height(6.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(elapsed, style = MaterialTheme.typography.headlineMedium, color = c.main, fontWeight = FontWeight.Medium)
-                    Spacer(Modifier.width(Spacing.s6))
+                    Spacer(Modifier.width(6.dp))
                     Text(
                         "/ $total", style = MaterialTheme.typography.bodyMedium, color = c.quiet,
                         modifier = Modifier.padding(bottom = 3.dp),
                     )
                     Spacer(Modifier.weight(1f))
                     Glyph(NxIcon.SkipPrevious, 18, 0.7f)
-                    Spacer(Modifier.width(Spacing.s10))
+                    Spacer(Modifier.width(10.dp))
                     Glyph(NxIcon.Pause, 22)
-                    Spacer(Modifier.width(Spacing.s10))
+                    Spacer(Modifier.width(10.dp))
                     Glyph(NxIcon.SkipNext, 18, 0.7f)
                 }
-                Spacer(Modifier.height(Spacing.s10))
+                Spacer(Modifier.height(10.dp))
                 Box(Modifier.fillMaxWidth().height(2.dp)) {
                     Box(Modifier.fillMaxSize().background(c.quiet.copy(alpha = 0.20f)))
                     Box(Modifier.fillMaxWidth(fraction).fillMaxHeight().background(c.lead))

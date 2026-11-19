@@ -1,14 +1,24 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 
 /**
  * A place that exists and has nothing behind it yet.
@@ -53,4 +63,31 @@ fun NxNotBuiltYet(
             }
         },
     )
+}
+
+@Preview
+@Composable
+private fun NxNotBuiltYetDarkPreview() = NotBuiltYetSamples(dark = true)
+
+@Preview
+@Composable
+private fun NxNotBuiltYetLightPreview() = NotBuiltYetSamples(dark = false)
+
+@Composable
+private fun NotBuiltYetSamples(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(32.dp),
+        ) {
+            NxNotBuiltYet("Not built yet", "This page exists and has nothing behind it so far.", Modifier.fillMaxWidth())
+            NxNotBuiltYet(
+                title    = "Coming later",
+                message  = "Server lists arrive in a later release.",
+                modifier = Modifier.fillMaxWidth(),
+                detail  = "Needs the mirror's server registry",
+                icon    = NxIcon.Lan,
+            )
+        }
+    }
 }

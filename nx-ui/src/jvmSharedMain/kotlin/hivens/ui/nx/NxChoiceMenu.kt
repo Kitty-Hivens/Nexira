@@ -7,6 +7,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -39,16 +40,20 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 
 /**
  * A list of answers to one question, hung off the control that asked it.
@@ -102,7 +107,7 @@ fun NxChoiceMenu(
 }
 
 /**
- * The plane a choice list sits on: the popup surface at the larger corner, rows
+ * The plane a choice list sits on: the popup surface at the menu corner, rows
  * running to its edges on every side, so the first and last answer's fill follows
  * the corner instead of being cut by it. A scrollbar only once there is something
  * to scroll.
@@ -122,7 +127,7 @@ internal fun NxChoiceSurface(
     val density = LocalDensity.current
     var bodyHeight by remember { mutableStateOf(0.dp) }
 
-    NxSurface(kind = SurfaceKind.Popup, shape = MaterialTheme.shapes.large, modifier = modifier) {
+    NxSurface(kind = SurfaceKind.Popup, shape = Shape.menu, modifier = modifier) {
         // Intrinsic width inside the bounds, for the reason the menu gives: a popup
         // arrives unbounded, and the rows only fill the same width once the column
         // has one.
@@ -276,3 +281,41 @@ private val CHOICE_EDGE = 6.dp
 internal val CHOICE_MIN_WIDTH = 180.dp
 private val CHOICE_MAX_WIDTH = 360.dp
 private val CHOICE_MAX_HEIGHT = 320.dp
+
+@Preview
+@Composable
+private fun NxChoiceMenuDarkPreview() = OpenChoiceLists(dark = true)
+
+@Preview
+@Composable
+private fun NxChoiceMenuLightPreview() = OpenChoiceLists(dark = false)
+
+/** The list as it stands once open, drawn through its own surface, for the reason the menu's preview gives. */
+@Composable
+private fun OpenChoiceLists(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Row(
+            modifier              = Modifier.width(560.dp).background(NxColor.page).padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            NxChoiceSurface(Modifier, CHOICE_MIN_WIDTH, CHOICE_MAX_WIDTH, CHOICE_MAX_HEIGHT, footer = null) {
+                NxChoiceItem("Fabric", selected = true, icon = NxIcon.Layers, onClick = {})
+                NxChoiceItem("Quilt", selected = false, icon = NxIcon.Layers, hint = "Beta", onClick = {})
+                NxChoiceItem("Forge", selected = false, icon = NxIcon.Layers, highlighted = true, onClick = {})
+                NxChoiceDivider()
+                NxChoiceItem("Vanilla", selected = false, enabled = false, onClick = {})
+            }
+            NxChoiceSurface(
+                modifier  = Modifier,
+                minWidth  = CHOICE_MIN_WIDTH,
+                maxWidth  = CHOICE_MAX_WIDTH,
+                maxHeight = CHOICE_MAX_HEIGHT,
+                footer    = { NxChoiceFooterItem("Show snapshots", NxIcon.Visibility, onClick = {}) },
+            ) {
+                NxChoiceItem("1.21.4", selected = false, hint = "Latest", onClick = {})
+                NxChoiceItem("1.21.1", selected = true, onClick = {})
+                NxChoiceItem("1.20.1", selected = false, onClick = {})
+            }
+        }
+    }
+}

@@ -18,7 +18,7 @@ import hivens.themes.Themes
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.surface.NxSurface
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
 import java.nio.file.Path
@@ -41,7 +41,7 @@ class NotBuiltYetRenderTest {
         val out = Path.of("build/render", "not-built-yet.png")
         Files.createDirectories(out.parent)
         val scene = ImageComposeScene(760, 620, density = Density(1f)) {
-            NxTheme(Themes.default, dark = true) {
+            NxThemed(Themes.default, dark = true) {
                 CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator("ru")) {
                     val s = nexiraStrings()
                     Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {

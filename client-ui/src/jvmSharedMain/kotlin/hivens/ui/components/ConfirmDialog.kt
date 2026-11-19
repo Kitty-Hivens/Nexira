@@ -9,7 +9,6 @@ import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxAlertDialog
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.OnFill
 
 /**
@@ -32,7 +31,7 @@ fun ConfirmDialog(
     confirmColor: Color = NxColor.lead(),
 ) {
     val s = nexiraStrings()
-    val container = NxTheme.colours.step(NxTheme.colours.topStep)
+    val container = NxColor.depth(NxColor.floating)
     OnFill(container) {
         NxAlertDialog(
             onDismissRequest = onDismiss,

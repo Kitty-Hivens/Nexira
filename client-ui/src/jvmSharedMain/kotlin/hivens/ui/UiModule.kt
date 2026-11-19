@@ -16,7 +16,6 @@ import hivens.launcher.network.ServerProtocolConfig
 import hivens.launcher.platform.PlatformPaths
 import hivens.launcher.sources.SourceWorks
 import hivens.packs.PacksHost
-import hivens.themes.api.ThemesKeys
 import hivens.ui.accounts.ClientAccountsHost
 import hivens.ui.activity.ActivityCommands
 import hivens.ui.activity.ActivityDriver
@@ -68,7 +67,6 @@ import hivens.ui.packs.withdrawNoticesOfInstalledPacks
 import hivens.ui.screens.library.content.ContentIconStore
 import hivens.ui.settings.LegacySettingsThroughService
 import hivens.ui.settings.SettingsDomainFiles
-import hivens.ui.theme.Theme
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.LogRetention
@@ -91,10 +89,9 @@ import hivens.ui.widgets.profile.ProfileSelectionSource
 import hivens.ui.widgets.state.WidgetStateFlushHook
 import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
-import hivens.ui.widgets.themepicker.ThemeSelectionSource
-import hivens.ui.widgets.themepicker.sampleThemeSelection
 import hivens.widget.api.BringIn
 import hivens.widget.api.CompiledModule
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.FactoryFailures
 import hivens.widget.api.HostFiles
@@ -281,8 +278,9 @@ fun uiCoreModule(
     // method, the processor warns rather than fails on a contract nobody here
     // provides), and the composite is the part that was never written.
     //
-    // Order is precedence and the built-in registry comes first, so a
-    // contributed widget cannot take over a kind the application depends on --
+    // Order is precedence and the built-in registry comes first, then the widgets
+    // of the modules compiled in, then the jars', so a contributed widget cannot
+    // take over a kind the application depends on --
     // the shell regions and the sign-in panel are non-removable because a layout
     // without them has no navigation and no way to sign in, and shadowing them
     // by id would be that removal through a side door.
@@ -301,6 +299,7 @@ fun uiCoreModule(
             builtIn   = builtIn,
             scope     = get(),
             host      = moduleHost(directory, dataDir),
+            compiled  = compiled,
         )
     }
     single<WidgetRegistry> { get<WidgetModules>().registry }
@@ -676,9 +675,6 @@ internal fun uiDataRegistry(
     // What a page provides for its own widgets, on that page and nowhere else.
     declare(ProjectPageSource, ::sampleProjectPage)
     declare(CataloguePackPageSource, ::sampleCataloguePackPage)
-    // The picker's widgets are shown on the sample of the theme in use, the themes module's,
-    // read when the palette asks, by when the module's keys are in.
-    declare(ThemeSelectionSource) { sampleThemeSelection(sampleOf(ThemesKeys.ACTIVE_ID)?.invoke() as? Theme) }
     declare(AboutUpdateSource, ::sampleUpdateCheck)
 }
 
@@ -704,6 +700,7 @@ internal fun uiCommandRegistry(
     declare(Commands.Back)
     declare(Commands.Forward)
     declare(Commands.PopTo)
+    declare(CompositionKeys.ShowConfig)
     // What the About page provides for its update panel.
     declare(OpenUpdateDialog)
     // What each window provides of the commands it takes.

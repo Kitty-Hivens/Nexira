@@ -27,7 +27,7 @@ import hivens.ui.feature.catalogue.toBuild
 import hivens.ui.feature.catalogue.toDetails
 import hivens.ui.feature.catalogue.toTags
 import hivens.ui.i18n.NexiraStrings
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import kotlinx.serialization.json.Json
 import org.jetbrains.skia.Data
 import org.jetbrains.skia.EncodedImageFormat
@@ -149,7 +149,7 @@ class ModVersionPageRenderTest {
         var png: Data? = null
         SwingUtilities.invokeAndWait {
             val scene = ImageComposeScene(1160, 900, density = Density(1f)) {
-                NxTheme(Themes.default, dark = true) {
+                NxThemed(Themes.default, dark = true) {
                     CompositionLocalProvider(LocalTranslator provides NexiraStrings.translator("ru")) {
                         Box(Modifier.fillMaxSize().background(NxColor.page).padding(14.dp)) {
                             ModVersionBody(

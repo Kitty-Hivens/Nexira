@@ -1,0 +1,158 @@
+public final class hivens/look/motion/api/Arrival {
+	public static final field $stable I
+	public synthetic fun <init> (Lhivens/look/motion/api/MotionRole;FFLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getFromScale ()F
+	public final fun getRole ()Lhivens/look/motion/api/MotionRole;
+	public final fun getTravel-D9Ej5fM ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/look/motion/api/Motion : hivens/look/manager/api/LookAxis {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/motion/api/Motion;
+	public final fun ambient (ILandroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionLoop;
+	public final fun arrival (Lhivens/widget/model/Entrance;Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/Arrival;
+	public final fun decoration (Lhivens/look/motion/api/MotionRole;Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getColourShift (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getDismiss (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getDrift (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getEmphasis (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getFade (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public fun getLabel ()Ljava/lang/String;
+	public final fun getLookChange (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getPageSwap (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getPanelSlide (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getPopup (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getReveal (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getScroll (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getSweep (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionLoop;
+	public final fun getTap (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun getTrack (Landroidx/compose/runtime/Composer;I)Lhivens/look/motion/api/MotionRole;
+	public final fun stagger (ILandroidx/compose/runtime/Composer;I)I
+}
+
+public final class hivens/look/motion/api/MotionAnswers {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/motion/api/MotionAnswers$Companion;
+	public final fun ambient (I)Lhivens/look/motion/api/MotionLoop;
+	public final fun arrival (Lhivens/widget/model/Entrance;)Lhivens/look/motion/api/Arrival;
+	public final fun decoration (Lhivens/look/motion/api/MotionRole;)Lhivens/look/motion/api/MotionRole;
+	public final fun getColourShift ()Lhivens/look/motion/api/MotionRole;
+	public final fun getDismiss ()Lhivens/look/motion/api/MotionRole;
+	public final fun getDrift ()Lhivens/look/motion/api/MotionRole;
+	public final fun getEmphasis ()Lhivens/look/motion/api/MotionRole;
+	public final fun getFade ()Lhivens/look/motion/api/MotionRole;
+	public final fun getLookChange ()Lhivens/look/motion/api/MotionRole;
+	public final fun getPageSwap ()Lhivens/look/motion/api/MotionRole;
+	public final fun getPanelSlide ()Lhivens/look/motion/api/MotionRole;
+	public final fun getPopup ()Lhivens/look/motion/api/MotionRole;
+	public final fun getReveal ()Lhivens/look/motion/api/MotionRole;
+	public final fun getScroll ()Lhivens/look/motion/api/MotionRole;
+	public final fun getSweep ()Lhivens/look/motion/api/MotionLoop;
+	public final fun getTap ()Lhivens/look/motion/api/MotionRole;
+	public final fun getTrack ()Lhivens/look/motion/api/MotionRole;
+	public final fun stagger (I)I
+}
+
+public final class hivens/look/motion/api/MotionAnswers$Builder {
+	public static final field $stable I
+	public final fun getAmbient ()Lkotlin/jvm/functions/Function1;
+	public final fun getArrival ()Lkotlin/jvm/functions/Function1;
+	public final fun getColourShift ()Lhivens/look/motion/api/MotionRole;
+	public final fun getDecoration ()Lkotlin/jvm/functions/Function1;
+	public final fun getDismiss ()Lhivens/look/motion/api/MotionRole;
+	public final fun getDrift ()Lkotlin/jvm/functions/Function0;
+	public final fun getEmphasis ()Lhivens/look/motion/api/MotionRole;
+	public final fun getFade ()Lhivens/look/motion/api/MotionRole;
+	public final fun getLookChange ()Lkotlin/jvm/functions/Function0;
+	public final fun getPageSwap ()Lhivens/look/motion/api/MotionRole;
+	public final fun getPanelSlide ()Lhivens/look/motion/api/MotionRole;
+	public final fun getPopup ()Lhivens/look/motion/api/MotionRole;
+	public final fun getReveal ()Lhivens/look/motion/api/MotionRole;
+	public final fun getScroll ()Lhivens/look/motion/api/MotionRole;
+	public final fun getStagger ()Lkotlin/jvm/functions/Function1;
+	public final fun getSweep ()Lhivens/look/motion/api/MotionLoop;
+	public final fun getTap ()Lhivens/look/motion/api/MotionRole;
+	public final fun getTrack ()Lhivens/look/motion/api/MotionRole;
+	public final fun setAmbient (Lkotlin/jvm/functions/Function1;)V
+	public final fun setArrival (Lkotlin/jvm/functions/Function1;)V
+	public final fun setColourShift (Lhivens/look/motion/api/MotionRole;)V
+	public final fun setDecoration (Lkotlin/jvm/functions/Function1;)V
+	public final fun setDismiss (Lhivens/look/motion/api/MotionRole;)V
+	public final fun setDrift (Lkotlin/jvm/functions/Function0;)V
+	public final fun setEmphasis (Lhivens/look/motion/api/MotionRole;)V
+	public final fun setFade (Lhivens/look/motion/api/MotionRole;)V
+	public final fun setLookChange (Lkotlin/jvm/functions/Function0;)V
+	public final fun setPageSwap (Lhivens/look/motion/api/MotionRole;)V
+	public final fun setPanelSlide (Lhivens/look/motion/api/MotionRole;)V
+	public final fun setPopup (Lhivens/look/motion/api/MotionRole;)V
+	public final fun setReveal (Lhivens/look/motion/api/MotionRole;)V
+	public final fun setScroll (Lhivens/look/motion/api/MotionRole;)V
+	public final fun setStagger (Lkotlin/jvm/functions/Function1;)V
+	public final fun setSweep (Lhivens/look/motion/api/MotionLoop;)V
+	public final fun setTap (Lhivens/look/motion/api/MotionRole;)V
+	public final fun setTrack (Lhivens/look/motion/api/MotionRole;)V
+}
+
+public final class hivens/look/motion/api/MotionAnswers$Companion {
+	public final fun build (Lkotlin/jvm/functions/Function1;)Lhivens/look/motion/api/MotionAnswers;
+	public final fun getBASE ()Lhivens/look/motion/api/MotionAnswers;
+}
+
+public final class hivens/look/motion/api/MotionApi {
+	public static final field $stable I
+	public static final field AXIS Ljava/lang/String;
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/look/motion/api/MotionApi;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public abstract class hivens/look/motion/api/MotionLoop {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/motion/api/MotionLoop$Companion;
+	public fun <init> ()V
+	public abstract fun getPeriodMs ()I
+	public abstract fun of (I)Landroidx/compose/animation/core/DurationBasedAnimationSpec;
+	public static synthetic fun of$default (Lhivens/look/motion/api/MotionLoop;IILjava/lang/Object;)Landroidx/compose/animation/core/DurationBasedAnimationSpec;
+}
+
+public final class hivens/look/motion/api/MotionLoop$Companion {
+	public final fun tween (ILandroidx/compose/animation/core/Easing;)Lhivens/look/motion/api/MotionLoop;
+}
+
+public final class hivens/look/motion/api/MotionModule : hivens/widget/api/CompiledModule {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/motion/api/MotionModule;
+	public fun getApiPackages ()Ljava/util/Map;
+	public fun getBoot ()Lhivens/widget/api/BootAnswers;
+	public fun getContributionKinds ()Ljava/util/List;
+	public fun getContributions ()Ljava/util/List;
+	public fun getId ()Ljava/lang/String;
+	public fun getName ()Ljava/lang/String;
+	public fun getProvides ()Ljava/util/Map;
+	public fun getStrings ()Lhivens/widget/api/ModuleStrings;
+	public fun getWidgets ()Lhivens/widget/api/WidgetRegistry;
+}
+
+public abstract class hivens/look/motion/api/MotionRole : androidx/compose/animation/core/FiniteAnimationSpec {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/motion/api/MotionRole$Companion;
+	public fun <init> ()V
+	public abstract fun enter-__ExYCQ (J)Landroidx/compose/animation/EnterTransition;
+	public abstract fun exit-__ExYCQ (J)Landroidx/compose/animation/ExitTransition;
+	public abstract fun getDurationMs ()I
+	public final fun getEnter ()Landroidx/compose/animation/EnterTransition;
+	public final fun getExit ()Landroidx/compose/animation/ExitTransition;
+	public abstract fun of (I)Landroidx/compose/animation/core/FiniteAnimationSpec;
+	public static synthetic fun of$default (Lhivens/look/motion/api/MotionRole;IILjava/lang/Object;)Landroidx/compose/animation/core/FiniteAnimationSpec;
+	public synthetic fun vectorize (Landroidx/compose/animation/core/TwoWayConverter;)Landroidx/compose/animation/core/VectorizedAnimationSpec;
+	public fun vectorize (Landroidx/compose/animation/core/TwoWayConverter;)Landroidx/compose/animation/core/VectorizedFiniteAnimationSpec;
+}
+
+public final class hivens/look/motion/api/MotionRole$Companion {
+	public final fun tween (ILandroidx/compose/animation/core/Easing;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;)Lhivens/look/motion/api/MotionRole;
+	public static synthetic fun tween$default (Lhivens/look/motion/api/MotionRole$Companion;ILandroidx/compose/animation/core/Easing;Lkotlin/jvm/functions/Function2;Lkotlin/jvm/functions/Function2;ILjava/lang/Object;)Lhivens/look/motion/api/MotionRole;
+}
+

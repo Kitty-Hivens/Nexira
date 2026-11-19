@@ -11,9 +11,10 @@ import kotlin.math.max
  * Answers the requests nx-ui makes of a [Scheme]. The scheme is the author's and is
  * never changed. Everything here is read from it or computed beside it.
  *
- * One instance per active scheme, held by [NxTheme], so the computed sets are worked
- * out once rather than on every recomposition that asks. Made directly for a scheme
- * that is not being drawn: a theme held to what it promises, before anyone chooses it.
+ * One instance per scheme drawn, held by its colour answers ([Scheme.colourAnswers]), so
+ * the computed sets are worked out once rather than on every recomposition that asks.
+ * Made directly for a scheme that is not being drawn: a theme held to what it promises,
+ * before anyone chooses it.
  */
 @Stable
 class SchemeColours(val scheme: Scheme) {

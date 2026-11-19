@@ -8,7 +8,7 @@ import hivens.ui.TypingScene
 import hivens.ui.host.HostKoin
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.utils.ConsoleSettings
 import hivens.ui.utils.GameConsoleService
 import kotlinx.coroutines.runBlocking
@@ -44,7 +44,7 @@ class ConsoleCommandLineTest {
                 TypingScene(800, 400) {
                     HostKoin(koin) {
                         ShippedLanguageProvider("en") {
-                            NxTheme(Themes.default, dark = true) {
+                            NxThemed(Themes.default, dark = true) {
                                 ConsoleContent(ConsoleSettings(), onSettingsChange = {}, source = ConsoleSource.Live)
                             }
                         }

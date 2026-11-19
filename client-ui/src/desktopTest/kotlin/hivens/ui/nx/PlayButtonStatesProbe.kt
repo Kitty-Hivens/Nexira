@@ -5,7 +5,6 @@ import hivens.i18n.api.LocalTranslator
 import hivens.i18n.api.Strings
 import hivens.themes.Themes
 import hivens.ui.i18n.NexiraStrings
-import hivens.ui.theme.Spacing
 import hivens.ui.icons.Symbol
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.graphics.luminance
@@ -42,6 +41,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.settle
 import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.decorativePair
 import org.jetbrains.skia.EncodedImageFormat
 import java.nio.file.Files
@@ -107,14 +107,14 @@ class PlayButtonStatesProbe {
     @Composable
     private fun SurfaceStrip(height: Int, content: @Composable () -> Unit) {
         Box(
-            Modifier.width(STRIP_W.dp).height(height.dp).background(NxTheme.colours.step(1)),
+            Modifier.width(STRIP_W.dp).height(height.dp).background(NxColor.depth(1)),
             contentAlignment = Alignment.CenterEnd,
         ) { Box(Modifier.padding(horizontal = 18.dp)) { content() } }
     }
 
     @Composable
     private fun Sheet(dark: Boolean, onSurface: Boolean = false, stripH: Int = STRIP_H, button: @Composable (Cell, Strings) -> Unit) {
-        NxTheme(Themes.default, dark = dark) {
+        NxThemed(Themes.default, dark = dark) {
             Box(Modifier.fillMaxSize().background(NxColor.page).padding(16.dp)) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     cells.forEach { cell ->
@@ -217,7 +217,7 @@ class PlayButtonStatesProbe {
                 .then(if (filled) Modifier.background(k.plate) else Modifier)
                 .then(if (cell.kind == Kind.Waiting) Modifier.progressLayer(cell.progress, k.onPlate.copy(alpha = 0.14f)) else Modifier)
                 .border(if (filled) 1.dp else 1.5.dp, if (filled) k.onPlate.copy(alpha = 0.18f) else if (cell.kind == Kind.Problem) k.warn.copy(alpha = 0.7f) else k.quietLine, shape)
-                .padding(horizontal = Spacing.s20, vertical = 9.dp),
+                .padding(horizontal = 20.dp, vertical = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(7.dp, Alignment.CenterHorizontally),
         ) {
@@ -250,7 +250,7 @@ class PlayButtonStatesProbe {
         val k = inks(onSurface)
         val shape = MaterialTheme.shapes.medium
         val ready = cell.kind == Kind.Ready
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.s12)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             if (!ready) {
                 Text(
                     cell.label(s),
@@ -269,7 +269,7 @@ class PlayButtonStatesProbe {
                     .then(if (filled) Modifier.background(k.plate) else Modifier)
                     .then(if (cell.kind == Kind.Waiting) Modifier.progressLayer(cell.progress, k.onPlate.copy(alpha = 0.14f)) else Modifier)
                     .border(if (filled) 1.dp else 1.5.dp, if (filled) k.onPlate.copy(alpha = 0.18f) else if (cell.kind == Kind.Problem) k.warn.copy(alpha = 0.7f) else k.quietLine, shape)
-                    .padding(horizontal = Spacing.s20, vertical = 9.dp),
+                    .padding(horizontal = 20.dp, vertical = 9.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 val content = if (filled) k.onPlate else k.quiet

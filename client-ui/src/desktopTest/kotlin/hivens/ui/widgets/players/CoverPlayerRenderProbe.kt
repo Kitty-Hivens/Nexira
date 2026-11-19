@@ -21,8 +21,7 @@ import hivens.ui.audio.PlaybackState
 import hivens.ui.audio.RepeatMode
 import hivens.ui.audio.TrackInfo
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import java.nio.file.Paths
@@ -62,12 +61,12 @@ class CoverPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((500 * d).toInt(), (1240 * d).toInt(), density = Density(d)) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = true) {
+                NxThemed(Themes.default, dark = true) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.TopCenter,
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s10)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                             widths.forEach { w ->
                                 Box(Modifier.width(w.dp)) {
                                     CoverPlayerCard(
@@ -104,12 +103,12 @@ class CoverPlayerRenderProbe {
         val d = 2f
         val scene = ImageComposeScene((460 * d).toInt(), (520 * d).toInt(), density = Density(d)) {
             ShippedLanguageProvider("en") {
-                NxTheme(Themes.default, dark = true) {
+                NxThemed(Themes.default, dark = true) {
                     Box(
-                        Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                        Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Column(verticalArrangement = Arrangement.spacedBy(Spacing.s16)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             row(
                                 playing(107_000L),
                                 TrackInfo(
@@ -154,9 +153,9 @@ class CoverPlayerRenderProbe {
             val d = 2f
             val scene = ImageComposeScene((460 * d).toInt(), (420 * d).toInt(), density = Density(d)) {
                 ShippedLanguageProvider("ru") {
-                    NxTheme(Themes.default, dark = dark) {
+                    NxThemed(Themes.default, dark = dark) {
                         Box(
-                            Modifier.fillMaxSize().background(NxColor.page).padding(Spacing.s16),
+                            Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                             contentAlignment = Alignment.TopStart,
                         ) {
                             Box(Modifier.width(420.dp)) {

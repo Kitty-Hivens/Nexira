@@ -19,7 +19,7 @@ dependencies {
     testImplementation(kotlin("test"))
     // The themes module's API, for the tests of a kind of contribution a module compiled into
     // the launcher declares rather than the kernel: the fixture brings a theme through it.
-    testImplementation(project(":themes-api"))
+    testImplementation(project(":look:colour-nx-api"))
 }
 
 // A widget module built the way a third party would build one, kept OFF the test
@@ -31,7 +31,7 @@ val fixtureModule: SourceSet = sourceSets.create("fixtureModule") {
 }
 dependencies {
     // The fixture brings a theme, which a module does through the themes module's API.
-    "fixtureModuleImplementation"(project(":themes-api"))
+    "fixtureModuleImplementation"(project(":look:colour-nx-api"))
 }
 
 val fixtureModuleJar = tasks.register<Jar>("fixtureModuleJar") {

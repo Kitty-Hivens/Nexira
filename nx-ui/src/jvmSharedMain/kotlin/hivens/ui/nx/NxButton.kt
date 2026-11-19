@@ -5,10 +5,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,14 +21,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
+import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
-import hivens.ui.theme.Spacing
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Status
 
 /**
@@ -55,7 +61,7 @@ fun NxButton(
     compact: Boolean = false,
     minHeight: Dp? = null,
 ) {
-    val shape = MaterialTheme.shapes.small
+    val shape = Shape.control
 
     val container: Color = when (style) {
         NxButtonStyle.Primary     -> NxColor.lead()
@@ -80,13 +86,13 @@ fun NxButton(
     val outline = NxInk.line
     val bordered = style == NxButtonStyle.Secondary
     val dim = if (enabled) 1f else 0.45f
-    val pad = if (compact) PaddingValues(horizontal = Spacing.s12, vertical = Spacing.s6)
-              else PaddingValues(horizontal = 18.dp, vertical = Spacing.s10)
+    val pad = if (compact) PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+              else PaddingValues(horizontal = 18.dp, vertical = 10.dp)
 
-    // Hover/press feedback through the shared ShapedStateLayer, provided as
-    // LocalIndication so the clickable picks it up.
+    // Hover/press feedback through the shared ShapedStateLayer at the button's own
+    // outline, provided as LocalIndication so the clickable picks it up.
     CompositionLocalProvider(
-        LocalIndication provides ShapedStateLayer(8.dp, content),
+        LocalIndication provides ShapedStateLayer(shape, content),
     ) {
         Row(
             modifier              = modifier
@@ -114,6 +120,42 @@ fun NxButton(
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
             )
+        }
+    }
+}
+
+@Preview
+@Composable
+private fun NxButtonDarkPreview() = ButtonStyles(dark = true)
+
+@Preview
+@Composable
+private fun NxButtonLightPreview() = ButtonStyles(dark = false)
+
+@Composable
+private fun ButtonStyles(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(560.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            for (enabled in listOf(true, false)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (style in NxButtonStyle.entries) {
+                        NxButton(style.name, onClick = {}, style = style, enabled = enabled)
+                    }
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                NxButton("Play", onClick = {}, icon = NxIcon.PlayArrow)
+                NxButton("Open folder", onClick = {}, style = NxButtonStyle.Secondary, icon = NxIcon.FolderOpen)
+                NxButton("Delete", onClick = {}, style = NxButtonStyle.Destructive, icon = NxIcon.Delete)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                NxButton("Compact", onClick = {}, compact = true)
+                NxButton("Compact", onClick = {}, style = NxButtonStyle.Secondary, icon = NxIcon.Add, compact = true)
+                NxButton("Tall", onClick = {}, style = NxButtonStyle.Secondary, minHeight = 48.dp)
+            }
         }
     }
 }

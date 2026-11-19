@@ -30,6 +30,7 @@ import hivens.ui.editor.ShellChromeBounds
 import hivens.ui.editor.LocalShellChromeBounds
 import hivens.ui.widgets.ChildLevel
 import hivens.catalogue.api.CatalogueKeys
+import hivens.widget.api.LocalHiddenWidget
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.ProvideSamples
 import hivens.widget.api.ProvideScoped
@@ -397,6 +398,7 @@ internal fun PreviewEnvironment(data: WidgetDataRegistry, content: @Composable (
         LocalWidgetDecorator provides { _, _, _, _, inner -> inner() },
         LocalUnknownWidgetDecorator provides { _, _, _ -> },
         LocalMisplacedWidget provides { _, _, _ -> },
+        LocalHiddenWidget provides null,
         LocalShellChromeBounds provides ownBounds,
     ) {
         ProvideScoped(CatalogueKeys.OpenProject, sampleOpenProject()) {

@@ -1,0 +1,278 @@
+public final class hivens/look/colour/api/Colour : hivens/look/manager/api/LookAxis {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/colour/api/Colour;
+	public fun getLabel ()Ljava/lang/String;
+}
+
+public final class hivens/look/colour/api/ColourAnswers {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/colour/api/ColourAnswers$Companion;
+	public final fun fillInverse-l2rxGTc (J)J
+	public final fun fillLead-l2rxGTc (J)J
+	public final fun fillMatch-l2rxGTc (J)J
+	public final fun fillOff-l2rxGTc (J)J
+	public final fun fillPlaceholder-l2rxGTc (J)J
+	public final fun fillQuiet-l2rxGTc (J)J
+	public final fun fillSelected-l2rxGTc (J)J
+	public final fun fillSelection-l2rxGTc (J)J
+	public final fun fillStatus-wrIjXm8 (Lhivens/look/manager/api/Status;J)J
+	public final fun fillTrack-l2rxGTc (J)J
+	public final fun getGroundDark ()Z
+	public final fun getGroundFloating ()I
+	public final fun getGroundPage-0d7_KjU ()J
+	public final fun getInkCaret-0d7_KjU ()J
+	public final fun getInkInverse-0d7_KjU ()J
+	public final fun getInkLead-0d7_KjU ()J
+	public final fun getInkLink-0d7_KjU ()J
+	public final fun getInkMain-0d7_KjU ()J
+	public final fun getInkMatch-0d7_KjU ()J
+	public final fun getInkOff-0d7_KjU ()J
+	public final fun getInkProse-0d7_KjU ()J
+	public final fun getInkQuiet-0d7_KjU ()J
+	public final fun getMediaFill-0d7_KjU ()J
+	public final fun getMediaInk-0d7_KjU ()J
+	public final fun getMediaLine-0d7_KjU ()J
+	public final fun getMediaQuiet-0d7_KjU ()J
+	public final fun getMediaScrim-0d7_KjU ()J
+	public final fun getPaintLead-0d7_KjU ()J
+	public final fun getPaintMark-0d7_KjU ()J
+	public final fun getPaintPalette ()Ljava/util/List;
+	public final fun getPaintPartner-0d7_KjU ()J
+	public final fun getPaintShadow-0d7_KjU ()J
+	public final fun getPaintThird-0d7_KjU ()J
+	public final fun groundDepth-vNxB06k (I)J
+	public final fun inkFaint-l2rxGTc (J)J
+	public final fun inkOn-l2rxGTc (J)J
+	public final fun lineActive-l2rxGTc (J)J
+	public final fun lineControl-l2rxGTc (J)J
+	public final fun lineDivider-l2rxGTc (J)J
+	public final fun lineFaint-l2rxGTc (J)J
+	public final fun lineFocus-l2rxGTc (J)J
+	public final fun lineOff-l2rxGTc (J)J
+	public final fun lineStatus-wrIjXm8 (Lhivens/look/manager/api/Status;J)J
+	public final fun mediaStatus-vNxB06k (Lhivens/look/manager/api/Status;)J
+	public final fun paintCategory-WaAFU9c (II)J
+	public final fun paintData-bKOvKu4 (JJ)J
+	public final fun paintData-l2rxGTc (J)J
+	public final fun paintHashed-vNxB06k (Ljava/lang/String;)J
+	public final fun paintShadowOn-l2rxGTc (J)J
+	public final fun paintStatus-vNxB06k (Lhivens/look/manager/api/Status;)J
+}
+
+public final class hivens/look/colour/api/ColourAnswers$Builder {
+	public static final field $stable I
+	public final fun getFillInverse ()Lkotlin/jvm/functions/Function1;
+	public final fun getFillLead ()Lkotlin/jvm/functions/Function1;
+	public final fun getFillMatch ()Lkotlin/jvm/functions/Function1;
+	public final fun getFillOff ()Lkotlin/jvm/functions/Function1;
+	public final fun getFillPlaceholder ()Lkotlin/jvm/functions/Function1;
+	public final fun getFillQuiet ()Lkotlin/jvm/functions/Function1;
+	public final fun getFillSelected ()Lkotlin/jvm/functions/Function1;
+	public final fun getFillSelection ()Lkotlin/jvm/functions/Function1;
+	public final fun getFillStatus ()Lkotlin/jvm/functions/Function2;
+	public final fun getFillTrack ()Lkotlin/jvm/functions/Function1;
+	public final fun getGroundDark ()Ljava/lang/Boolean;
+	public final fun getGroundDepth ()Lkotlin/jvm/functions/Function1;
+	public final fun getGroundFloating ()Ljava/lang/Integer;
+	public final fun getGroundPage-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getInkCaret-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getInkFaint ()Lkotlin/jvm/functions/Function1;
+	public final fun getInkInverse-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getInkLead-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getInkLink-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getInkMain-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getInkMatch-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getInkOff-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getInkOn ()Lkotlin/jvm/functions/Function1;
+	public final fun getInkProse-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getInkQuiet-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getLineActive ()Lkotlin/jvm/functions/Function1;
+	public final fun getLineControl ()Lkotlin/jvm/functions/Function1;
+	public final fun getLineDivider ()Lkotlin/jvm/functions/Function1;
+	public final fun getLineFaint ()Lkotlin/jvm/functions/Function1;
+	public final fun getLineFocus ()Lkotlin/jvm/functions/Function1;
+	public final fun getLineOff ()Lkotlin/jvm/functions/Function1;
+	public final fun getLineStatus ()Lkotlin/jvm/functions/Function2;
+	public final fun getMediaFill-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getMediaInk-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getMediaLine-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getMediaQuiet-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getMediaScrim-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getMediaStatus ()Lkotlin/jvm/functions/Function1;
+	public final fun getPaintCategory ()Lkotlin/jvm/functions/Function2;
+	public final fun getPaintData ()Lkotlin/jvm/functions/Function1;
+	public final fun getPaintHashed ()Lkotlin/jvm/functions/Function1;
+	public final fun getPaintLead-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getPaintMark-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getPaintPalette ()Ljava/util/List;
+	public final fun getPaintPartner-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getPaintShadow-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun getPaintShadowOn ()Lkotlin/jvm/functions/Function1;
+	public final fun getPaintStatus ()Lkotlin/jvm/functions/Function1;
+	public final fun getPaintThird-QN2ZGVo ()Landroidx/compose/ui/graphics/Color;
+	public final fun setFillInverse (Lkotlin/jvm/functions/Function1;)V
+	public final fun setFillLead (Lkotlin/jvm/functions/Function1;)V
+	public final fun setFillMatch (Lkotlin/jvm/functions/Function1;)V
+	public final fun setFillOff (Lkotlin/jvm/functions/Function1;)V
+	public final fun setFillPlaceholder (Lkotlin/jvm/functions/Function1;)V
+	public final fun setFillQuiet (Lkotlin/jvm/functions/Function1;)V
+	public final fun setFillSelected (Lkotlin/jvm/functions/Function1;)V
+	public final fun setFillSelection (Lkotlin/jvm/functions/Function1;)V
+	public final fun setFillStatus (Lkotlin/jvm/functions/Function2;)V
+	public final fun setFillTrack (Lkotlin/jvm/functions/Function1;)V
+	public final fun setGroundDark (Ljava/lang/Boolean;)V
+	public final fun setGroundDepth (Lkotlin/jvm/functions/Function1;)V
+	public final fun setGroundFloating (Ljava/lang/Integer;)V
+	public final fun setGroundPage-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setInkCaret-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setInkFaint (Lkotlin/jvm/functions/Function1;)V
+	public final fun setInkInverse-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setInkLead-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setInkLink-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setInkMain-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setInkMatch-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setInkOff-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setInkOn (Lkotlin/jvm/functions/Function1;)V
+	public final fun setInkProse-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setInkQuiet-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setLineActive (Lkotlin/jvm/functions/Function1;)V
+	public final fun setLineControl (Lkotlin/jvm/functions/Function1;)V
+	public final fun setLineDivider (Lkotlin/jvm/functions/Function1;)V
+	public final fun setLineFaint (Lkotlin/jvm/functions/Function1;)V
+	public final fun setLineFocus (Lkotlin/jvm/functions/Function1;)V
+	public final fun setLineOff (Lkotlin/jvm/functions/Function1;)V
+	public final fun setLineStatus (Lkotlin/jvm/functions/Function2;)V
+	public final fun setMediaFill-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setMediaInk-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setMediaLine-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setMediaQuiet-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setMediaScrim-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setMediaStatus (Lkotlin/jvm/functions/Function1;)V
+	public final fun setPaintCategory (Lkotlin/jvm/functions/Function2;)V
+	public final fun setPaintData (Lkotlin/jvm/functions/Function1;)V
+	public final fun setPaintHashed (Lkotlin/jvm/functions/Function1;)V
+	public final fun setPaintLead-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setPaintMark-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setPaintPalette (Ljava/util/List;)V
+	public final fun setPaintPartner-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setPaintShadow-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+	public final fun setPaintShadowOn (Lkotlin/jvm/functions/Function1;)V
+	public final fun setPaintStatus (Lkotlin/jvm/functions/Function1;)V
+	public final fun setPaintThird-Y2TPw74 (Landroidx/compose/ui/graphics/Color;)V
+}
+
+public final class hivens/look/colour/api/ColourAnswers$Companion {
+	public final fun build (Lkotlin/jvm/functions/Function1;)Lhivens/look/colour/api/ColourAnswers;
+	public final fun getBASE ()Lhivens/look/colour/api/ColourAnswers;
+}
+
+public final class hivens/look/colour/api/ColourApi {
+	public static final field $stable I
+	public static final field AXIS Ljava/lang/String;
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/look/colour/api/ColourApi;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public abstract interface class hivens/look/colour/api/ColourCategory {
+}
+
+public final class hivens/look/colour/api/ColourModule : hivens/widget/api/CompiledModule {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/colour/api/ColourModule;
+	public fun getApiPackages ()Ljava/util/Map;
+	public fun getBoot ()Lhivens/widget/api/BootAnswers;
+	public fun getContributionKinds ()Ljava/util/List;
+	public fun getContributions ()Ljava/util/List;
+	public fun getId ()Ljava/lang/String;
+	public fun getName ()Ljava/lang/String;
+	public fun getProvides ()Ljava/util/Map;
+	public fun getStrings ()Lhivens/widget/api/ModuleStrings;
+}
+
+public final class hivens/look/colour/api/Fill {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/colour/api/Fill;
+	public final fun getInverse (Landroidx/compose/runtime/Composer;I)J
+	public final fun getLead (Landroidx/compose/runtime/Composer;I)J
+	public final fun getMatch (Landroidx/compose/runtime/Composer;I)J
+	public final fun getOff (Landroidx/compose/runtime/Composer;I)J
+	public final fun getPlaceholder (Landroidx/compose/runtime/Composer;I)J
+	public final fun getQuiet (Landroidx/compose/runtime/Composer;I)J
+	public final fun getSelected (Landroidx/compose/runtime/Composer;I)J
+	public final fun getSelection (Landroidx/compose/runtime/Composer;I)J
+	public final fun getTrack (Landroidx/compose/runtime/Composer;I)J
+	public final fun status-XeAY9LY (Lhivens/look/manager/api/Status;Landroidx/compose/runtime/Composer;I)J
+}
+
+public final class hivens/look/colour/api/Ground {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/colour/api/Ground;
+	public final fun depth-XeAY9LY (ILandroidx/compose/runtime/Composer;I)J
+	public final fun getCurrent (Landroidx/compose/runtime/Composer;I)J
+	public final fun getDark (Landroidx/compose/runtime/Composer;I)Z
+	public final fun getFloating (Landroidx/compose/runtime/Composer;I)I
+	public final fun getPage (Landroidx/compose/runtime/Composer;I)J
+	public final fun mix-eb82Cgs (JFLandroidx/compose/runtime/Composer;I)J
+}
+
+public final class hivens/look/colour/api/Ink {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/colour/api/Ink;
+	public final fun getCaret (Landroidx/compose/runtime/Composer;I)J
+	public final fun getFaint (Landroidx/compose/runtime/Composer;I)J
+	public final fun getInverse (Landroidx/compose/runtime/Composer;I)J
+	public final fun getLead (Landroidx/compose/runtime/Composer;I)J
+	public final fun getLink (Landroidx/compose/runtime/Composer;I)J
+	public final fun getMain (Landroidx/compose/runtime/Composer;I)J
+	public final fun getMatch (Landroidx/compose/runtime/Composer;I)J
+	public final fun getOff (Landroidx/compose/runtime/Composer;I)J
+	public final fun getProse (Landroidx/compose/runtime/Composer;I)J
+	public final fun getQuiet (Landroidx/compose/runtime/Composer;I)J
+	public final fun on-swEIR5s (JLandroidx/compose/runtime/Composer;I)J
+}
+
+public final class hivens/look/colour/api/Line {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/colour/api/Line;
+	public final fun getActive (Landroidx/compose/runtime/Composer;I)J
+	public final fun getControl (Landroidx/compose/runtime/Composer;I)J
+	public final fun getDivider (Landroidx/compose/runtime/Composer;I)J
+	public final fun getFaint (Landroidx/compose/runtime/Composer;I)J
+	public final fun getFocus (Landroidx/compose/runtime/Composer;I)J
+	public final fun getOff (Landroidx/compose/runtime/Composer;I)J
+	public final fun status-XeAY9LY (Lhivens/look/manager/api/Status;Landroidx/compose/runtime/Composer;I)J
+}
+
+public final class hivens/look/colour/api/Media {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/colour/api/Media;
+	public final fun getFill (Landroidx/compose/runtime/Composer;I)J
+	public final fun getInk (Landroidx/compose/runtime/Composer;I)J
+	public final fun getLine (Landroidx/compose/runtime/Composer;I)J
+	public final fun getQuiet (Landroidx/compose/runtime/Composer;I)J
+	public final fun getScrim (Landroidx/compose/runtime/Composer;I)J
+	public final fun status-XeAY9LY (Lhivens/look/manager/api/Status;Landroidx/compose/runtime/Composer;I)J
+}
+
+public final class hivens/look/colour/api/Paint {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/colour/api/Paint;
+	public final fun category-XeAY9LY (Ljava/lang/Enum;Landroidx/compose/runtime/Composer;I)J
+	public final fun data-6vV8vXo (JJLandroidx/compose/runtime/Composer;I)J
+	public final fun data-swEIR5s (JLandroidx/compose/runtime/Composer;I)J
+	public final fun getLead (Landroidx/compose/runtime/Composer;I)J
+	public final fun getMark (Landroidx/compose/runtime/Composer;I)J
+	public final fun getPalette (Landroidx/compose/runtime/Composer;I)Ljava/util/List;
+	public final fun getPartner (Landroidx/compose/runtime/Composer;I)J
+	public final fun getShadow (Landroidx/compose/runtime/Composer;I)J
+	public final fun getThird (Landroidx/compose/runtime/Composer;I)J
+	public final fun hashed-XeAY9LY (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)J
+	public final fun shadow-swEIR5s (JLandroidx/compose/runtime/Composer;I)J
+	public final fun status-XeAY9LY (Lhivens/look/manager/api/Status;Landroidx/compose/runtime/Composer;I)J
+}
+
+public final class hivens/look/colour/api/RolesKt {
+	public static final fun getLocalGround ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+

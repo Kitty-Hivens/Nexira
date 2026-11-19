@@ -1,16 +1,22 @@
 package hivens.ui.widgets.themepicker
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import hivens.themes.Themes
 import hivens.themes.api.ThemesKeys
+import hivens.ui.FRAME_NANOS
+import hivens.ui.Screen
+import hivens.ui.ScreenRouter
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
 import hivens.ui.puppet.PuppetRegistry
-import hivens.ui.settle
-import hivens.ui.theme.NxTheme
+import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.KoinLevelServicesHost
@@ -28,8 +34,7 @@ import hivens.widget.api.WidgetScope
 import hivens.widget.api.command
 import hivens.widget.api.flowSource
 import hivens.widget.api.rememberLatestCommand
-import hivens.widget.generated.GeneratedWidgetRegistry
-import hivens.widget.model.LayoutGraph
+import hivens.widget.model.DefaultLayout
 import hivens.widget.model.ScopeLevel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,60 +44,79 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Apply on the theme picker puts the choice in use and then leaves, in that order,
- * and with nothing to put it in use it does nothing at all rather than leave a
- * choice behind that did not land.
+ * Apply on the theme picker puts the choice in use and then leaves, in that order, and with nothing
+ * to put it in use it does nothing at all rather than leave a choice behind that did not land. The
+ * choice not yet applied is the page's, so it is still there after going back and forward again, and
+ * a picker opened afresh starts at the theme in use.
+ *
+ * The picker is drawn the way the launcher draws it: the host's frame, the bundled layout's slots, and
+ * the colour provider's controls in them.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 class ThemePickerApplyTest {
 
-    /** Draws the picker in a page, with Apply answered only when [answerApply], presses Apply, and says what it fired. */
-    private fun pressApply(answerApply: Boolean): List<String> {
+    private val other = Themes.all.first { it.id != Themes.default.id }
+
+    /** The picker's world, with Apply answered only when [answerApply], and what it fired. */
+    private class World(answerApply: Boolean) {
         val fired = ArrayList<String>()
         // The themes on offer, the one in use and the choice are the themes module's app
         // keys, answered here as the app's own values and command.
         val data = WidgetDataRegistry().apply {
             register(ThemesKeys.Offered, flowSource(MutableStateFlow(Themes.all)))
             register(ThemesKeys.Active, flowSource(MutableStateFlow(Themes.default)))
-            declare(ThemeSelectionSource)
+            register(ThemesKeys.Dark, flowSource(MutableStateFlow(true)))
         }
         val commands = WidgetCommandRegistry().apply {
             if (answerApply) register(ThemesKeys.Choose, command { id: String -> fired += "apply $id" })
             declare(Commands.Back)
         }
-        val app: WidgetScope = koinApplication {
-            modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) } })
-        }.koin.get()
-        onEventThread {
-            val scene = ImageComposeScene(900, 700, density = Density(1f)) {
-                ShippedLanguageProvider("en") {
-                    NxTheme(Themes.default, dark = true) {
-                        CompositionLocalProvider(
-                            LocalWidgetDataRegistry provides data,
-                            LocalWidgetCommandRegistry provides commands,
-                            LocalScope provides app,
-                            LocalLayoutGraph provides LayoutGraph.EMPTY,
-                            LocalWidgetRegistry provides GeneratedWidgetRegistry,
-                            LocalSurfaceFamilies provides SurfaceFamilies(),
-                        ) {
-                            ChildLevel(ScopeLevel.Composition) {
-                                val back = rememberLatestCommand<Unit> { fired += "back" }
-                                ProvideScopedCommand(Commands.Back, back) {
-                                    ChildLevel(ScopeLevel.Page) { ThemePickerSurface() }
-                                }
-                            }
+        val app: WidgetScope
+
+        init {
+            bringInControls(data, commands)
+            app = koinApplication {
+                modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined, commands) } })
+            }.koin.get()
+        }
+
+        @Composable
+        fun Draw(content: @Composable () -> Unit) {
+            ShippedLanguageProvider("en") {
+                NxThemed(Themes.default, dark = true) {
+                    CompositionLocalProvider(
+                        LocalWidgetDataRegistry provides data,
+                        LocalWidgetCommandRegistry provides commands,
+                        LocalScope provides app,
+                        LocalLayoutGraph provides DefaultLayout.load(),
+                        LocalWidgetRegistry provides launcherAndControls,
+                        LocalSurfaceFamilies provides SurfaceFamilies(),
+                    ) {
+                        ChildLevel(ScopeLevel.Composition) {
+                            val back = rememberLatestCommand<Unit> { fired += "back" }
+                            ProvideScopedCommand(Commands.Back, back) { content() }
                         }
                     }
                 }
             }
+        }
+    }
+
+    /** Draws the picker in a page, presses Apply, and says what it fired. */
+    private fun pressApply(answerApply: Boolean): List<String> {
+        val world = World(answerApply)
+        onEventThread {
+            val scene = ImageComposeScene(900, 700, density = Density(1f)) {
+                world.Draw { ChildLevel(ScopeLevel.Page) { ThemePickerSurface() } }
+            }
             try {
-                scene.settle(4)
+                repeat(8) { scene.render(it * FRAME_NANOS).close() }
                 PuppetRegistry.click("themePicker.apply").getOrThrow()
             } finally {
                 scene.close()
             }
         }
-        return fired
+        return world.fired
     }
 
     @Test
@@ -103,5 +127,60 @@ class ThemePickerApplyTest {
     @Test
     fun `with nothing to apply it, apply does not leave`() {
         assertEquals(emptyList(), pressApply(answerApply = false))
+    }
+
+    /**
+     * Picks [other] on the picker, goes to another screen with the history [away] holds, comes back to
+     * the picker with the history [returning] holds, and says what Apply fired then.
+     */
+    private fun pickLeaveAndReturn(away: List<Screen>, returning: List<Screen>): List<String> {
+        val world = World(answerApply = true)
+        var current: Screen by mutableStateOf(Screen.ThemePicker)
+        var history: List<Screen> by mutableStateOf(listOf(Screen.ThemePicker))
+        onEventThread {
+            val scene = ImageComposeScene(900, 700, density = Density(1f)) {
+                world.Draw {
+                    ScreenRouter(current, history) { screen -> if (screen == Screen.ThemePicker) ThemePickerSurface() }
+                }
+            }
+            var t = 0L
+            fun frames(count: Int) = repeat(count) {
+                scene.render(t).close()
+                t += FRAME_NANOS
+            }
+            try {
+                frames(8)
+                PuppetRegistry.click("themePicker.select.${other.id}").getOrThrow()
+                frames(4)
+                current = Screen.About
+                history = away
+                frames(90)
+                current = Screen.ThemePicker
+                history = returning
+                frames(90)
+                PuppetRegistry.click("themePicker.apply").getOrThrow()
+            } finally {
+                scene.close()
+            }
+        }
+        return world.fired
+    }
+
+    @Test
+    fun `a choice not yet applied is still there after going back and forward again`() {
+        // On to another screen and back: the picker never left the history, so its page did not.
+        assertEquals(
+            listOf("apply ${other.id}", "back"),
+            pickLeaveAndReturn(away = listOf(Screen.ThemePicker, Screen.About), returning = listOf(Screen.ThemePicker, Screen.About)),
+        )
+    }
+
+    @Test
+    fun `a picker opened afresh starts at the theme in use`() {
+        // The picker left the history, as a switch of tab leaves it, and was opened again: a new page.
+        assertEquals(
+            listOf("apply ${Themes.default.id}", "back"),
+            pickLeaveAndReturn(away = listOf(Screen.About), returning = listOf(Screen.About, Screen.ThemePicker)),
+        )
     }
 }

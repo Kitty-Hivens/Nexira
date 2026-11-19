@@ -215,6 +215,35 @@ fun missingNeeds(needs: List<String>): List<String> {
 }
 
 /**
+ * Whether the Boolean source [id] answers true where the caller stands. False where it
+ * answers false, where nothing answers it, where nothing declares it and where [id]
+ * names a command or a source of another type: a condition that cannot be read hides
+ * what it guards rather than showing it.
+ *
+ * Read the way [rememberScopedSource] reads, a value [ProvideScoped] put over the level
+ * first. Recomposes the caller as the source emits, as an owner provides or withdraws
+ * it, and when the host brings in a module that declares it.
+ */
+@Composable
+fun conditionHolds(id: String): Boolean {
+    val scope = LocalScope.current ?: return false
+    scope.watch(id)
+    val declaration = scope.declarationOf(id)?.takeIf { it.kind == KeyKind.Source } ?: return false
+    val key = remember(declaration) { SourceKey<Any?>(declaration.id, declaration.level) }
+    return rememberScopedSource(key).valueOrNull() == true
+}
+
+/**
+ * Whether this widget is shown where the caller stands: it names no show condition, or
+ * its condition holds ([conditionHolds]). See [WidgetDescriptor.shownWhen].
+ */
+@Composable
+fun WidgetDescriptor.shownHere(): Boolean {
+    val condition = shownWhen ?: return true
+    return conditionHolds(condition)
+}
+
+/**
  * Whether every id in [ids] has a sample, so [ProvideSamples] can stand in for all
  * of them. An id nothing declares has none.
  */

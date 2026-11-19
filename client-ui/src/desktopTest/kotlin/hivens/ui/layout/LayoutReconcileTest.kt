@@ -136,9 +136,16 @@ class LayoutReconcileTest {
         val family = FamilyId("browse")
         assertEquals(default.surfaces[browse], out.surfaces[browse])
         assertEquals(default.surfaces[rail]!!.family(family), out.surfaces[rail]!!.family(family))
+        // Everything the release had is kept as it was. A family may gain slots, only the ones the
+        // bundle declares, the way the colour provider's controls arrived in two existing surfaces.
         released.surfaces.forEach { (id, layout) ->
             val now = out.surfaces[id]!!
-            layout.families.forEach { (fid, f) -> assertEquals(f, now.family(fid), "${id.value}/${fid.value} changed") }
+            layout.families.forEach { (fid, f) ->
+                val nowFamily = now.family(fid)!!
+                f.slots.forEach { (slot, content) -> assertEquals(content, nowFamily.slots[slot], "${id.value}/${fid.value}/${slot.value} changed") }
+                val gained = nowFamily.slots.keys - f.slots.keys
+                assertEquals(gained, gained.filterTo(HashSet()) { it in default.surfaces[id]?.family(fid)?.slots.orEmpty() }, "${id.value}/${fid.value} gained slots the bundle does not declare")
+            }
         }
     }
 

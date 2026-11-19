@@ -30,7 +30,6 @@ import hivens.ui.nx.NxToggle
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetToggle
-import hivens.ui.theme.NxTheme
 import hivens.ui.utils.pickDirectory
 import hivens.ui.utils.rememberFileDialogSettings
 import io.github.vinceglb.filekit.PlatformFile
@@ -290,7 +289,7 @@ internal fun AdvancedSection(
 
     if (pendingTarget != null) {
         val target = pendingTarget!!
-        val container = NxTheme.colours.step(NxTheme.colours.topStep)
+        val container = NxColor.depth(NxColor.floating)
         OnFill(container) {
             NxAlertDialog(
                 onDismissRequest = { pendingTarget = null },

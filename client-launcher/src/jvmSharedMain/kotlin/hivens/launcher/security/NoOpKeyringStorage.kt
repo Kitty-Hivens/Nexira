@@ -10,7 +10,7 @@ import hivens.core.security.IKeyringStorage
  * KVM-headless server, exotic Linux without libsecret, etc.).
  *
  * Singleton -- there's no per-instance state. Use
- * [NoOpKeyringStorage.INSTANCE] to avoid pointless object allocations
+ * [NoOpKeyringStorage] to avoid pointless object allocations
  * on every factory miss.
  */
 object NoOpKeyringStorage : IKeyringStorage {

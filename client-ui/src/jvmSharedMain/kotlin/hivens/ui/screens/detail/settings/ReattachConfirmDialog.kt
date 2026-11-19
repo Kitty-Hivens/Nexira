@@ -28,11 +28,10 @@ import hivens.packs.api.ReattachPreview
 import hivens.packs.api.ReattachPreviewView
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxAlertDialog
-import hivens.ui.nx.NxCalloutBanner
-import hivens.ui.nx.NxCalloutTone
+import hivens.ui.nx.CalloutBanner
+import hivens.ui.nx.CalloutTone
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxTheme
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status
 import hivens.ui.utils.shortNameList
@@ -85,7 +84,7 @@ internal fun ReattachConfirmDialog(
     }
     val state = previews?.get(packId) ?: ReattachPreviewView.Comparing
     val title = s.text("packSettingsReattach", sourceName)
-    val container = NxTheme.colours.step(NxTheme.colours.topStep)
+    val container = NxColor.depth(NxColor.floating)
     OnFill(container) {
         NxAlertDialog(
             onDismissRequest = onDismiss,
@@ -150,12 +149,12 @@ internal fun ReattachConfirmDialog(
 @Composable
 private fun PreviewBody(preview: ReattachPreview) {
     val s = nexiraStrings()
-    if (preview.movesRuntime) NxCalloutBanner(body = s.text("packVersionNeedsCare"), tone = NxCalloutTone.Warning)
+    if (preview.movesRuntime) CalloutBanner(body = s.text("packVersionNeedsCare"), tone = CalloutTone.Warning)
     if (preview.unreadable.isNotEmpty()) {
-        NxCalloutBanner(body = s.text("packSettingsReattachUnreadable", shortNameList(preview.unreadable.map { it.substringAfterLast('/') })), tone = NxCalloutTone.Warning)
+        CalloutBanner(body = s.text("packSettingsReattachUnreadable", shortNameList(preview.unreadable.map { it.substringAfterLast('/') })), tone = CalloutTone.Warning)
     }
     when (preview.basis) {
-        "no-baseline" -> NxCalloutBanner(body = s.text("packSettingsReattachNoBaseline"), tone = NxCalloutTone.Warning)
+        "no-baseline" -> CalloutBanner(body = s.text("packSettingsReattachNoBaseline"), tone = CalloutTone.Warning)
         "names-only" -> Text(s.text("packSettingsReattachNamesOnly"), style = MaterialTheme.typography.bodySmall)
         else -> Unit
     }

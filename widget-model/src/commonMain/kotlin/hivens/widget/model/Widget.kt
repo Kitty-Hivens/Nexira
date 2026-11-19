@@ -97,4 +97,15 @@ annotation class Widget(
     // place instead of a widget that reads nothing. The processor checks the ids are
     // non-blank and listed once.
     val needs: Array<String> = [],
+    // The id of a Boolean source this widget is shown under, a SourceKey id. Blank (the
+    // default) shows it wherever it stands. Where the source answers false, or nothing
+    // answers it, a slot does not place the widget at all, so it takes no gap and no cell,
+    // where a widget that merely drew nothing would still be measured as an item. While
+    // somebody arranges, it is drawn dimmed with the reason instead, so it can be found.
+    //
+    // For a widget with a reason to be absent that is not missing data: the controls of a
+    // provider that is not the one drawing, say. Missing data is what [needs] is for, and
+    // the processor refuses an id named as both, since a need with no answer is marked
+    // misplaced and a condition with none is hidden. It also refuses a blank one.
+    val shownWhen: String = "",
 )

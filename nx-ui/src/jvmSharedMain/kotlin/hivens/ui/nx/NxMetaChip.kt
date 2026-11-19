@@ -1,11 +1,26 @@
 package hivens.ui.nx
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
+import hivens.ui.effects.pixelArtBackground
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
+import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status
 
@@ -81,5 +96,45 @@ fun NxMetaChip(
             leading    = leading,
             onClick    = onClick,
         )
+    }
+}
+
+@Preview
+@Composable
+private fun NxMetaChipDarkPreview() = MetaChipTones(dark = true)
+
+@Preview
+@Composable
+private fun NxMetaChipLightPreview() = MetaChipTones(dark = false)
+
+@Composable
+private fun MetaChipTones(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(480.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NxMetaChip("1.21.1")
+                NxMetaChip("Installed", tone = NxMetaChipTone.Success)
+                NxMetaChip("Beta", tone = NxMetaChipTone.Warning)
+                NxMetaChip("Missing", tone = NxMetaChipTone.Error)
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NxMetaChip("Launching", dot = NxColor.status(Status.Info))
+                NxMetaChip("Fabric", leading = { Symbol(NxIcon.Build, null, tint = NxInk.quiet, size = 14.dp) })
+                NxMetaChip("Fork", onClick = {})
+            }
+            Row(
+                modifier              = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .pixelArtBackground("meta-chip", Color(0xFF3B6EA8), Color(0xFFB8608E))
+                    .padding(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                NxMetaChip("On media", tone = NxMetaChipTone.OnMedia)
+                NxMetaChip("Accent", tone = NxMetaChipTone.OnMediaAccent)
+            }
+        }
     }
 }

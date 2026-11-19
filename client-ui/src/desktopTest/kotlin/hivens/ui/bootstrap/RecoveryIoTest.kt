@@ -1,6 +1,7 @@
 package hivens.ui.bootstrap
 
 import hivens.config.Storage
+import hivens.i18n.I18nSettingsDomain
 import hivens.look.manager.LookSettingsDomain
 import hivens.themes.Themes
 import hivens.themes.ThemesSettingsDomain
@@ -174,13 +175,24 @@ class RecoveryIoTest {
     }
 
     @Test
-    fun `resetSettings deletes the modules' settings files, so the language comes back as the first run picks it`() {
-        val domains = dataDir / Storage.SETTINGS_DIR
-        Files.createDirectories(domains)
-        Files.writeString(domains / "i18n.json", """{"schema":1,"value":{"language":"ja"}}""")
-        Files.writeString(domains / "notes.txt", "kept")
-        RecoveryIo.resetSettings(dataDir)
-        assertFalse(Files.exists(domains / "i18n.json"))
-        assertTrue(Files.exists(domains / "notes.txt"), "only the domains' own files go")
+    fun `resetSettings deletes the modules' settings files, so each comes back as the first run picks it`() {
+        val previous = Locale.getDefault()
+        Locale.setDefault(Locale.forLanguageTag("ru-RU"))
+        try {
+            val domains = dataDir / Storage.SETTINGS_DIR
+            Files.createDirectories(domains)
+            Files.writeString(domains / "i18n.json", """{"schema":1,"value":{"language":"ja"}}""")
+            Files.writeString(domains / "${ThemesSettingsDomain.id}.json", """{"schema":1,"value":{"theme":"lotus","mode":"Wallpaper","dark":false}}""")
+            Files.writeString(domains / "${LookSettingsDomain.id}.json", """{"schema":1,"value":{"pack":"material"}}""")
+            Files.writeString(domains / "notes.txt", "kept")
+            RecoveryIo.resetSettings(dataDir)
+            val files = SettingsDomainFiles(domains, settings())
+            assertEquals("ru", files.peek(I18nSettingsDomain).language, "the language the machine speaks, as on a first run")
+            assertEquals(ThemesSettingsDomain.firstRun(), files.peek(ThemesSettingsDomain), "the first run's mode and scheme, and no theme chosen")
+            assertFalse(Files.exists(domains / "${LookSettingsDomain.id}.json"), "a domain with no first run of its own is left to its defaults")
+            assertTrue(Files.exists(domains / "notes.txt"), "only the domains' own files go")
+        } finally {
+            Locale.setDefault(previous)
+        }
     }
 }

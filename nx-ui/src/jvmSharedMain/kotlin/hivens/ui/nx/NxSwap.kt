@@ -4,10 +4,22 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import hivens.ui.theme.Motion
 import hivens.ui.theme.MotionRole
+import hivens.ui.theme.NeutralTheme
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxThemed
 
 /**
  * Replaces content when [target] changes, animating the swap.
@@ -30,7 +42,7 @@ import hivens.ui.theme.MotionRole
 fun <T> NxSwap(
     target: T,
     modifier: Modifier = Modifier,
-    role: MotionRole = Motion.fade,
+    role: MotionRole = Motion.pageSwap,
     label: String = "nxSwap",
     contentKey: (T) -> Any? = { it },
     content: @Composable (T) -> Unit,
@@ -70,4 +82,27 @@ fun NxReveal(
         label    = label,
         content  = content,
     )
+}
+
+@Preview
+@Composable
+private fun NxSwapDarkPreview() = SwapAndReveal(dark = true)
+
+@Preview
+@Composable
+private fun NxSwapLightPreview() = SwapAndReveal(dark = false)
+
+@Composable
+private fun SwapAndReveal(dark: Boolean) {
+    NxThemed(NeutralTheme, dark = dark) {
+        Column(
+            modifier            = Modifier.width(320.dp).background(NxColor.page).padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            NxSwap(target = 2) { page -> Text("Page $page of 5", color = NxInk.main) }
+            NxSwap(target = "Slide", role = Motion.panelSlide) { Text("$it role", color = NxInk.main) }
+            NxReveal(visible = true) { Text("Revealed content", color = NxInk.quiet) }
+            NxReveal(visible = false) { Text("Hidden content", color = NxInk.quiet) }
+        }
+    }
 }

@@ -52,6 +52,7 @@ class WidgetRegistryProcessor(
                     sizing = extracted.sizing,
                     enter = extracted.enter,
                     needs = extracted.needs,
+                    shownWhen = extracted.shownWhen,
                 ),
                 containingFile = symbol.containingFile,
                 symbol = symbol,
