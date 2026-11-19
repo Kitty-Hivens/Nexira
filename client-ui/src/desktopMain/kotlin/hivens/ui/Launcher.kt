@@ -113,7 +113,7 @@ import kotlin.time.Duration.Companion.seconds
 
 /**
  * Compose-aware Koin singletons that the ui module owns. Passed into
- * [GuiBootstrap.preBoot] so they land in the same Koin context as
+ * [GuiBootstrap.completeBoot] so they land in the same Koin context as
  * the launcher's own modules without inverting the module dependency
  * direction (client-launcher must not know about client-ui types).
  */
@@ -383,7 +383,7 @@ fun runLauncher(args: Array<String>) {
  * kernel), and a crash while already in safe mode falls back to the terminal
  * Swing crash dialog.
  *
- * Koin singletons and the data dirs are created in [GuiBootstrap.preBoot]
+ * The data dirs and the Koin singletons are created by [GuiBootstrap.preWindow] and [GuiBootstrap.completeBoot]
  * -- outside this loop -- so a restart keeps the user's data, session and audio
  * playback; only transient composition state (current screen, scroll) is lost.
  */
