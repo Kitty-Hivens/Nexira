@@ -28,9 +28,18 @@ SCAN_EXTS = {".kt"}
 
 EXCLUDE_PATH_FRAGMENTS = ("/build/", "/.gradle/", "/.idea/")
 
-# Where the vocabulary itself lives, and the one place allowed to read the raw
-# axis. Anything else asking these questions is bypassing the scale.
-VOCABULARY = ("nx-ui/src/jvmSharedMain/kotlin/hivens/ui/theme/Motion.kt",)
+# Where the durations themselves are answered, the places allowed to write them:
+# the motion axis's contract with its neutral base answers, and the nx answers in
+# nx-ui that the nx motion provider and the previews both read. Anything else
+# writing a duration is bypassing the axis.
+VOCABULARY = (
+    "look/motion-api/src/jvmSharedMain/",
+    "nx-ui/src/jvmSharedMain/kotlin/hivens/ui/theme/Motion.kt",
+)
+
+# Tests hold the answers to the numbers they must equal, so a literal there is the
+# point of the test, not a bypass.
+TEST_SOURCE_SETS = ("/src/test/", "/src/jvmTest/", "/src/desktopTest/", "/src/commonTest/", "/src/androidUnitTest/")
 
 # Deliberate exemptions. Each names why the scale cannot reach it -- not a place
 # to park a site nobody wanted to move.
@@ -55,7 +64,7 @@ RULES = (
     Rule(
         "literal-duration",
         re.compile(r"\btween\s*(?:<[^>]*>)?\s*\(\s*(?:durationMillis\s*=\s*)?\d[\d_]*"),
-        "literal duration in tween() -- ask Motion for the role that fits, or Motion.ownRhythm if the period belongs to the effect",
+        "literal duration in tween(): ask Motion for the role that fits, or Motion.ambient if the period belongs to the effect",
     ),
 )
 
@@ -90,7 +99,9 @@ def violations() -> list[tuple[str, int, str, str]]:
             rel = path.relative_to(ROOT).as_posix()
             if any(frag in "/" + rel for frag in EXCLUDE_PATH_FRAGMENTS):
                 continue
-            if rel in VOCABULARY:
+            if any(rel == v or (v.endswith("/") and rel.startswith(v)) for v in VOCABULARY):
+                continue
+            if any(t in "/" + rel for t in TEST_SOURCE_SETS):
                 continue
             allowed = exempt_keys(rel)
             text = path.read_text(encoding="utf-8", errors="replace")
