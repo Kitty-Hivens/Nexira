@@ -55,6 +55,8 @@ kotlin {
                 api(project(":look:colour-api"))
                 // What every movement here is read from: the motion axis's answers, the same way.
                 api(project(":look:motion-api"))
+                // What every corner here is read from: the shape axis's answers, the same way.
+                api(project(":look:shape-api"))
             }
         }
 

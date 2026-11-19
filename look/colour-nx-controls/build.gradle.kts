@@ -16,6 +16,7 @@ kotlin.sourceSets.named("jvmSharedMain") {
     dependencies {
         implementation(project(":look:colour-nx-api"))
         implementation(project(":look:colour-api"))
+        implementation(project(":look:shape-api"))
         implementation(project(":look:manager-api"))
         implementation(project(":widget-api"))
         implementation(project(":widget-model"))

@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -60,7 +61,7 @@ fun NxButton(
     compact: Boolean = false,
     minHeight: Dp? = null,
 ) {
-    val shape = MaterialTheme.shapes.small
+    val shape = Shape.control
 
     val container: Color = when (style) {
         NxButtonStyle.Primary     -> NxColor.lead()
@@ -88,10 +89,10 @@ fun NxButton(
     val pad = if (compact) PaddingValues(horizontal = 12.dp, vertical = 6.dp)
               else PaddingValues(horizontal = 18.dp, vertical = 10.dp)
 
-    // Hover/press feedback through the shared ShapedStateLayer, provided as
-    // LocalIndication so the clickable picks it up.
+    // Hover/press feedback through the shared ShapedStateLayer at the button's own
+    // outline, provided as LocalIndication so the clickable picks it up.
     CompositionLocalProvider(
-        LocalIndication provides ShapedStateLayer(8.dp, content),
+        LocalIndication provides ShapedStateLayer(shape, content),
     ) {
         Row(
             modifier              = modifier

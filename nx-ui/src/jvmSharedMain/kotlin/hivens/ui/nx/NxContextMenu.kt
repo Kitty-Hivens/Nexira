@@ -59,6 +59,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.window.PopupPositionProvider
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -277,7 +278,7 @@ private fun NxMenuSurface(
 
     NxSurface(
         kind     = SurfaceKind.Popup,
-        shape    = MaterialTheme.shapes.medium,
+        shape    = Shape.menu,
         modifier = modifier,
     ) {
         // Intrinsic width outside the bounds, so the menu is as wide as its widest
@@ -376,7 +377,7 @@ fun NxMenuItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(MaterialTheme.shapes.small)
+            .clip(Shape.control)
             .background(wash)
             .hoverable(interaction, enabled = enabled)
             .layerTrigger()

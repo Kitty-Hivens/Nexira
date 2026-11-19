@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.look.colour.api.Paint
+import hivens.look.shape.api.Shape
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
@@ -252,7 +253,7 @@ private fun ParticleFields(dark: Boolean) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             for ((field, density) in ParticleField.entries.zip(ParticleDensity.entries + ParticleDensity.Rich)) {
-                NxSurface(SurfaceKind.Card, Modifier.size(150.dp, 120.dp).clip(MaterialTheme.shapes.medium)) {
+                NxSurface(SurfaceKind.Card, Modifier.size(150.dp, 120.dp).clip(Shape.card)) {
                     NxParticleField(field, Modifier.fillMaxSize(), density = density)
                     Box(Modifier.padding(8.dp)) {
                         Text("${field.name}, ${density.name}", style = MaterialTheme.typography.labelSmall, color = NxInk.quiet)

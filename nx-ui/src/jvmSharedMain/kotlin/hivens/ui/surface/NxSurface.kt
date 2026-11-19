@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -39,6 +40,7 @@ import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Plane
 import hivens.ui.theme.bevelHairline
 import hivens.look.colour.api.Colour
+import hivens.look.shape.api.Shape as ShapeAxis
 
 /**
  * Where [kind] sits on the ladder, given the step of the plane holding it.
@@ -79,7 +81,7 @@ internal fun surfaceStep(kind: SurfaceKind, parentStep: Int, topStep: Int): Int 
 fun NxSurface(
     kind: SurfaceKind,
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.medium,
+    shape: Shape = ShapeAxis.card,
     /** Body opacity, 0..1. Null is the kind's own: solid. */
     opacity: Float? = null,
     /** How far the surface blurs what is behind it. Null is the kind's own: none for a body. */
@@ -195,7 +197,7 @@ fun SurfaceKind.defaultOpacity(): Float = 1f
 @Composable
 fun NxCard(
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.medium,
+    shape: Shape = ShapeAxis.card,
     interactionSource: InteractionSource? = null,
     content: @Composable BoxScope.() -> Unit,
 ) = NxSurface(
@@ -230,7 +232,7 @@ private fun SurfaceKinds(dark: Boolean) {
                     NxCard {
                         Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             SurfaceLabel("Card in the panel")
-                            NxSurface(SurfaceKind.Field, shape = MaterialTheme.shapes.small) {
+                            NxSurface(SurfaceKind.Field, shape = ShapeAxis.control) {
                                 Box(Modifier.padding(10.dp)) { SurfaceLabel("Field in the card") }
                             }
                         }
@@ -244,7 +246,7 @@ private fun SurfaceKinds(dark: Boolean) {
             }
             Row(
                 modifier              = Modifier
-                    .clip(MaterialTheme.shapes.medium)
+                    .clip(RoundedCornerShape(12.dp))
                     .pixelArtBackground("surface", Color(0xFF3B6EA8), Color(0xFFB8608E))
                     .padding(16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),

@@ -18,6 +18,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -65,7 +66,7 @@ fun CalloutBanner(
         CalloutTone.Warning -> NxIcon.Warning
         CalloutTone.Error   -> NxIcon.Warning
     }
-    val shape = MaterialTheme.shapes.medium
+    val shape = Shape.card
     OnFill(fill) {
         Row(
             modifier = modifier

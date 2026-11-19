@@ -22,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NeutralTheme
@@ -86,7 +87,7 @@ fun NxAnchoredCard(
 private fun CardSurface(modifier: Modifier, width: Dp, content: @Composable ColumnScope.() -> Unit) {
     NxSurface(
         kind     = SurfaceKind.Popup,
-        shape    = MaterialTheme.shapes.large,
+        shape    = Shape.menu,
         modifier = modifier.width(width),
     ) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp), content = content)

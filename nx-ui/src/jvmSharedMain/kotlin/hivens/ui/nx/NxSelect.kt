@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -235,7 +236,7 @@ private fun <T> SelectList(
 
     NxSurface(
         kind     = SurfaceKind.Popup,
-        shape    = MaterialTheme.shapes.large,
+        shape    = Shape.menu,
         modifier = Modifier
             .widthIn(min = CHOICE_MIN_WIDTH)
             .width(if (width > 0.dp) width else CHOICE_MIN_WIDTH)

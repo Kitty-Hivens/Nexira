@@ -32,6 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.i18n.api.strings
+import hivens.look.shape.api.Shape
 import hivens.themes.api.ThemesKeys
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -110,7 +111,7 @@ private fun ThemeCard(
         targetValue   = if (isSelected) 1.03f else 1f,
         animationSpec = spring(dampingRatio = 0.7f, stiffness = 300f),
     )
-    val shape = MaterialTheme.shapes.medium
+    val shape = Shape.card
     // The frame is the launcher's own, outside the theme being shown: it marks the
     // choice in the colours the person is looking at the picker in.
     val frame = if (isSelected) NxColor.lead() else NxInk.line

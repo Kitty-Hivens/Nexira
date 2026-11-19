@@ -6,7 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -127,7 +127,7 @@ private fun MetaChipTones(dark: Boolean) {
             }
             Row(
                 modifier              = Modifier
-                    .clip(MaterialTheme.shapes.medium)
+                    .clip(RoundedCornerShape(12.dp))
                     .pixelArtBackground("meta-chip", Color(0xFF3B6EA8), Color(0xFFB8608E))
                     .padding(12.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),

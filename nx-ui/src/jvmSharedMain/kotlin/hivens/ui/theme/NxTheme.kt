@@ -1,6 +1,7 @@
 package hivens.ui.theme
 
 import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.shape.CornerBasedShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
@@ -14,12 +15,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import hivens.look.colour.api.Colour
 import hivens.look.colour.api.ColourAnswers
+import hivens.look.shape.api.ShapeAnswers
 import hivens.look.manager.api.Status as LookStatus
+import hivens.look.shape.api.Shape as ShapeAxis
 import hivens.ui.nx.ThemeStateLayer
 
 /**
@@ -30,8 +34,9 @@ import hivens.ui.nx.ThemeStateLayer
  * Which colours those are is not decided here: a window is placed inside the look the host wraps it in,
  * and a preview or a render inside [NxThemed]. Material components still in use get a colour scheme
  * cut from the same ladder and colours, so they agree with the library around them instead of falling
- * back to Material's own purple. Text selection and the right-click menu a text field opens are set
- * from the answers too. The page is the first plane: content directly inside reads against step 0
+ * back to Material's own purple, and Material's corners cut from the shape axis's roles
+ * ([materialShapes]). Text selection and the right-click menu a text field opens are set from the
+ * answers too. The page is the first plane: content directly inside reads against step 0
  * until a surface says otherwise.
  */
 @Composable
@@ -44,8 +49,10 @@ fun NxTheme(
     content: @Composable () -> Unit,
 ) {
     val answers = Colour.local.current
+    val shapeAnswers = ShapeAxis.local.current
     val page = answers.groundPage
     val colorScheme = remember(answers) { materialScheme(answers) }
+    val shapes = remember(shapeAnswers) { materialShapes(shapeAnswers) }
     val selection = remember(answers) { TextSelectionColors(handleColor = answers.paintLead, backgroundColor = answers.fillSelection(page)) }
 
     CompositionLocalProvider(
@@ -58,7 +65,7 @@ fun NxTheme(
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
-            shapes      = NexiraShapes,
+            shapes      = shapes,
             typography  = nexiraTypography(uiFamily ?: nexiraSansFamily()),
         ) {
             // Inside MaterialTheme's lambda on purpose: MaterialTheme provides its
@@ -139,22 +146,20 @@ private fun materialScheme(c: ColourAnswers): ColorScheme {
 }
 
 /**
- * The one place a corner radius is decided.
+ * Material's corners, filled from the shape axis's roles so a Material component and a call site still
+ * reading `MaterialTheme.shapes` round as the role it stands for: the tooltip for `extraSmall`, the
+ * control for `small`, the card for `medium`, the sheet for `large` and the dialog for `extraLarge`.
  *
- * Material's own bundle rather than a token object beside it: `MaterialTheme.shapes`
- * is already what a call site reaches for, `Card`, `Button`, dialogs and sheets read
- * it without being told, and a component that wants the card corner asks for
- * [Shapes.medium] instead of importing a constant. A second vocabulary next to this
- * one is what the style axis was.
- *
- * `small` is the button corner and `medium` the card corner, which is the pairing the
- * primitives assume: a chip, a field and a scrollbar take `small`, a plane takes
- * `medium`, and a floating panel takes `large`.
+ * Material takes corner shapes only. A role answered in another family leaves its slot at the axis's
+ * base answer for that role, which is a corner shape.
  */
-internal val NexiraShapes: Shapes = Shapes(
-    extraSmall = RoundedCornerShape(4.dp),
-    small      = RoundedCornerShape(8.dp),
-    medium     = RoundedCornerShape(12.dp),
-    large      = RoundedCornerShape(16.dp),
-    extraLarge = RoundedCornerShape(24.dp),
+internal fun materialShapes(a: ShapeAnswers): Shapes = Shapes(
+    extraSmall = a.tooltip.corners(ShapeAnswers.BASE.tooltip),
+    small      = a.control.corners(ShapeAnswers.BASE.control),
+    medium     = a.card.corners(ShapeAnswers.BASE.card),
+    large      = a.sheet.corners(ShapeAnswers.BASE.sheet),
+    extraLarge = a.dialog.corners(ShapeAnswers.BASE.dialog),
 )
+
+private fun Shape.corners(base: Shape): CornerBasedShape =
+    this as? CornerBasedShape ?: base as? CornerBasedShape ?: RoundedCornerShape(0.dp)

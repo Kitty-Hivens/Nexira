@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -104,7 +105,7 @@ fun ThemePickerPreviewWidget() {
 /** A run of swatches in the order the theme gives them. */
 @Composable
 private fun Strip(colours: List<Color>) {
-    Row(Modifier.fillMaxWidth().height(18.dp).clip(MaterialTheme.shapes.extraSmall)) {
+    Row(Modifier.fillMaxWidth().height(18.dp).clip(RoundedCornerShape(4.dp))) {
         colours.forEach { colour -> Box(Modifier.weight(1f).fillMaxSize().background(colour)) }
     }
 }

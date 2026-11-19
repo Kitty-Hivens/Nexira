@@ -38,6 +38,8 @@ class HostBoundaryTest {
         "import hivens.look.motion.api.MotionModule",
         "import hivens.look.motion.nx.MotionNxModule",
         "import hivens.look.motion.nx.controls.MotionNxControls",
+        "import hivens.look.shape.api.ShapeModule",
+        "import hivens.look.shape.nx.ShapeNxModule",
     )
 
     /** The recovery surface, and the one engine of the launcher's own words it may make. */

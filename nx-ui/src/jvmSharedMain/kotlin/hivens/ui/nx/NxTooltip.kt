@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -63,6 +64,7 @@ import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 import hivens.ui.theme.NxInk
 import hivens.ui.surface.SurfaceKind
+import hivens.look.shape.api.Shape as ShapeAxis
 
 /**
  * Where a tooltip sits relative to what raised it.
@@ -178,7 +180,7 @@ fun NxTooltip(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     behaviour: NxTooltipBehaviour = NxTooltipBehaviour.Label,
-    shape: Shape = MaterialTheme.shapes.extraSmall,
+    shape: Shape = ShapeAxis.tooltip,
     contentPadding: PaddingValues = behaviour.contentPadding,
     content: @Composable () -> Unit,
 ) {
@@ -457,7 +459,7 @@ private fun TooltipContents(dark: Boolean) {
                     Box(
                         Modifier
                             .size(160.dp, 90.dp)
-                            .clip(MaterialTheme.shapes.small)
+                            .clip(RoundedCornerShape(8.dp))
                             .pixelArtBackground("tooltip", Color(0xFF3B6EA8), Color(0xFFB8608E)),
                     )
                 }
@@ -468,7 +470,7 @@ private fun TooltipContents(dark: Boolean) {
 
 @Composable
 private fun TooltipPlane(behaviour: NxTooltipBehaviour, content: @Composable () -> Unit) {
-    NxSurface(kind = SurfaceKind.Popup, shape = MaterialTheme.shapes.extraSmall) {
+    NxSurface(kind = SurfaceKind.Popup, shape = ShapeAxis.tooltip) {
         Box(Modifier.widthIn(max = behaviour.maxWidth).padding(behaviour.contentPadding)) { content() }
     }
 }

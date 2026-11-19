@@ -55,6 +55,7 @@ import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxThemed
+import hivens.look.shape.api.Shape as ShapeAxis
 
 /**
  * A modal dialog in the window: [content] centred over a scrim that blocks
@@ -170,7 +171,7 @@ fun NxAlertDialog(
     icon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
-    shape: Shape = AlertDialogDefaults.shape,
+    shape: Shape = ShapeAxis.dialog,
     containerColor: Color = AlertDialogDefaults.containerColor,
     iconContentColor: Color = AlertDialogDefaults.iconContentColor,
     titleContentColor: Color = AlertDialogDefaults.titleContentColor,

@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NeutralTheme
@@ -184,7 +185,7 @@ private fun GlowEffects(dark: Boolean) {
 
 @Composable
 private fun GlowSample(label: String, effect: Modifier) {
-    NxSurface(SurfaceKind.Card, effect.size(120.dp, 72.dp).clip(MaterialTheme.shapes.medium)) {
+    NxSurface(SurfaceKind.Card, effect.size(120.dp, 72.dp).clip(Shape.card)) {
         Box(Modifier.align(Alignment.Center)) { Text(label, style = MaterialTheme.typography.labelMedium, color = NxInk.main) }
     }
 }

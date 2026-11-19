@@ -5,12 +5,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.PlateOutline
+import hivens.look.shape.api.Shape
+import hivens.look.shape.api.ShapeAnswers
 import hivens.themes.Themes
 import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.AdaptiveWidget
@@ -160,6 +164,21 @@ class WidgetSurfaceRenderTest {
         assertTrue(pixel(spec("star"), X + W / 2, up).isPage, "the star's notch did not cut in")
     }
 
+    /**
+     * A corner the node leaves unsaid is the look's plate corner, and one set on the node is stronger.
+     * Read on the corner diagonal 6px in: outside a 40 radius, which cuts 11.7px there, and inside a
+     * 12 one, which cuts 3.5px.
+     */
+    @Test
+    fun `an unsaid corner is the look's plate corner, and a corner set on the node is stronger`() {
+        val round = ShapeAnswers.build { plate = PlateOutline(40.dp, 0f, 0f) }
+        val unsaid = SurfaceSpec(fill = "#FF000000", opacity = 1f)
+        val set = SurfaceSpec(fill = "#FF000000", opacity = 1f, shape = SurfaceShape(corners = SurfaceCorners(all = 12f)))
+        assertTrue(!pixel(unsaid, X + 6, Y + 6).isPage, "under nx the plate rounds at 12, which leaves this point on the body")
+        assertTrue(pixel(unsaid, X + 6, Y + 6, round).isPage, "the unsaid corner did not follow the look's plate")
+        assertTrue(!pixel(set, X + 6, Y + 6, round).isPage, "the look's plate overrode a corner the node set")
+    }
+
     /** An unknown kind is a newer file in an older build: it keeps the plane. */
     @Test
     fun `a kind the renderer does not know falls back to the card shape`() {
@@ -179,12 +198,14 @@ class WidgetSurfaceRenderTest {
     }
 
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun pixel(spec: SurfaceSpec, px: Int, py: Int): Px {
+    private fun pixel(spec: SurfaceSpec, px: Int, py: Int, shapes: ShapeAnswers? = null): Px {
         val scene = ImageComposeScene(width = SW, height = SH, density = Density(1f)) {
             NxThemed(Themes.default, dark = true) {
-                Box(Modifier.fillMaxSize().background(PAGE)) {
-                    Box(Modifier.offset(X.dp, Y.dp).size(W.dp, H.dp)) {
-                        WidgetSurface(spec) { Box(Modifier.fillMaxSize()) }
+                CompositionLocalProvider(Shape.local provides (shapes ?: Shape.local.current)) {
+                    Box(Modifier.fillMaxSize().background(PAGE)) {
+                        Box(Modifier.offset(X.dp, Y.dp).size(W.dp, H.dp)) {
+                            WidgetSurface(spec) { Box(Modifier.fillMaxSize()) }
+                        }
                     }
                 }
             }
@@ -193,7 +214,7 @@ class WidgetSurfaceRenderTest {
         scene.close()
         File(OUT).mkdirs()
         image.encodeToData(EncodedImageFormat.PNG)?.bytes
-            ?.let { File(OUT, "widget-surface-${spec.hashCode()}-$px-$py.png").writeBytes(it) }
+            ?.let { File(OUT, "widget-surface-${spec.hashCode()}-$px-$py${if (shapes == null) "" else "-own-look"}.png").writeBytes(it) }
         val c = Bitmap.makeFromImage(image).getColor(px, py)
         val out = Px((c shr 16) and 0xFF, (c shr 8) and 0xFF, c and 0xFF)
         println("WidgetSurfaceRenderTest: $spec at ($px,$py) -> $out")

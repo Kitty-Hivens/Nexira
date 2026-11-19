@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -94,7 +95,7 @@ private fun BasicTextFields(dark: Boolean) {
                     cursorBrush   = SolidColor(NxColor.lead()),
                     modifier      = Modifier.fillMaxWidth(),
                     decorationBox = { inner ->
-                        Box(Modifier.border(1.dp, NxInk.line, MaterialTheme.shapes.small).padding(10.dp)) {
+                        Box(Modifier.border(1.dp, NxInk.line, Shape.control).padding(10.dp)) {
                             if (value.isEmpty()) Text("Own frame, empty", style = style.copy(color = NxInk.quiet))
                             inner()
                         }

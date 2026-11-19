@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -347,7 +348,7 @@ private fun PlayButtonGrounds(dark: Boolean) {
         ) {
             Column(
                 modifier            = Modifier
-                    .clip(MaterialTheme.shapes.medium)
+                    .clip(RoundedCornerShape(12.dp))
                     .pixelArtBackground("play-button", Color(0xFF2E4A6B), Color(0xFF6B3E5C))
                     .background(Color.Black.copy(alpha = 0.45f))
                     .padding(16.dp),

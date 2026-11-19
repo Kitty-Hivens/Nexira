@@ -27,6 +27,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -100,7 +101,7 @@ fun NxColorField(
                 style    = MaterialTheme.typography.labelSmall,
                 color    = NxColor.lead(),
                 modifier = Modifier
-                    .clip(MaterialTheme.shapes.small)
+                    .clip(Shape.control)
                     .clickable { text = ""; onClear() }
                     .padding(horizontal = 8.dp, vertical = 4.dp),
             )

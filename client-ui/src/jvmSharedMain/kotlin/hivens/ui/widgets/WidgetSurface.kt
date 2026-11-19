@@ -16,6 +16,8 @@ import hivens.widget.model.SurfaceShape
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.parseFill
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.PlateOutline
+import hivens.ui.theme.plateOutline
 
 /**
  * Paints a widget's own surface: the seven values of a [SurfaceSpec], rendered by the
@@ -38,7 +40,7 @@ fun WidgetSurface(spec: SurfaceSpec, content: @Composable () -> Unit) {
     val fill = parseFill(spec.fill)
     NxSurface(
         kind = fill.kind(),
-        shape = spec.shape.toShape(),
+        shape = spec.shape.toShape(plateOutline),
         opacity = spec.opacity,
         // A widget that does not name a radius gets none. This call site used to
         // say so by passing a preset that carried no backdrop, and when the presets
@@ -87,22 +89,24 @@ private fun borderColor(spec: SurfaceSpec): Color? {
 }
 
 /**
- * The outline a shape record describes.
+ * The outline a shape record describes, each field it leaves unsaid answered by the
+ * look's [plate] outline.
  *
- * Blank and "round" both take the per-corner values, which fall back to the style's
- * card corner one field at a time -- that is what lets a plane be square on one side
+ * Blank and "round" both take the per-corner values, which fall back to the plate's
+ * corner one field at a time. That is what lets a plane be square on one side
  * and rounded on the other without a second set of fields. A kind this does not answer
- * lands on the same card shape rather than on a rectangle, because an unknown kind is
- * a newer file being read by an older build and the card shape is the safer guess.
+ * lands on the same rounded shape rather than on a rectangle, because an unknown kind is
+ * a newer file being read by an older build and the rounded shape is the safer guess.
  *
- * A named smoothing switches the rounded rect to a squircle. It is a different curve,
- * not a different radius, so it needs an outline `RoundedCornerShape` cannot cut --
- * which is why smoothing sat in the record unread until the shapes library arrived
- * with it. Zero keeps the cheaper shape.
+ * A smoothing, named or the plate's, switches the rounded rect to a squircle. It is a
+ * different curve, not a different radius, so it needs an outline `RoundedCornerShape`
+ * cannot cut, which is why smoothing sat in the record unread until the shapes library
+ * arrived with it. Zero keeps the cheaper shape. A star's points and depth and a
+ * polygon's sides are what makes each one, so they stay this function's own.
  */
-private fun SurfaceShape.toShape(): Shape {
-    val fallback = 12f
-    val smooth = smoothing ?: 0f
+private fun SurfaceShape.toShape(plate: PlateOutline): Shape {
+    val fallback = plate.corner.value
+    val smooth = smoothing ?: plate.smoothing
     return when (kind.trim().lowercase()) {
         "circle" -> CircleShape
         "pill" -> RoundedCornerShape(percent = 50)
@@ -110,13 +114,13 @@ private fun SurfaceShape.toShape(): Shape {
         "star" -> PolygonShape(
             points = points ?: 5,
             innerRadius = innerRadius ?: 0.5f,
-            rounding = pointRounding ?: 0f,
+            rounding = pointRounding ?: plate.pointRounding,
             smoothing = smooth,
         )
         "polygon" -> PolygonShape(
             points = points ?: 6,
             innerRadius = 1f,
-            rounding = pointRounding ?: 0f,
+            rounding = pointRounding ?: plate.pointRounding,
             smoothing = smooth,
         )
         else -> if (smooth > 0f) {

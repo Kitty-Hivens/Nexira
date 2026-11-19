@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -22,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
+import hivens.look.shape.api.Shape
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
@@ -74,7 +74,7 @@ fun NxSwitch(
     Box(
         modifier = modifier
             .size(trackWidth, trackHeight)
-            .clip(RoundedCornerShape(trackCorner))
+            .clip(Shape.capsule)
             .background(trackColor)
             .let { m ->
                 if (onCheckedChange != null) m.toggleable(value = checked, enabled = enabled, role = Role.Switch, onValueChange = onCheckedChange)
@@ -86,7 +86,7 @@ fun NxSwitch(
             Modifier
                 .offset(x = thumbX)
                 .size(thumbSize)
-                .clip(RoundedCornerShape(thumbCorner))
+                .clip(Shape.capsule)
                 .background(thumbColor),
         )
     }
@@ -95,8 +95,6 @@ fun NxSwitch(
 private val trackWidth = 44.dp
 private val trackHeight = 24.dp
 private val thumbSize = 18.dp
-private val trackCorner = 12.dp
-private val thumbCorner = 9.dp
 
 @Preview
 @Composable

@@ -182,9 +182,11 @@ kotlin {
                 // them beyond listing their CompiledModule.
                 implementation(project(":look:colour-api"))
                 implementation(project(":look:motion-api"))
+                implementation(project(":look:shape-api"))
                 implementation(project(":look:packs"))
-                // The nx motion provider, compiled in like the colour one.
+                // The nx motion and shape providers, compiled in like the colour one.
                 implementation(project(":look:motion-nx"))
+                implementation(project(":look:shape-nx"))
                 // The nx providers' controls, compiled in like the providers: the shell names
                 // nothing of them beyond their CompiledModule, and draws their widgets by kind.
                 implementation(project(":look:colour-nx-controls"))

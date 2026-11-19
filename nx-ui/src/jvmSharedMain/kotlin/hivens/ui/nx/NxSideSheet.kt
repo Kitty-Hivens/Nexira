@@ -35,6 +35,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.NxIcon
 import hivens.ui.layers.Layer
 import hivens.ui.layers.LayerHost
@@ -113,7 +114,7 @@ fun NxSideSheet(
             val sheetWidth by animateDpAsState(target, (slide ?: Motion.tap).of(), label = "sheetWidth")
             NxSurface(
                 kind     = SurfaceKind.Dialog,
-                shape    = MaterialTheme.shapes.large,
+                shape    = Shape.sheet,
                 modifier = modifier
                     .align(Alignment.TopEnd)
                     .padding(EDGE)

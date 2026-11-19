@@ -7,7 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -117,7 +117,7 @@ private fun PixelArtCards(dark: Boolean) {
                 "beta" to (Color(0xFF2E6B4F) to Color(0xFFE0B341)),
                 "gamma" to (NxColor.lead() to NxColor.hashed("gamma")),
             )) {
-                Box(Modifier.size(160.dp, 96.dp).clip(MaterialTheme.shapes.medium).pixelArtBackground(seed, pair.first, pair.second))
+                Box(Modifier.size(160.dp, 96.dp).clip(RoundedCornerShape(12.dp)).pixelArtBackground(seed, pair.first, pair.second))
             }
         }
     }

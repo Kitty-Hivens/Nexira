@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -91,7 +92,7 @@ fun NxRow(
     trailing: @Composable () -> Unit = {},
 ) {
     val rowModifier = if (onClick != null) {
-        val shape = MaterialTheme.shapes.medium
+        val shape = Shape.card
         val interaction = remember { MutableInteractionSource() }
         val alpha = softHoverAlpha(interaction, highlighted)
         val tint = NxInk.main

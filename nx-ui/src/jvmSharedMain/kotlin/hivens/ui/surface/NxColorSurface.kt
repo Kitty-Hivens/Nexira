@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,7 +41,7 @@ import hivens.ui.theme.NxThemed
 fun NxColorSurface(
     color: Color,
     modifier: Modifier = Modifier,
-    shape: Shape = MaterialTheme.shapes.medium,
+    shape: Shape = RoundedCornerShape(12.dp),
     border: BorderStroke? = null,
     content: @Composable BoxScope.() -> Unit = {},
 ) {
@@ -71,7 +70,7 @@ private fun ColorSurfaces(dark: Boolean) {
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             NxColorSurface(Color(0xFF3B6EA8), Modifier.size(48.dp))
-            NxColorSurface(Color(0xFFB8608E), Modifier.size(48.dp), shape = MaterialTheme.shapes.small)
+            NxColorSurface(Color(0xFFB8608E), Modifier.size(48.dp), shape = RoundedCornerShape(8.dp))
             NxColorSurface(Color(0xFFF2F2F2), Modifier.size(48.dp), border = BorderStroke(1.dp, NxInk.line))
             NxColorSurface(Color(0xFF1B1B1B), Modifier.size(48.dp), shape = CircleShape, border = BorderStroke(2.dp, NxColor.lead()))
             NxColorSurface(Color.Transparent, Modifier.size(48.dp), shape = RoundedCornerShape(4.dp), border = BorderStroke(1.dp, NxInk.line))

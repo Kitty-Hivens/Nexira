@@ -9,6 +9,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextDecoration
+import hivens.look.shape.api.Shape
 import hivens.ui.layers.layerTrigger
 import hivens.ui.theme.Motion
 import androidx.compose.foundation.background
@@ -22,8 +23,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.foundation.shape.CornerSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,7 +72,7 @@ internal fun NxPill(
     leading: (@Composable () -> Unit)? = null,
     onClick: (() -> Unit)? = null,
 ) {
-    val shape = RoundedCornerShape(pillCorner)
+    val shape = Shape.capsule
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
     val pressed by interaction.collectIsPressedAsState()
@@ -122,7 +121,8 @@ internal fun NxPill(
 
 /**
  * Measured off the reference's tag, not chosen: 14 normal, a hairline, eight in
- * from each end, four between a mark and its word, and a full round.
+ * from each end, and four between a mark and its word. The ends are the look's
+ * capsule.
  *
  * The label used to be labelSmall, 11 and medium. In a sidebar block whose title
  * is 18 and whose group labels are 16, an 11 chip read as a footnote to the
@@ -131,7 +131,6 @@ internal fun NxPill(
  * measured against the reference and matched; the chip was the one piece still
  * carrying a guess.
  */
-private val pillCorner = CornerSize(50)
 private val pillHeight = 24.dp
 private val pillPadding = 8.dp
 private val pillGap = 4.dp

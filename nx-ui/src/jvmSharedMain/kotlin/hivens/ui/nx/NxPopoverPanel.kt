@@ -38,6 +38,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.NxIcon
 import hivens.ui.layers.AnchoredLayer
 import hivens.ui.layers.LayerHost
@@ -120,7 +121,7 @@ fun NxPopoverPanel(
         ) {
             NxSurface(
                 kind     = SurfaceKind.Popup,
-                shape    = MaterialTheme.shapes.medium,
+                shape    = Shape.menu,
                 modifier = modifier.width(width),
             ) {
                 Column(Modifier.fillMaxWidth()) {

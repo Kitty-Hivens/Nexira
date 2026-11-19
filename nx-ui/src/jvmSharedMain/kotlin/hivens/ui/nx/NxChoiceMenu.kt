@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -106,7 +107,7 @@ fun NxChoiceMenu(
 }
 
 /**
- * The plane a choice list sits on: the popup surface at the larger corner, rows
+ * The plane a choice list sits on: the popup surface at the menu corner, rows
  * running to its edges on every side, so the first and last answer's fill follows
  * the corner instead of being cut by it. A scrollbar only once there is something
  * to scroll.
@@ -126,7 +127,7 @@ internal fun NxChoiceSurface(
     val density = LocalDensity.current
     var bodyHeight by remember { mutableStateOf(0.dp) }
 
-    NxSurface(kind = SurfaceKind.Popup, shape = MaterialTheme.shapes.large, modifier = modifier) {
+    NxSurface(kind = SurfaceKind.Popup, shape = Shape.menu, modifier = modifier) {
         // Intrinsic width inside the bounds, for the reason the menu gives: a popup
         // arrives unbounded, and the rows only fill the same width once the column
         // has one.

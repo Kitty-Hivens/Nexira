@@ -214,5 +214,8 @@ include(":look:motion-api")
 include(":look:motion-nx")
 // The UI that steers the nx motion provider: the reduce motion switch.
 include(":look:motion-nx-controls")
+include(":look:shape-api")
+// The nx shape provider: nx's corners, with no settings of its own.
+include(":look:shape-nx")
 include(":profiler-agent")
 include(":authlib-agent")

@@ -1,0 +1,93 @@
+public final class hivens/look/shape/api/PlateOutline {
+	public static final field $stable I
+	public synthetic fun <init> (FFFLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCorner-D9Ej5fM ()F
+	public final fun getPointRounding ()F
+	public final fun getSmoothing ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/look/shape/api/Shape : hivens/look/manager/api/LookAxis {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/shape/api/Shape;
+	public final fun getCapsule (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
+	public final fun getCard (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
+	public final fun getControl (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
+	public final fun getDialog (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
+	public final fun getIndicator (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
+	public fun getLabel ()Ljava/lang/String;
+	public final fun getMenu (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
+	public final fun getPlate (Landroidx/compose/runtime/Composer;I)Lhivens/look/shape/api/PlateOutline;
+	public final fun getSheet (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
+	public final fun getThumb (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
+	public final fun getTooltip (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/graphics/Shape;
+}
+
+public final class hivens/look/shape/api/ShapeAnswers {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/shape/api/ShapeAnswers$Companion;
+	public final fun getCapsule ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getCard ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getControl ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getDialog ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getIndicator ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getMenu ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getPlate ()Lhivens/look/shape/api/PlateOutline;
+	public final fun getSheet ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getThumb ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getTooltip ()Landroidx/compose/ui/graphics/Shape;
+}
+
+public final class hivens/look/shape/api/ShapeAnswers$Builder {
+	public static final field $stable I
+	public final fun getCapsule ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getCard ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getControl ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getDialog ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getIndicator ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getMenu ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getPlate ()Lhivens/look/shape/api/PlateOutline;
+	public final fun getSheet ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getThumb ()Landroidx/compose/ui/graphics/Shape;
+	public final fun getTooltip ()Landroidx/compose/ui/graphics/Shape;
+	public final fun setCapsule (Landroidx/compose/ui/graphics/Shape;)V
+	public final fun setCard (Landroidx/compose/ui/graphics/Shape;)V
+	public final fun setControl (Landroidx/compose/ui/graphics/Shape;)V
+	public final fun setDialog (Landroidx/compose/ui/graphics/Shape;)V
+	public final fun setIndicator (Landroidx/compose/ui/graphics/Shape;)V
+	public final fun setMenu (Landroidx/compose/ui/graphics/Shape;)V
+	public final fun setPlate (Lhivens/look/shape/api/PlateOutline;)V
+	public final fun setSheet (Landroidx/compose/ui/graphics/Shape;)V
+	public final fun setThumb (Landroidx/compose/ui/graphics/Shape;)V
+	public final fun setTooltip (Landroidx/compose/ui/graphics/Shape;)V
+}
+
+public final class hivens/look/shape/api/ShapeAnswers$Companion {
+	public final fun build (Lkotlin/jvm/functions/Function1;)Lhivens/look/shape/api/ShapeAnswers;
+	public final fun getBASE ()Lhivens/look/shape/api/ShapeAnswers;
+}
+
+public final class hivens/look/shape/api/ShapeApi {
+	public static final field $stable I
+	public static final field AXIS Ljava/lang/String;
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/look/shape/api/ShapeApi;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public final class hivens/look/shape/api/ShapeModule : hivens/widget/api/CompiledModule {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/shape/api/ShapeModule;
+	public fun getApiPackages ()Ljava/util/Map;
+	public fun getBoot ()Lhivens/widget/api/BootAnswers;
+	public fun getContributionKinds ()Ljava/util/List;
+	public fun getContributions ()Ljava/util/List;
+	public fun getId ()Ljava/lang/String;
+	public fun getName ()Ljava/lang/String;
+	public fun getProvides ()Ljava/util/Map;
+	public fun getStrings ()Lhivens/widget/api/ModuleStrings;
+	public fun getWidgets ()Lhivens/widget/api/WidgetRegistry;
+}
+

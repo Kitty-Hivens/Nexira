@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -37,7 +38,7 @@ fun NxChoiceChip(
     enabled: Boolean = true,
     onToggle: () -> Unit,
 ) {
-    val shape = MaterialTheme.shapes.small
+    val shape = Shape.control
     val alpha = if (enabled) 1f else 0.4f
     val bg = if (selected) NxColor.wash(NxColor.lead(), 0.18f * alpha)
              else NxColor.wash(NxInk.quiet, 0.08f * alpha)

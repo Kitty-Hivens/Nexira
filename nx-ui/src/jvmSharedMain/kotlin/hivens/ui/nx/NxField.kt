@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hivens.look.shape.api.Shape
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NeutralTheme
@@ -63,7 +64,7 @@ fun NxField(
 ) {
     NxSurface(
         kind     = SurfaceKind.Field,
-        shape    = MaterialTheme.shapes.small,
+        shape    = Shape.control,
         modifier = modifier,
     ) {
         // Inside the surface, so the ink is the one that reads on the field itself.
