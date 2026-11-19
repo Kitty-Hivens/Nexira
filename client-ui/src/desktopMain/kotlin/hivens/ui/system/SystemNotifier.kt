@@ -5,6 +5,7 @@ import dev.hivens.libnotify.NotificationAction
 import dev.hivens.libnotify.NotificationEvent
 import dev.hivens.libnotify.Notifier
 import dev.hivens.libnotify.NotifierConfig
+import dev.hivens.libnotify.Subscription
 import dev.hivens.libnotify.Urgency
 import org.slf4j.LoggerFactory
 
@@ -40,7 +41,7 @@ object SystemNotifier {
     private var state: State = State.NOT_STARTED
 
     @Volatile private var notifier: Notifier? = null
-    @Volatile private var unsubscribe: (() -> Unit)? = null
+    @Volatile private var subscription: Subscription? = null
 
     /**
      * Installing a notifier and taking it down happen under this, and [generation]
@@ -102,7 +103,7 @@ object SystemNotifier {
                     return
                 }
                 notifier = n
-                unsubscribe = n.onEvent { event ->
+                subscription = n.onEvent { event ->
                     when (event) {
                         // A click on the banner body, or on the "Show window" action,
                         // both mean "bring the launcher back".
@@ -145,10 +146,10 @@ object SystemNotifier {
     fun shutdown() {
         synchronized(lifecycle) {
             generation++
-            val _ = runCatching { unsubscribe?.invoke() }
+            val _ = runCatching { subscription?.close() }
             val _ = runCatching { notifier?.close() }
             notifier = null
-            unsubscribe = null
+            subscription = null
             onShowWindow = null
             state = State.NOT_STARTED
         }
