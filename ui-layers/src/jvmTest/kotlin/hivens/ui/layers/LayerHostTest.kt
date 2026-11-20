@@ -226,6 +226,67 @@ class LayerHostTest {
     }
 
     @Test
+    fun `a layer draws what its call site gives it now`() {
+        val layers = WindowLayers()
+        var answer by mutableStateOf("comparing")
+        var drawn: String? = null
+        LayerScene {
+            LayerHost(layers, Modifier.fillMaxSize()) {
+                Asking({ answer }) { drawn = it }
+            }
+        }.use { scene ->
+            scene.settle()
+            assertEquals("comparing", drawn)
+            answer = "ready"
+            scene.settle()
+            assertEquals("ready", drawn)
+        }
+    }
+
+    // A confirmation opened from a settings sheet whose answer arrives after it opened.
+    @Test
+    fun `a layer opened from inside another draws what its call site gives it now`() {
+        val layers = WindowLayers()
+        var answer by mutableStateOf("comparing")
+        var drawn: String? = null
+        LayerScene {
+            LayerHost(layers, Modifier.fillMaxSize()) {
+                Layer(visible = true) {
+                    Asking({ answer }) { drawn = it }
+                }
+            }
+        }.use { scene ->
+            scene.settle()
+            assertEquals("comparing", drawn)
+            answer = "ready"
+            scene.settle()
+            assertEquals("ready", drawn)
+        }
+    }
+
+    // The answer reaches the layer through a slot a dialog component lays out, the way
+    // a confirmation's text does.
+    @Test
+    fun `a layer opened from inside another draws what a slot handed through a component gives it now`() {
+        val layers = WindowLayers()
+        var answer by mutableStateOf("comparing")
+        var drawn: String? = null
+        LayerScene {
+            LayerHost(layers, Modifier.fillMaxSize()) {
+                Layer(visible = true) {
+                    AskingThroughSlot({ answer }) { drawn = it }
+                }
+            }
+        }.use { scene ->
+            scene.settle()
+            assertEquals("comparing", drawn)
+            answer = "ready"
+            scene.settle()
+            assertEquals("ready", drawn)
+        }
+    }
+
+    @Test
     fun `a layer's content keeps the composition locals of where it was opened`() {
         val layers = WindowLayers()
         val callSite = compositionLocalOf<String?> { null }
@@ -283,6 +344,28 @@ class LayerHostTest {
 private fun Named(name: String, names: MutableMap<LayerResident, String>) {
     val resident = LocalResident.current ?: return
     names[resident] = name
+}
+
+/**
+ * A call site that reads [answer] in a restart scope of its own and opens a modal layer
+ * showing it, the way a dialog reads its own state and hands it to the layer.
+ */
+@Composable
+private fun Asking(answer: () -> String, drawn: (String) -> Unit) {
+    val now = answer()
+    Layer(visible = true, modal = true) { drawn(now) }
+}
+
+/** [Asking], with the answer handed to the layer through a slot of a component in between. */
+@Composable
+private fun AskingThroughSlot(answer: () -> String, drawn: (String) -> Unit) {
+    val now = answer()
+    SlotDialog(text = { drawn(now) })
+}
+
+@Composable
+private fun SlotDialog(text: @Composable () -> Unit) {
+    Layer(visible = true, modal = true) { Box { text() } }
 }
 
 /** A 50 by 50 clickable square at ([x], [y]) in the window, counting its clicks. */

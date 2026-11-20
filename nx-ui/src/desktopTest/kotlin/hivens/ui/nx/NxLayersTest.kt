@@ -37,11 +37,21 @@ import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Text
 import hivens.ui.layers.DismissOnBack
+import hivens.ui.layers.Layer
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.WindowLayers
+import androidx.compose.runtime.collectAsState
+import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxThemed
+import hivens.ui.theme.OnFill
 import hivens.ui.theme.TestTheme
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import org.jetbrains.skia.Bitmap
 import javax.swing.SwingUtilities
 import kotlin.math.abs
@@ -264,6 +274,93 @@ class NxLayersTest {
         assertEquals(0, behind, "and the window under it is out of reach")
     }
 
+    // A confirmation opened from a settings sheet that shows "comparing" until the
+    // comparison it asked for answers.
+    @Test
+    fun `an alert dialog opened from inside a layer shows what its call site has now`() = onEventThread {
+        var answer by mutableStateOf("comparing")
+        var drawn: String? = null
+        LayersWindow {
+            Layer(visible = true) {
+                Asking({ answer }) { drawn = it }
+            }
+        }.use { window ->
+            window.settle(frames = 20)
+            assertEquals("comparing", drawn)
+            answer = "ready"
+            window.settle(frames = 20)
+            assertEquals("ready", drawn)
+        }
+    }
+
+    // The pack settings sheet: sections in an AnimatedContent, the confirmation in one.
+    @Test
+    fun `an alert dialog opened from a side sheet section shows what its call site has now`() = onEventThread {
+        var answer by mutableStateOf("comparing")
+        var drawn: String? = null
+        LayersWindow {
+            NxSideSheet(onDismissRequest = {}) {
+                AnimatedContent(targetState = 0, label = "section") { _ ->
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        Asking({ answer }) { drawn = it }
+                    }
+                }
+            }
+        }.use { window ->
+            window.settle(frames = 20)
+            assertEquals("comparing", drawn)
+            answer = "ready"
+            window.settle(frames = 20)
+            assertEquals("ready", drawn)
+        }
+    }
+
+    // The reattach confirmation as it is written: its answer collected from a flow,
+    // and the dialog drawn on a fill of its own.
+    @Test
+    fun `an alert dialog on a fill shows what a collected flow answers after it opened`() = onEventThread {
+        val answers = MutableStateFlow("comparing")
+        var drawn: String? = null
+        LayersWindow {
+            NxSideSheet(onDismissRequest = {}) {
+                AnimatedContent(targetState = 0, label = "section") { _ ->
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        AskingOnFill(answers) { drawn = it }
+                    }
+                }
+            }
+        }.use { window ->
+            window.settle(frames = 20)
+            assertEquals("comparing", drawn)
+            answers.value = "ready"
+            window.settle(frames = 20)
+            assertEquals("ready", drawn)
+        }
+    }
+
+    // The same with the answer of a type the Compose compiler cannot call stable, as
+    // the packs API's views are to it: it was this that the dialog never redrew.
+    @Test
+    fun `an alert dialog shows an unstable answer that arrives after it opened`() = onEventThread {
+        val answers = MutableStateFlow<Answer>(Answer.Comparing)
+        var drawn: Answer? = null
+        LayersWindow {
+            NxSideSheet(onDismissRequest = {}) {
+                AnimatedContent(targetState = 0, label = "section") { _ ->
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+                        AskingUnstable(answers) { drawn = it }
+                    }
+                }
+            }
+        }.use { window ->
+            window.settle(frames = 20)
+            assertEquals(Answer.Comparing, drawn)
+            answers.value = Answer.Ready(mutableListOf("mods/a.jar"))
+            window.settle(frames = 20)
+            assertTrue(drawn is Answer.Ready, "the dialog drew the answer, saw $drawn")
+        }
+    }
+
     @Test
     fun `a tooltip never takes Escape`() = onEventThread {
         var closed = 0
@@ -409,6 +506,57 @@ class NxLayersTest {
             assertEquals("the screen", inDialog)
             assertEquals("the screen", inTooltip)
         }
+    }
+}
+
+/** A call site that reads [answer] in its own restart scope and shows it in an [NxAlertDialog]'s text. */
+@Composable
+private fun Asking(answer: () -> String, drawn: (String) -> Unit) {
+    val now = answer()
+    NxAlertDialog(
+        onDismissRequest = {},
+        confirmButton    = { NxButton("Confirm", onClick = {}) },
+        title            = { Text("Reattach") },
+        text             = { drawn(now) },
+    )
+}
+
+/** [Asking], with the answer collected from [answers] and the dialog on a fill, as the reattach confirmation is. */
+@Composable
+private fun AskingOnFill(answers: StateFlow<String>, drawn: (String) -> Unit) {
+    val now by answers.collectAsState()
+    val container = NxColor.depth(NxColor.floating)
+    OnFill(container) {
+        NxAlertDialog(
+            onDismissRequest = {},
+            confirmButton    = { NxButton("Confirm", onClick = {}) },
+            title            = { Text("Reattach") },
+            text             = { drawn(now) },
+            containerColor   = container,
+        )
+    }
+}
+
+/** An answer the Compose compiler cannot prove stable: it holds a mutable list. */
+private sealed interface Answer {
+    data object Comparing : Answer
+    data class Ready(val removed: MutableList<String>) : Answer
+}
+
+/** [AskingOnFill] with an [Answer], captured by the text slot the way the reattach confirmation captured its state. */
+@Composable
+private fun AskingUnstable(answers: StateFlow<Answer>, drawn: (Answer) -> Unit) {
+    val now by answers.collectAsState()
+    val container = NxColor.depth(NxColor.floating)
+    val answer = now
+    OnFill(container) {
+        NxAlertDialog(
+            onDismissRequest = {},
+            confirmButton    = { NxButton("Confirm", onClick = {}) },
+            title            = { Text("Reattach") },
+            text             = { drawn(answer) },
+            containerColor   = container,
+        )
     }
 }
 

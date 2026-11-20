@@ -16,6 +16,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -85,42 +86,50 @@ internal fun ReattachConfirmDialog(
     val state = previews?.get(packId) ?: ReattachPreviewView.Comparing
     val title = s.text("packSettingsReattach", sourceName)
     val container = NxColor.depth(NxColor.floating)
+    // Read inside the slots rather than captured by them, so the answer itself redraws
+    // the dialog's layer. Captured, the answer arrived here and the dialog was skipped
+    // as unchanged: the slot was the same lambda object, and its new body never reached
+    // where the layer draws it, so "comparing" stayed up over a finished comparison.
+    val shownState = rememberUpdatedState(state)
+    val shownAvailable = rememberUpdatedState(available)
     OnFill(container) {
         NxAlertDialog(
             onDismissRequest = onDismiss,
             paneTitle        = title,
             title = { Text(title) },
             text = {
+                val current = shownState.value
+                val canAsk = shownAvailable.value
                 Column(
                     modifier = Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     when {
-                        !available -> Text(
+                        !canAsk -> Text(
                             s.text("packSettingsReattachUnavailable"),
                             style = MaterialTheme.typography.bodyMedium,
                             color = NxColor.status(Status.Error),
                         )
-                        state == ReattachPreviewView.Comparing -> Row(
+                        current == ReattachPreviewView.Comparing -> Row(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
                             CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp, color = NxColor.lead())
                             Text(s.text("packSettingsReattachComparing"), style = MaterialTheme.typography.bodyMedium)
                         }
-                        state is ReattachPreviewView.Failed -> Text(
-                            s.text("packSettingsReattachCompareFailed", state.message),
+                        current is ReattachPreviewView.Failed -> Text(
+                            s.text("packSettingsReattachCompareFailed", current.message),
                             style = MaterialTheme.typography.bodyMedium,
                             color = NxColor.status(Status.Error),
                         )
-                        state is ReattachPreviewView.Ready -> PreviewBody(state.preview)
+                        current is ReattachPreviewView.Ready -> PreviewBody(current.preview)
                     }
                 }
             },
             confirmButton = {
                 // Not while files are left that could not be read: the launcher refuses
                 // that reattach, so the dialog does not offer it.
-                val ready = (state as? ReattachPreviewView.Ready)?.takeIf { available && it.preview.unreadable.isEmpty() }
+                val ready = (shownState.value as? ReattachPreviewView.Ready)?.takeIf { shownAvailable.value && it.preview.unreadable.isEmpty() }
                 TextButton(
                     onClick = {
                         if (ready != null) {
