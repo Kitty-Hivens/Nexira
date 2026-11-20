@@ -1,3 +1,4 @@
+import hivens.android.launcherApi
 import hivens.packaging.PackagingExtension
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
@@ -88,7 +89,7 @@ kotlin {
     }
     android {
         namespace = "hivens.ui"
-        compileSdk = providers.gradleProperty("nexira.android.compileSdk").map(String::toInt).getOrElse(37)
+        compileSdk { launcherApi(providers) }
         minSdk = 31
         // Compose resources travel as assets of the Android library, which are only packaged when the library takes part in resource processing.
         androidResources {

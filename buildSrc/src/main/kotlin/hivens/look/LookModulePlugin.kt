@@ -1,6 +1,7 @@
 package hivens.look
 
 import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
+import hivens.android.launcherApi
 import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -53,7 +54,7 @@ class LookModulePlugin : Plugin<Project> {
         kotlin.jvm()
         (kotlin as ExtensionAware).extensions.configure(KotlinMultiplatformAndroidLibraryTarget::class.java) {
             namespace = names.namespace
-            compileSdk = project.providers.gradleProperty("nexira.android.compileSdk").map(String::toInt).getOrElse(37)
+            compileSdk { launcherApi(project.providers) }
             minSdk = 31
             compilerOptions { jvmTarget.set(JvmTarget.JVM_25) }
         }

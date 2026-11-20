@@ -1,3 +1,4 @@
+import hivens.android.launcherApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -31,10 +32,8 @@ val releaseKeystore: String? = providers.environmentVariable("ANDROID_KEYSTORE_F
 
 android {
     namespace = "dev.hivens.nexira"
-    // Compose 1.13 for Android is built against API 37.1, so the app compiles against that and targets 37.
-    compileSdk {
-        version = release(37) { minorApiLevel = 1 }
-    }
+    // The same API the library modules compile against, and the app targets 37.
+    compileSdk { launcherApi(providers) }
 
     defaultConfig {
         applicationId = "dev.hivens.nexira"

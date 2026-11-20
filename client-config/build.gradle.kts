@@ -1,3 +1,4 @@
+import hivens.android.launcherApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -34,7 +35,7 @@ kotlin {
     jvm()
     android {
         namespace = "hivens.config"
-        compileSdk = providers.gradleProperty("nexira.android.compileSdk").map(String::toInt).getOrElse(37)
+        compileSdk { launcherApi(providers) }
         minSdk = 31
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_25)

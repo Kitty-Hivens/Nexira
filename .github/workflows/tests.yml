@@ -18,7 +18,8 @@ name: Tests
 # them. The repo is public, so GitHub-hosted minutes are free on every OS.
 #
 # Docs-only PRs (CHANGELOG, *.md) do not touch the paths below, so they skip
-# the matrix entirely.
+# the matrix entirely. The Android app's manifest and resources are not Kotlin,
+# so its directory is named as a whole.
 
 on:
   pull_request:
@@ -27,6 +28,7 @@ on:
       - '**.kts'
       - 'gradle/**'
       - 'gradle.properties'
+      - 'android-app/**'
       - '.github/workflows/tests.yml'
   push:
     branches: [dev, stable]
@@ -37,6 +39,7 @@ on:
       - '**.kts'
       - 'gradle/**'
       - 'gradle.properties'
+      - 'android-app/**'
       - '.github/workflows/tests.yml'
 
 concurrency:
@@ -156,3 +159,38 @@ jobs:
           path: |
             */build/reports/tests/
             look/*/build/reports/tests/
+
+  # The Android app as the nightly builds it, without the signing key. Nothing else
+  # here compiles an Android target, and a release build is the only one that checks
+  # each module against the API floor its dependencies declare: a Compose bump that
+  # asked for API 37.1 passed every check above and failed the nightly's APK.
+  android:
+    name: Android (release APK)
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # The same platform and NDK the release job installs, by the names the build
+      # scripts use: the API is set in buildSrc's LauncherApi.kt.
+      - name: Install the SDK platform and NDK
+        run: |
+          if [ -z "${ANDROID_HOME:-}" ]; then
+            echo "::error title=Android SDK::ANDROID_HOME is not set on this runner image."
+            exit 1
+          fi
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" --install "platforms;android-37.2" "ndk;28.2.13676358" "build-tools;36.1.0" > /dev/null
+
+      # No key reaches a pull request, so the APK comes out unsigned, which is all
+      # this needs: the build is the check.
+      - name: Build the release APK
+        run: ./gradlew :android-app:assembleRelease
