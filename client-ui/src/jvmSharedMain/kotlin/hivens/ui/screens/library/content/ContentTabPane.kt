@@ -11,7 +11,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -22,8 +21,14 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.animation.core.AnimationSpec
+import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.snapshotFlow
+import hivens.ui.theme.Motion
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.horizontalScroll
@@ -260,26 +265,31 @@ internal fun ContentTabPane(
             }
             else -> {
                 val listState = rememberLazyListState()
+                val settle = Motion.scroll
+                LaunchedEffect(listState, settle) { listState.settleOnRows(settle.of()) }
                 val hover = remember { MutableInteractionSource() }
                 val hovered by hover.collectIsHoveredAsState()
                 Box(Modifier.fillMaxSize().hoverable(hover)) {
                     LazyColumn(
                         state               = listState,
-                        modifier            = Modifier.fillMaxSize().dragSelect(
+                        // Inset by padding rather than content padding: the list clips at
+                        // its own edge, so a row settled at the top has nothing above it.
+                        // Content padding is drawn into, and the row before showed a sliver.
+                        modifier            = Modifier.fillMaxSize().padding(8.dp).dragSelect(
                             listState   = listState,
                             keyAt       = { index -> visible.getOrNull(index)?.selectionKey() },
                             isSelected  = { it in state.selectedKeys },
                             setSelected = state::setSelected,
                             selecting   = state.selectedKeys.isNotEmpty(),
                         ),
-                        contentPadding      = PaddingValues(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        items(items = visible, key = { it.selectionKey() }) { c ->
+                        itemsIndexed(items = visible, key = { _, c -> c.selectionKey() }) { index, c ->
                             val rules = state.rulesFor(c)
                             val ref = ContentRef(c.kind, c.fileName)
                             ContentRow(
                                 content        = c,
+                                striped        = index % 2 == 1,
                                 selected       = c.selectionKey() in state.selectedKeys,
                                 iconState      = state.iconFor(c),
                                 rules          = rules,
@@ -770,6 +780,11 @@ internal fun ContentRow(
     onToggle: (Boolean) -> Unit,
     onDelete: (() -> Unit)?,
     onDetails: () -> Unit,
+    /**
+     * Whether this is every second row, drawn a shade off the rows around it, so the
+     * eye keeps its line across a row as wide as the window.
+     */
+    striped: Boolean = false,
     resolveProject: suspend () -> ModrinthProject?,
     update: ModUpdate?,
     onUpdate: () -> Unit,
@@ -801,6 +816,7 @@ internal fun ContentRow(
         val rowFill = when {
             selected -> NxColor.wash(NxColor.lead(), 0.14f)
             warning != null -> NxColor.wash(NxColor.status(Status.Error), PROBLEM_WASH)
+            striped -> NxColor.wash(NxInk.main, STRIPE_WASH)
             else -> Color.Transparent
         }
         OnFill(rowFill) {
@@ -1064,6 +1080,29 @@ private fun ContentIcon(state: ContentIconState?, seed: String, displayName: Str
 
 /** The light red under a row with a [ContentRow] warning. */
 private const val PROBLEM_WASH = 0.10f
+
+/** The shade every second [ContentRow] takes. The main ink, so it lightens on a dark theme and darkens on a light one. */
+private const val STRIPE_WASH = 0.035f
+
+/** How long the list has to stay still before it settles, so a wheel turned in steps is not pulled between them. */
+private const val SETTLE_AFTER_MS = 140L
+
+/**
+ * Brings the list to rest on a row boundary each time a scroll stops, to whichever
+ * boundary is nearer, so the top row is never cut. A list scrolled to its end stays
+ * there: settling would pull the last row back out of view.
+ */
+private suspend fun LazyListState.settleOnRows(spec: AnimationSpec<Float>) {
+    snapshotFlow { isScrollInProgress }.collectLatest { moving ->
+        if (moving) return@collectLatest
+        delay(SETTLE_AFTER_MS)
+        val offset = firstVisibleItemScrollOffset
+        val first = layoutInfo.visibleItemsInfo.firstOrNull() ?: return@collectLatest
+        if (offset == 0 || !canScrollForward) return@collectLatest
+        val delta = if (offset > first.size / 2) first.size + layoutInfo.mainAxisItemSpacing - offset else -offset
+        animateScrollBy(delta.toFloat(), spec)
+    }
+}
 
 /** The sentence under a mod the pack's rules have something to say about. */
 internal fun problemReason(problem: OptionalContentRules.Problem, s: Strings): String {
