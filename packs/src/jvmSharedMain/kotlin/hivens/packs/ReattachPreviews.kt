@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
+import org.slf4j.LoggerFactory
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 
@@ -54,6 +55,7 @@ class ReattachPreviews(
     /** How long an answered preview is kept for a caller that never forgets it. */
     private val keepFor: Duration = 15.minutes,
 ) {
+    private val log = LoggerFactory.getLogger(ReattachPreviews::class.java)
     private val _previews = MutableStateFlow<Map<String, ReattachPreviewState>>(emptyMap())
 
     /** The latest preview per pack id, for each pack whose preview is wanted. */
@@ -90,6 +92,7 @@ class ReattachPreviews(
     /** Measures [pack] against its source's build again, replacing any preview it had. */
     fun request(pack: PackInstance) {
         synchronized(lock) {
+            log.debug("reattach preview: {} asked{}", pack.instanceDirName, if (pack.id in jobs) ", replacing one still measured" else "")
             asked[pack.id] = pack
             startLocked(pack)
         }
@@ -98,6 +101,7 @@ class ReattachPreviews(
     /** Drops the preview of the pack [packId], stopping it if it is still being measured. */
     fun forget(packId: String) {
         val pack = synchronized(lock) {
+            log.debug("reattach preview: {} forgotten{}", packId, if (packId in jobs) " while still measured" else "")
             jobs.remove(packId)?.cancel()
             expiries.remove(packId)?.cancel()
             _previews.update { it - packId }
@@ -112,6 +116,9 @@ class ReattachPreviews(
             val pack = asked[packId] ?: return
             jobs.remove(packId)?.cancel()
             expiries.remove(packId)?.cancel()
+            // Said, because from the dialog a preview held for someone else's work looks
+            // exactly like a slow comparison.
+            log.debug("reattach preview: {} {}", pack.instanceDirName, if (working) "waits for work on the pack" else "measured again after work on the pack")
             if (working) {
                 _previews.update { it + (packId to ReattachPreviewState.Comparing) }
             } else {
@@ -133,6 +140,7 @@ class ReattachPreviews(
             val self = coroutineContext.job
             // Only the measurement still current for a pack still wanted may answer for it.
             synchronized(lock) {
+                log.debug("reattach preview: {} answered {}, {}", pack.instanceDirName, state::class.simpleName, if (jobs[pack.id] === self) "kept" else "dropped as superseded")
                 if (jobs[pack.id] === self) {
                     jobs.remove(pack.id)
                     _previews.update { it + (pack.id to state) }

@@ -41,6 +41,11 @@
 
     MDC keys reserved for future Step-2: sessionId / launchId. The pattern
     already prints them — current code just doesn't put them yet.
+
+    Level: the launcher's own loggers (hivens.*) log at INFO unless the
+    environment says otherwise. NEXIRA_LOG_LEVEL=DEBUG (or TRACE) opens their
+    debug lines for one run, `NEXIRA_LOG_LEVEL=DEBUG ./gradlew :client-ui:run`.
+    Third-party libraries and the game stream stay where they are.
 -->
 <configuration scan="false" packagingData="false">
 
@@ -63,6 +68,7 @@
 
     <property name="LOGS_DIR"   value="${nexira.logs.dir:-${java.io.tmpdir}/nexira-fallback-logs}"/>
     <property name="SESSION_ID" value="${nexira.sessionId:-?}"/>
+    <property name="OWN_LEVEL"  value="${NEXIRA_LOG_LEVEL:-INFO}"/>
 
     <!-- sessionId is process-wide (system property → logback variable interpolation
          at config-load time). launchId is per-game-launch (MDC, propagated through
@@ -156,12 +162,12 @@
     </logger>
 
     <!-- Our own network-side code: console + network.log + crash.log. -->
-    <logger name="hivens.core.api"        level="INFO" additivity="false">
+    <logger name="hivens.core.api"        level="${OWN_LEVEL}" additivity="false">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="NETWORK_FILE"/>
         <appender-ref ref="CRASH_FILE"/>
     </logger>
-    <logger name="hivens.launcher.update" level="INFO" additivity="false">
+    <logger name="hivens.launcher.update" level="${OWN_LEVEL}" additivity="false">
         <appender-ref ref="CONSOLE"/>
         <appender-ref ref="NETWORK_FILE"/>
         <appender-ref ref="CRASH_FILE"/>
@@ -176,6 +182,9 @@
         <appender-ref ref="GAME_FILE"/>
         <appender-ref ref="CRASH_FILE"/>
     </logger>
+
+    <!-- The launcher's own code, at the level the environment asks for. -->
+    <logger name="hivens" level="${OWN_LEVEL}"/>
 
     <!-- Everything else: console + launcher.log + crash.log. -->
     <root level="INFO">

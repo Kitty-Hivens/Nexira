@@ -39,6 +39,8 @@ import org.slf4j.LoggerFactory
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.time.Duration
+import kotlin.time.TimeSource
 
 /**
  * Drives a mirror pack instance from its installed build to another one -- a
@@ -362,7 +364,11 @@ class PackUpdateService(
      */
     override suspend fun previewReattach(instance: PackInstance, source: PackReference): ReattachPreview =
         withContext(Dispatchers.IO) {
-            reattachPlan(clientDirOf(instance), instance, reattachTarget(instance, source)).preview
+            val clock = StepClock()
+            val target = reattachTarget(instance, source)
+            clock.step("target")
+            reattachPlan(clientDirOf(instance), instance, target, clock).preview
+                .also { log.info("reattach preview: {} measured in {}", instance.instanceDirName, clock) }
         }
 
     /**
@@ -448,16 +454,24 @@ class PackUpdateService(
      * written down later. Without either, every difference is the pack's to write,
      * as an update with no baseline treats it, and the preview says so.
      */
-    private suspend fun reattachPlan(clientDir: Path, record: PackInstance, target: SmrtPackManifest): ReattachPlan {
+    private suspend fun reattachPlan(
+        clientDir: Path,
+        record: PackInstance,
+        target: SmrtPackManifest,
+        clock: StepClock = StepClock(),
+    ): ReattachPlan {
         val baseline = record.installedManifest ?: currentVersionOf(record)?.let { version ->
             runCatching { client.fetchManifestVersion(record.packRef.id, version).toBaselineManifest() }
                 .onFailure { if (it is CancellationException) throw it else log.warn("reattach: no baseline for {}: {}", record.instanceDirName, it.toString()) }
                 .getOrNull()
         }
+        clock.step("baseline")
         val based = record.copy(installedManifest = baseline)
         val targetManifest = target.toBaselineManifest()
         val current = scanInstanceState(clientDir, baseline?.flatten()?.keys.orEmpty() + targetManifest.flatten().keys)
+        clock.step("hash ${current.flatten().size} files")
         val baselineMods = fetchBaselineMods(based)
+        clock.step("baseline mods")
         val basis = when {
             baseline == null -> ReattachBasis.NoBaseline
             baselineMods == null -> ReattachBasis.NamesOnly
@@ -470,6 +484,7 @@ class PackUpdateService(
             .filter { Files.isSymbolicLink(clientDir.resolve(it)) }
         val plan = computePlan(based, target, targetManifest, current, baselineMods)
             .strictInMods(target, current, links.map { it.removeSuffix(DISABLED) }.toSet())
+        clock.step("plan")
 
         val touched = plan.toAdd.toSet() + plan.toUpdate + plan.toDelete + plan.conflicts
         val turnedOn = ArrayList<String>()
@@ -493,6 +508,7 @@ class PackUpdateService(
             sortByName(asset.dest, !asset.toggleable || (assetState[asset.dest] ?: true))
         }
         val scan = syncService.strays(clientDir, target)
+        clock.step("strays")
         val strays = scan.strays
         val preview = ReattachPreview(
             build = target.packVersion,
@@ -625,3 +641,23 @@ class PackUpdateService(
 
 /** The name a switched-off file sits under, beside its own. */
 private const val DISABLED = ".disabled"
+
+/**
+ * How long each step of a measurement took, for the log line that reports it. A
+ * reattach preview waits on the network, on hashing and on a walk of `mods/`, and
+ * which of them a slow one spent its time in is not visible from the dialog.
+ */
+private class StepClock {
+    private var last = TimeSource.Monotonic.markNow()
+    private val steps = ArrayList<Pair<String, Duration>>()
+
+    fun step(name: String) {
+        val now = TimeSource.Monotonic.markNow()
+        steps += name to (now - last)
+        last = now
+    }
+
+    override fun toString(): String =
+        "${steps.fold(Duration.ZERO) { sum, (_, took) -> sum + took }.inWholeMilliseconds} ms (" +
+            steps.joinToString(", ") { (name, took) -> "$name ${took.inWholeMilliseconds} ms" } + ")"
+}
