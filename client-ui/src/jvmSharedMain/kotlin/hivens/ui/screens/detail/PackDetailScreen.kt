@@ -663,6 +663,10 @@ internal fun HeroAction(icon: IconKey, contentDescription: String?, onClick: () 
  * and stretched. FlowRow (not Row) so a narrow content area (the right panel
  * eats width) wraps the trailing pills to a second line instead of clipping
  * Worlds / Logs off the right edge.
+ *
+ * The pills sit on a panel of their own, sized to them. Laid straight over the page,
+ * an unselected pill was a faint wash on whatever the wallpaper had there, the same
+ * reason the content toolbar has its panel.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -674,10 +678,15 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
         NxIcon.Public to s.text("packDetailTabWorlds"),
         NxIcon.Description to s.text("packDetailTabLogs"),
     )
+    NxSurface(
+        kind     = SurfaceKind.Panel,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+        shape    = MaterialTheme.shapes.medium,
+    ) {
     FlowRow(
-        modifier              = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement   = Arrangement.spacedBy(6.dp),
+        modifier              = Modifier.padding(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement   = Arrangement.spacedBy(4.dp),
     ) {
         tabs.forEachIndexed { i, (icon, label) ->
             val active = i == selected
@@ -707,6 +716,7 @@ private fun PackTabBar(selected: Int, onSelect: (Int) -> Unit) {
                 }
             }
         }
+    }
     }
 }
 

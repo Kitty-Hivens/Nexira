@@ -11,6 +11,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -246,6 +247,10 @@ internal fun ContentTabPane(
         // the batch outlives this tab anyway.
 
         val visible = state.visible
+        // One panel under the whole list, as the other tabs have, from the first frame.
+        // Each row is a card of its own, and laid straight on the page the gaps between
+        // them striped the list with the wallpaper.
+        NxSurface(SurfaceKind.Panel, modifier = Modifier.fillMaxSize()) {
         when {
             state.items == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator(color = NxColor.wash(NxColor.lead(), 0.6f), strokeWidth = 2.dp, modifier = Modifier.size(26.dp))
@@ -267,6 +272,7 @@ internal fun ContentTabPane(
                             setSelected = state::setSelected,
                             selecting   = state.selectedKeys.isNotEmpty(),
                         ),
+                        contentPadding      = PaddingValues(8.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         items(items = visible, key = { it.selectionKey() }) { c ->
@@ -302,6 +308,7 @@ internal fun ContentTabPane(
                     )
                 }
             }
+        }
         }
     }
 
