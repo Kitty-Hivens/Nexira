@@ -59,7 +59,7 @@ class NxStrokeProviderTest {
     fun `nx's strokes are the ones nx drew before the stroke axis`() {
         val nx = nxStrokeAnswers()
         assertEquals(StrokeRole.solid(1.dp), nx.edge)
-        assertEquals(StrokeRole.solid(2.dp), nx.mark)
+        assertEquals(StrokeRole.solid(2.dp, snap = true), nx.mark)
         assertEquals(StrokeRole.solid(1.dp), nx.divider)
         assertEquals(StrokeRole.solid(1.5.dp, dash = Dash(8.dp, 6.dp)), nx.placeholder)
     }

@@ -19,7 +19,9 @@ fun nxStrokeAnswers(): StrokeAnswers = NxStroke.ANSWERS
 private object NxStroke {
     val ANSWERS: StrokeAnswers = StrokeAnswers.build {
         edge = StrokeRole.solid(1.dp)
-        mark = StrokeRole.solid(2.dp)
+        // In whole pixels, so at any density it fills the room the components give a mark, as
+        // the filled bar it was drawn as before the axis did.
+        mark = StrokeRole.solid(2.dp, snap = true)
         divider = StrokeRole.solid(1.dp)
         placeholder = StrokeRole.solid(1.5.dp, dash = Dash(8.dp, 6.dp))
     }

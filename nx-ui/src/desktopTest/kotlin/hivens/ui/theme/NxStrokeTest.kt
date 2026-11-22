@@ -1,6 +1,7 @@
 package hivens.ui.theme
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,11 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
@@ -23,11 +29,16 @@ import androidx.compose.ui.unit.dp
 import hivens.look.stroke.api.Stroke
 import hivens.look.stroke.api.StrokeAnswers
 import hivens.look.stroke.api.StrokeRole
+import hivens.look.stroke.api.drawStroke
 import hivens.ui.nx.NxPlaceholderOutline
 import hivens.ui.nx.NxRule
+import hivens.ui.nx.NxSettingGroup
+import hivens.ui.nx.NxSettingRow
+import hivens.ui.nx.NxTabRow
 import org.jetbrains.skia.Bitmap
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
+import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertSame
 
@@ -98,6 +109,56 @@ class NxStrokeTest {
             }
             assertContentEquals(before, after, "a placeholder at density $density")
         }
+    }
+
+    @Test
+    fun `under nx a tab's mark is the filled bar it was before the axis, at any density`() {
+        for (density in listOf(1f, 1.25f, 1.5f, 2f)) {
+            val bar = render(density) { Box(Modifier.size(26.dp, 2.dp).background(Color.Red)) }
+            val mark = nxStrokeAnswers().mark
+            val drawn = render(density) {
+                Box(Modifier.size(26.dp, 2.dp).drawBehind { drawStroke(mark, Offset(0f, size.height / 2), Offset(size.width, size.height / 2), SolidColor(Color.Red)) })
+            }
+            assertContentEquals(bar, drawn, "a mark at density $density")
+        }
+    }
+
+    @Test
+    fun `no stroke a look answers moves a rule, a settings group or a tab row`() {
+        val heavy = StrokeAnswers.build {
+            divider = StrokeRole.solid(6.dp)
+            mark = StrokeRole.solid(7.dp)
+        }
+        val fine = StrokeAnswers.build {}
+        val sizes = listOf(nxStrokeAnswers(), heavy, fine).map { answers -> layoutOf(answers) }
+        assertEquals(sizes.first(), sizes[1], "a heavier stroke moved the layout")
+        assertEquals(sizes.first(), sizes[2], "a hairline moved the layout")
+    }
+
+    /** The sizes a rule, a settings group and a tab row lay out at with [answers] for the stroke axis. */
+    private fun layoutOf(answers: StrokeAnswers): List<IntSize> {
+        val sizes = MutableList(3) { IntSize.Zero }
+        val scene = ImageComposeScene(width = 400, height = 600, density = Density(1.25f)) {
+            NxThemed(NeutralTheme) {
+                CompositionLocalProvider(Stroke.local provides answers) {
+                    Column(Modifier.width(300.dp)) {
+                        NxRule(Color.Red, Modifier.onGloballyPositioned { sizes[0] = it.size })
+                        NxSettingGroup("Group", Modifier.onGloballyPositioned { sizes[1] = it.size }) {
+                            NxSettingRow("One")
+                            NxSettingRow("Two")
+                            NxSettingRow("Three")
+                        }
+                        NxTabRow(listOf("A", "B"), selected = 0, onSelect = {}, modifier = Modifier.onGloballyPositioned { sizes[2] = it.size })
+                    }
+                }
+            }
+        }
+        try {
+            repeat(3) { scene.render(it * 16_000_000L).close() }
+        } finally {
+            scene.close()
+        }
+        return sizes
     }
 
     /** [content] in an nx theme, off screen at [density], as its RGBA bytes. */

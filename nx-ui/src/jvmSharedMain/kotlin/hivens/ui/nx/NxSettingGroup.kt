@@ -29,7 +29,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.look.stroke.api.Stroke
-import hivens.look.stroke.api.StrokeState
 import hivens.look.stroke.api.drawStroke
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
@@ -140,7 +139,8 @@ fun NxSettingBlock(
 
 /**
  * Lays its children out in a column and draws the look's divider in the gap
- * between each pair that has a height, a gap as tall as the divider is wide.
+ * between each pair that has a height. The gap is a rule's own room
+ * ([RULE_HEIGHT]), whatever the divider answers, so no look moves a row.
  * Where the lines go is decided by the placement and read by the draw, so it is
  * held as state the draw observes rather than worked out twice.
  */
@@ -152,13 +152,13 @@ private fun RuledColumn(modifier: Modifier, content: @Composable () -> Unit) {
     Layout(
         content  = content,
         modifier = modifier.drawBehind {
-            val middle = divider.style(StrokeState.Rest, this).width / 2
+            val middle = RULE_HEIGHT.toPx() / 2
             rules.forEach { y -> drawStroke(divider, Offset(0f, y + middle), Offset(size.width, y + middle), line) }
         },
     ) { measurables, constraints ->
         val loose = constraints.copy(minHeight = 0)
         val placeables = measurables.map { it.measure(loose) }.filter { it.height > 0 }
-        val gap = divider.width().roundToPx().coerceAtLeast(1)
+        val gap = RULE_HEIGHT.roundToPx()
         val height = placeables.sumOf { it.height } + gap * (placeables.size - 1).coerceAtLeast(0)
         layout(constraints.maxWidth, height.coerceIn(constraints.minHeight, constraints.maxHeight)) {
             var y = 0

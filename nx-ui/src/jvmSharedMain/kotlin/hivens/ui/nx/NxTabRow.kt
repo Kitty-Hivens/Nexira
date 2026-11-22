@@ -54,9 +54,9 @@ import hivens.ui.theme.NxThemed
  * and one narrowing a list, read as one control with two lines.
  *
  * It was the project page's own row before any other screen needed one, and the
- * numbers are that page's, measured off its reference: twenty between words, and a
- * mark twenty-six wide under the word rather than a rule its width, drawn by the
- * look's mark.
+ * numbers are that page's, measured off its reference: twenty between words, a
+ * mark twenty-six wide and two high under the word rather than a rule its width.
+ * The look's mark draws along the middle of that room, and never changes it.
  *
  * Every word keeps its whole width, and the row scrolls sideways where they do not
  * fit, bringing the current one into view. Squeezed into a phone held upright, the
@@ -71,7 +71,6 @@ fun NxTabRow(
 ) {
     val density = LocalDensity.current
     val mark = Stroke.mark
-    val markHeight = with(density) { mark.width(MARKED).roundToPx().coerceAtLeast(1).toDp() }
     val lead = SolidColor(NxColor.lead())
     // Where each tab's mark belongs, measured rather than computed: the labels are
     // different words in different languages and the row is the only thing that
@@ -150,11 +149,11 @@ fun NxTabRow(
             // animation already in flight, a run of fast clicks is followed rather
             // than queued: the mark is always heading for the tab last asked for,
             // from wherever it had got to. It scrolls with the words it marks.
-            Box(Modifier.height(markHeight)) {
+            Box(Modifier.height(MARK_HEIGHT)) {
                 if (placed) {
                     Box(
                         Modifier.offset { IntOffset(travel.value.roundToPx(), 0) }
-                            .size(width = MARK_WIDTH, height = markHeight)
+                            .size(width = MARK_WIDTH, height = MARK_HEIGHT)
                             .drawBehind {
                                 val middle = size.height / 2
                                 drawStroke(mark, Offset(0f, middle), Offset(size.width, middle), lead, MARKED)
@@ -168,6 +167,7 @@ fun NxTabRow(
 
 /** The underline: a mark under the word rather than a rule the width of it. */
 private val MARK_WIDTH = 26.dp
+private val MARK_HEIGHT = 2.dp
 
 /** The mark is always on the tab in force. */
 private val MARKED = StrokeState(selected = true)
