@@ -31,6 +31,6 @@ object NexiraPack : LookPack {
     override val id: String = LookApi.DEFAULT_PACK
     override val label: String = "packs.nexira"
 
-    // By id, as a pack knows no axis and no provider: colour, motion and shape, each answered by the nx family.
-    override val providers: Map<String, String> = mapOf("colour" to "nx", "motion" to "nx", "shape" to "nx")
+    // By id, as a pack knows no axis and no provider: colour, motion, shape and stroke, each answered by the nx family.
+    override val providers: Map<String, String> = mapOf("colour" to "nx", "motion" to "nx", "shape" to "nx", "stroke" to "nx")
 }

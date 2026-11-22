@@ -217,5 +217,8 @@ include(":look:motion-nx-controls")
 include(":look:shape-api")
 // The nx shape provider: nx's corners, with no settings of its own.
 include(":look:shape-nx")
+include(":look:stroke-api")
+// The nx stroke provider: nx's strokes, with no settings of its own.
+include(":look:stroke-nx")
 include(":profiler-agent")
 include(":authlib-agent")

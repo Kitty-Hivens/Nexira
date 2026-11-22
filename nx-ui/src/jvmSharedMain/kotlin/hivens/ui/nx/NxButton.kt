@@ -1,9 +1,9 @@
 package hivens.ui.nx
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -15,6 +15,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -25,6 +26,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.look.shape.api.Shape
+import hivens.look.stroke.api.Stroke
+import hivens.look.stroke.api.collectStrokeState
+import hivens.look.stroke.api.stroke
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -62,6 +66,9 @@ fun NxButton(
     minHeight: Dp? = null,
 ) {
     val shape = Shape.control
+    val edge = Stroke.edge
+    val interaction = remember { MutableInteractionSource() }
+    val state = interaction.collectStrokeState(enabled = enabled)
 
     val container: Color = when (style) {
         NxButtonStyle.Primary     -> NxColor.lead()
@@ -102,9 +109,9 @@ fun NxButton(
                     if (enabled) container
                     else Color.Transparent,
                 )
-                .let { if (bordered) it.border(1.dp, outline.copy(alpha = dim), shape) else it }
+                .let { if (bordered) it.stroke(edge, outline.copy(alpha = dim), shape, state) else it }
                 .layerTrigger()
-                .clickable(enabled = enabled, onClick = onClick)
+                .clickable(interactionSource = interaction, indication = LocalIndication.current, enabled = enabled, onClick = onClick)
                 .padding(pad),
             verticalAlignment     = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 8.dp),

@@ -12,6 +12,8 @@ import hivens.look.motion.nx.controls.MotionNxControls
 import hivens.look.packs.LookPacksModule
 import hivens.look.shape.api.ShapeModule
 import hivens.look.shape.nx.ShapeNxModule
+import hivens.look.stroke.api.StrokeModule
+import hivens.look.stroke.nx.StrokeNxModule
 import hivens.packs.PacksModule
 import hivens.source.mirror.MirrorSourceModule
 import hivens.source.modrinth.ModrinthSourceModule
@@ -29,6 +31,7 @@ val CompiledModules: List<CompiledModule> =
         I18nModule, ThemesModule, LookManagerModule, ColourModule, LookPacksModule, ColourNxControls,
         MotionModule, MotionNxModule, MotionNxControls,
         ShapeModule, ShapeNxModule,
+        StrokeModule, StrokeNxModule,
         PacksModule, AccountsModule, CatalogueModule, MirrorSourceModule, ModrinthSourceModule,
     )
 

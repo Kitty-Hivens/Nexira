@@ -1,7 +1,6 @@
 package hivens.ui.nx
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +27,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.look.shape.api.Shape
+import hivens.look.stroke.api.Stroke
+import hivens.look.stroke.api.stroke
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -85,7 +86,7 @@ fun NxColorField(
                 .size(22.dp)
                 .clip(RoundedCornerShape(6.dp))
                 .background(parsed ?: Color.Transparent)
-                .border(1.dp, NxInk.line, RoundedCornerShape(6.dp)),
+                .stroke(Stroke.edge, NxInk.line, RoundedCornerShape(6.dp)),
         )
         NxField(
             value         = text,

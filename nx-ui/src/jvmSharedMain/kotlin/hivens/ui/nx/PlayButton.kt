@@ -7,8 +7,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -47,6 +45,9 @@ import hivens.ui.theme.NxTheme
 import hivens.ui.theme.NxThemed
 import hivens.look.colour.api.Fill
 import hivens.look.colour.api.Ink
+import hivens.look.stroke.api.Stroke
+import hivens.look.stroke.api.collectStrokeState
+import hivens.look.stroke.api.stroke
 import kotlinx.serialization.Serializable
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -175,10 +176,12 @@ private fun Plate(
     compact: Boolean,
 ) {
     val shape = MaterialTheme.shapes.medium
+    val edgeRole = Stroke.edge
     val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val pressed by interaction.collectIsPressedAsState()
     val interactive = tone == PlayTone.Ready
+    val state = interaction.collectStrokeState(enabled = interactive)
+    val hovered = state.hovered
+    val pressed = state.pressed
     val solid = tone == PlayTone.Ready || tone == PlayTone.Waiting
 
     val fillTarget = when {
@@ -238,7 +241,9 @@ private fun Plate(
             .clip(shape)
             .background(fill)
             .then(if (tone == PlayTone.Waiting) Modifier.workProgress(progress, inks.onPlate.copy(alpha = 0.14f)) else Modifier)
-            .border(if (solid) 1.dp else 1.5.dp, edge, shape)
+            // Refused, the plate has no fill and its edge is all that outlines it, so that edge is
+            // the control's own and heavier than the look's.
+            .then(if (solid) Modifier.stroke(edgeRole, edge, shape, state) else Modifier.border(1.5.dp, edge, shape))
             .clickable(
                 interactionSource = interaction,
                 indication        = null,

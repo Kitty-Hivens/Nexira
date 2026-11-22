@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -144,7 +143,7 @@ fun NxPopoverPanel(
                             onClick            = onDismissRequest,
                         )
                     }
-                    HorizontalDivider(color = NxInk.line)
+                    NxRule(NxInk.line)
                     Column(
                         modifier            = Modifier
                             .fillMaxWidth()
@@ -156,7 +155,7 @@ fun NxPopoverPanel(
                         content()
                     }
                     footer?.let {
-                        HorizontalDivider(color = NxInk.line)
+                        NxRule(NxInk.line)
                         Row(
                             modifier              = Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp),
                             verticalAlignment     = Alignment.CenterVertically,

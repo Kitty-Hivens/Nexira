@@ -26,6 +26,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
@@ -34,6 +37,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import hivens.look.stroke.api.Stroke
+import hivens.look.stroke.api.StrokeState
+import hivens.look.stroke.api.drawStroke
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
@@ -48,8 +54,9 @@ import hivens.ui.theme.NxThemed
  * and one narrowing a list, read as one control with two lines.
  *
  * It was the project page's own row before any other screen needed one, and the
- * numbers are that page's, measured off its reference: twenty between words, a
- * mark twenty-six wide and two high under the word rather than a rule its width.
+ * numbers are that page's, measured off its reference: twenty between words, and a
+ * mark twenty-six wide under the word rather than a rule its width, drawn by the
+ * look's mark.
  *
  * Every word keeps its whole width, and the row scrolls sideways where they do not
  * fit, bringing the current one into view. Squeezed into a phone held upright, the
@@ -63,6 +70,9 @@ fun NxTabRow(
     modifier: Modifier = Modifier,
 ) {
     val density = LocalDensity.current
+    val mark = Stroke.mark
+    val markHeight = with(density) { mark.width(MARKED).roundToPx().coerceAtLeast(1).toDp() }
+    val lead = SolidColor(NxColor.lead())
     // Where each tab's mark belongs, measured rather than computed: the labels are
     // different words in different languages and the row is the only thing that
     // knows how wide each came out.
@@ -140,12 +150,15 @@ fun NxTabRow(
             // animation already in flight, a run of fast clicks is followed rather
             // than queued: the mark is always heading for the tab last asked for,
             // from wherever it had got to. It scrolls with the words it marks.
-            Box(Modifier.height(MARK_HEIGHT)) {
+            Box(Modifier.height(markHeight)) {
                 if (placed) {
                     Box(
                         Modifier.offset { IntOffset(travel.value.roundToPx(), 0) }
-                            .size(width = MARK_WIDTH, height = MARK_HEIGHT)
-                            .background(NxColor.lead()),
+                            .size(width = MARK_WIDTH, height = markHeight)
+                            .drawBehind {
+                                val middle = size.height / 2
+                                drawStroke(mark, Offset(0f, middle), Offset(size.width, middle), lead, MARKED)
+                            },
                     )
                 }
             }
@@ -155,7 +168,9 @@ fun NxTabRow(
 
 /** The underline: a mark under the word rather than a rule the width of it. */
 private val MARK_WIDTH = 26.dp
-private val MARK_HEIGHT = 2.dp
+
+/** The mark is always on the tab in force. */
+private val MARKED = StrokeState(selected = true)
 
 @Preview
 @Composable

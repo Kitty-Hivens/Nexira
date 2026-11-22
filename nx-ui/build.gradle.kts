@@ -58,6 +58,8 @@ kotlin {
                 api(project(":look:motion-api"))
                 // What every corner here is read from: the shape axis's answers, the same way.
                 api(project(":look:shape-api"))
+                // What every edge, mark and rule here is drawn by: the stroke axis's answers, the same way.
+                api(project(":look:stroke-api"))
             }
         }
 

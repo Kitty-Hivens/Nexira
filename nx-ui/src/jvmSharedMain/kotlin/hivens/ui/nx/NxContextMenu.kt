@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -304,7 +303,7 @@ private fun NxMenuSurface(
                 content()
             }
             footer?.let {
-                HorizontalDivider(color = NxInk.line)
+                NxRule(NxInk.line)
                 Column(Modifier.padding(MENU_INSET)) { it() }
             }
         }
@@ -430,10 +429,7 @@ fun NxMenuItem(
  */
 @Composable
 fun NxMenuDivider() {
-    HorizontalDivider(
-        color    = NxInk.line,
-        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
-    )
+    NxRule(NxInk.line, Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
 }
 
 /** A muted caption over a group of rows, for a menu that carries more than one kind of thing. */

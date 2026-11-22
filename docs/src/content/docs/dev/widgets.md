@@ -116,6 +116,7 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 | `nexira.look.colour`  | `:look:colour-api`    | `hivens.look.colour.api`  | Asking colour by role, and answering the colour axis               |
 | `nexira.look.motion`  | `:look:motion-api`    | `hivens.look.motion.api`  | Asking movement by role, and answering the motion axis             |
 | `nexira.look.shape`   | `:look:shape-api`     | `hivens.look.shape.api`   | Asking corners and outlines by role, and answering the shape axis  |
+| `nexira.look.stroke`  | `:look:stroke-api`    | `hivens.look.stroke.api`  | Asking strokes by role, and answering the stroke axis              |
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
 
@@ -324,6 +325,14 @@ A provider of motion answers with `MotionAnswers.build { ... }`. A role it leave
 The shape axis, `shape`, comes with the launcher in `:look:shape-api` (`nexira.look.shape`). A widget asks it by the kind of thing it draws, a category every interface has, never by a radius: `Shape.control` for something pressed, typed into or picked, `Shape.card` for a region in the flow, `Shape.capsule` for what is round at its ends, `Shape.indicator` for a mark saying where something is, `Shape.menu`, `Shape.tooltip`, `Shape.sheet` and `Shape.dialog` for what floats, and `Shape.thumb` for a scrollbar's grip. Each answers a Compose `Shape`, so a provider may answer cut, smoothed or any other corners. A component that keeps a corner of its own beside its category's answer keeps it as its own, and is no new role. `Shape.plate` answers the outline of a widget's own plate where the widget's node leaves it unsaid: its corner, its smoothing and how round a star's or a polygon's points are. A value set on the node is stronger.
 
 A provider of shape answers with `ShapeAnswers.build { ... }`. A role it leaves alone keeps its base answer: square, as Compose draws where nobody chose, with the capsule fully round and the thumb at Compose's own 4dp. The default pack names the `nx` family for shape.
+
+### Stroke
+
+The stroke axis, `stroke`, comes with the launcher in `:look:stroke-api` (`nexira.look.stroke`). A widget asks it by what a stroke is for, never by a width: `Stroke.edge` for the edge of something pressed, typed into or picked, `Stroke.mark` for a mark saying where something is or which is chosen, `Stroke.divider` for a rule between groups or rows, and `Stroke.placeholder` for the outline of a place that is empty or can take something. The edge of a plane, a card or a panel, is the plane's own and not asked here.
+
+Each role answers a `StrokeRole`, which draws itself. The widget hands it what to draw along, the brush to draw in and the state it is in, and the role decides everything else: its width, its ends and joins, a dash, or a stroke of its own that is doubled, glows or moves. `Modifier.stroke(role, color, shape, state)` outlines a node the way `Modifier.border` does, and `drawStroke(role, ...)` draws an outline, a line or a path in a draw block the way `drawOutline`, `drawLine` and `drawPath` do with a `Stroke` style. The colour is the colour axis's, `Line` for most strokes. The state is a `StrokeState`, the six states Compose knows and no others: hovered, focused, pressed, dragged, enabled and selected. `interactionSource.collectStrokeState(enabled, selected)` collects it from an interaction source, and a widget that passes no state is drawn at rest.
+
+A provider of stroke answers with `StrokeAnswers.build { ... }`, each role a `StrokeRole.solid(...)`, a `StrokeRole.byState { state -> ... }`, or a class of its own extending `StrokeRole`. A role it leaves alone keeps its base answer: a hairline, one device pixel with butt ends and no dash, as Compose strokes where nobody chose a width. The default pack names the `nx` family for stroke.
 
 ## Catalogue sources
 

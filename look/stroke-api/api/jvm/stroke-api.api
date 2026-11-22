@@ -1,0 +1,128 @@
+public final class hivens/look/stroke/api/Dash {
+	public static final field $stable I
+	public synthetic fun <init> (FFFILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (FFFLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOff-D9Ej5fM ()F
+	public final fun getOn-D9Ej5fM ()F
+	public final fun getPhase-D9Ej5fM ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/look/stroke/api/Stroke : hivens/look/manager/api/LookAxis {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/stroke/api/Stroke;
+	public final fun getDivider (Landroidx/compose/runtime/Composer;I)Lhivens/look/stroke/api/StrokeRole;
+	public final fun getEdge (Landroidx/compose/runtime/Composer;I)Lhivens/look/stroke/api/StrokeRole;
+	public fun getLabel ()Ljava/lang/String;
+	public final fun getMark (Landroidx/compose/runtime/Composer;I)Lhivens/look/stroke/api/StrokeRole;
+	public final fun getPlaceholder (Landroidx/compose/runtime/Composer;I)Lhivens/look/stroke/api/StrokeRole;
+}
+
+public final class hivens/look/stroke/api/StrokeAnswers {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/stroke/api/StrokeAnswers$Companion;
+	public final fun getDivider ()Lhivens/look/stroke/api/StrokeRole;
+	public final fun getEdge ()Lhivens/look/stroke/api/StrokeRole;
+	public final fun getMark ()Lhivens/look/stroke/api/StrokeRole;
+	public final fun getPlaceholder ()Lhivens/look/stroke/api/StrokeRole;
+}
+
+public final class hivens/look/stroke/api/StrokeAnswers$Builder {
+	public static final field $stable I
+	public final fun getDivider ()Lhivens/look/stroke/api/StrokeRole;
+	public final fun getEdge ()Lhivens/look/stroke/api/StrokeRole;
+	public final fun getMark ()Lhivens/look/stroke/api/StrokeRole;
+	public final fun getPlaceholder ()Lhivens/look/stroke/api/StrokeRole;
+	public final fun setDivider (Lhivens/look/stroke/api/StrokeRole;)V
+	public final fun setEdge (Lhivens/look/stroke/api/StrokeRole;)V
+	public final fun setMark (Lhivens/look/stroke/api/StrokeRole;)V
+	public final fun setPlaceholder (Lhivens/look/stroke/api/StrokeRole;)V
+}
+
+public final class hivens/look/stroke/api/StrokeAnswers$Companion {
+	public final fun build (Lkotlin/jvm/functions/Function1;)Lhivens/look/stroke/api/StrokeAnswers;
+	public final fun getBASE ()Lhivens/look/stroke/api/StrokeAnswers;
+}
+
+public final class hivens/look/stroke/api/StrokeApi {
+	public static final field $stable I
+	public static final field AXIS Ljava/lang/String;
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/look/stroke/api/StrokeApi;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public final class hivens/look/stroke/api/StrokeModule : hivens/widget/api/CompiledModule {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/stroke/api/StrokeModule;
+	public fun getApiPackages ()Ljava/util/Map;
+	public fun getBoot ()Lhivens/widget/api/BootAnswers;
+	public fun getContributionKinds ()Ljava/util/List;
+	public fun getContributions ()Ljava/util/List;
+	public fun getId ()Ljava/lang/String;
+	public fun getName ()Ljava/lang/String;
+	public fun getProvides ()Ljava/util/Map;
+	public fun getStrings ()Lhivens/widget/api/ModuleStrings;
+	public fun getWidgets ()Lhivens/widget/api/WidgetRegistry;
+}
+
+public abstract class hivens/look/stroke/api/StrokeRole {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/stroke/api/StrokeRole$Companion;
+	public fun <init> ()V
+	public fun outline (Landroidx/compose/ui/graphics/Shape;Landroidx/compose/ui/graphics/Brush;Lhivens/look/stroke/api/StrokeState;)Landroidx/compose/ui/Modifier;
+	public fun strokeLine-5iVPX68 (Landroidx/compose/ui/graphics/drawscope/DrawScope;JJLandroidx/compose/ui/graphics/Brush;Lhivens/look/stroke/api/StrokeState;)V
+	public fun strokeOutline (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/graphics/Outline;Landroidx/compose/ui/graphics/Brush;Lhivens/look/stroke/api/StrokeState;)V
+	public fun strokePath (Landroidx/compose/ui/graphics/drawscope/DrawScope;Landroidx/compose/ui/graphics/Path;Landroidx/compose/ui/graphics/Brush;Lhivens/look/stroke/api/StrokeState;)V
+	public abstract fun style (Lhivens/look/stroke/api/StrokeState;Landroidx/compose/ui/unit/Density;)Landroidx/compose/ui/graphics/drawscope/Stroke;
+	public final fun thickness (Lhivens/look/stroke/api/StrokeState;Landroidx/compose/ui/unit/Density;)I
+	public abstract fun width-u2uoSUM (Lhivens/look/stroke/api/StrokeState;)F
+	public static synthetic fun width-u2uoSUM$default (Lhivens/look/stroke/api/StrokeRole;Lhivens/look/stroke/api/StrokeState;ILjava/lang/Object;)F
+}
+
+public final class hivens/look/stroke/api/StrokeRole$Companion {
+	public final fun byState (Lkotlin/jvm/functions/Function1;)Lhivens/look/stroke/api/StrokeRole;
+	public final fun solid-imdHBbA (FIIFLhivens/look/stroke/api/Dash;Z)Lhivens/look/stroke/api/StrokeRole;
+	public static synthetic fun solid-imdHBbA$default (Lhivens/look/stroke/api/StrokeRole$Companion;FIIFLhivens/look/stroke/api/Dash;ZILjava/lang/Object;)Lhivens/look/stroke/api/StrokeRole;
+}
+
+public final class hivens/look/stroke/api/StrokeRoleKt {
+	public static final fun drawStroke (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lhivens/look/stroke/api/StrokeRole;Landroidx/compose/ui/graphics/Outline;Landroidx/compose/ui/graphics/Brush;Lhivens/look/stroke/api/StrokeState;)V
+	public static final fun drawStroke (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lhivens/look/stroke/api/StrokeRole;Landroidx/compose/ui/graphics/Path;Landroidx/compose/ui/graphics/Brush;Lhivens/look/stroke/api/StrokeState;)V
+	public static synthetic fun drawStroke$default (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lhivens/look/stroke/api/StrokeRole;Landroidx/compose/ui/graphics/Outline;Landroidx/compose/ui/graphics/Brush;Lhivens/look/stroke/api/StrokeState;ILjava/lang/Object;)V
+	public static synthetic fun drawStroke$default (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lhivens/look/stroke/api/StrokeRole;Landroidx/compose/ui/graphics/Path;Landroidx/compose/ui/graphics/Brush;Lhivens/look/stroke/api/StrokeState;ILjava/lang/Object;)V
+	public static final fun drawStroke-pGV3PM0 (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lhivens/look/stroke/api/StrokeRole;JJLandroidx/compose/ui/graphics/Brush;Lhivens/look/stroke/api/StrokeState;)V
+	public static synthetic fun drawStroke-pGV3PM0$default (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lhivens/look/stroke/api/StrokeRole;JJLandroidx/compose/ui/graphics/Brush;Lhivens/look/stroke/api/StrokeState;ILjava/lang/Object;)V
+	public static final fun stroke (Landroidx/compose/ui/Modifier;Lhivens/look/stroke/api/StrokeRole;Landroidx/compose/ui/graphics/Brush;Landroidx/compose/ui/graphics/Shape;Lhivens/look/stroke/api/StrokeState;)Landroidx/compose/ui/Modifier;
+	public static synthetic fun stroke$default (Landroidx/compose/ui/Modifier;Lhivens/look/stroke/api/StrokeRole;Landroidx/compose/ui/graphics/Brush;Landroidx/compose/ui/graphics/Shape;Lhivens/look/stroke/api/StrokeState;ILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+	public static final fun stroke-XO-JAsU (Landroidx/compose/ui/Modifier;Lhivens/look/stroke/api/StrokeRole;JLandroidx/compose/ui/graphics/Shape;Lhivens/look/stroke/api/StrokeState;)Landroidx/compose/ui/Modifier;
+	public static synthetic fun stroke-XO-JAsU$default (Landroidx/compose/ui/Modifier;Lhivens/look/stroke/api/StrokeRole;JLandroidx/compose/ui/graphics/Shape;Lhivens/look/stroke/api/StrokeState;ILjava/lang/Object;)Landroidx/compose/ui/Modifier;
+}
+
+public final class hivens/look/stroke/api/StrokeState {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/stroke/api/StrokeState$Companion;
+	public fun <init> ()V
+	public fun <init> (ZZZZZZ)V
+	public synthetic fun <init> (ZZZZZZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDragged ()Z
+	public final fun getEnabled ()Z
+	public final fun getFocused ()Z
+	public final fun getHovered ()Z
+	public final fun getPressed ()Z
+	public final fun getSelected ()Z
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/look/stroke/api/StrokeState$Companion {
+	public final fun getRest ()Lhivens/look/stroke/api/StrokeState;
+}
+
+public final class hivens/look/stroke/api/StrokeStateKt {
+	public static final fun collectStrokeState (Landroidx/compose/foundation/interaction/InteractionSource;ZZLandroidx/compose/runtime/Composer;II)Lhivens/look/stroke/api/StrokeState;
+}
+

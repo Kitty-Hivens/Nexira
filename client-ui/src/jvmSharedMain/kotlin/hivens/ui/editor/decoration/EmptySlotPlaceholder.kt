@@ -6,12 +6,13 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -19,9 +20,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -31,6 +29,7 @@ import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.nx.NxPlaceholderOutline
 import hivens.ui.theme.Motion
 import hivens.widget.model.SlotPath
 import hivens.ui.theme.NxInk
@@ -44,9 +43,9 @@ import hivens.ui.theme.NxColor
 //      and palette drops can resolve the slot via slotForPoint.
 //
 // 80dp tall by default -- enough to be obviously droppable without
-// stealing too much visual real estate. Subtle dashed primary border
-// + breathing alpha animation so the placeholder reads as "active
-// but not noisy".
+// stealing too much visual real estate. Outlined by the look's
+// placeholder stroke in the primary colour, breathing in alpha, so the
+// placeholder reads as "active but not noisy".
 @Composable
 fun EmptySlotPlaceholder(
     path: SlotPath,
@@ -79,29 +78,12 @@ fun EmptySlotPlaceholder(
             .padding(vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
-        // Dashed border via Canvas so we can use PathEffect; M3's
-        // border modifier does not support dashed strokes.
-        val borderColor = NxColor.lead().copy(alpha = breath)
-        // Every length here is dp converted at draw time. They used to be bare
-        // floats, which a DrawScope reads as device pixels: on a 2K display the
-        // border came out at half its weight with half-length dashes, and the
-        // corner ignored the style entirely.
-        val corner = 12.dp
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawRoundRect(
-                color  = borderColor,
-                style  = Stroke(
-                    width      = 1.5.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(8.dp.toPx(), 6.dp.toPx()), 0f),
-                ),
-                cornerRadius = CornerRadius(corner.toPx(), corner.toPx()),
-            )
-        }
+        NxPlaceholderOutline(NxColor.lead().copy(alpha = breath), RoundedCornerShape(12.dp), Modifier.fillMaxSize())
         Box(
             modifier         = Modifier.padding(8.dp),
             contentAlignment = Alignment.Center,
         ) {
-            androidx.compose.foundation.layout.Row(
+            Row(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Symbol(icon = NxIcon.Add,

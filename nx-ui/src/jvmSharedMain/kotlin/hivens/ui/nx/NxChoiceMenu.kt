@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -143,7 +142,7 @@ internal fun NxChoiceSurface(
                 content()
             }
             footer?.let {
-                HorizontalDivider(color = NxInk.line)
+                NxRule(NxInk.line)
                 it()
             }
         }
@@ -243,7 +242,7 @@ fun NxChoiceItem(
 /** A hairline between two groups of answers, running to the list's edges like the rows. */
 @Composable
 fun NxChoiceDivider() {
-    HorizontalDivider(color = NxInk.line)
+    NxRule(NxInk.line)
 }
 
 /**

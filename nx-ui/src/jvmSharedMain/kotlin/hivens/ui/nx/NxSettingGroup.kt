@@ -22,12 +22,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import hivens.look.stroke.api.Stroke
+import hivens.look.stroke.api.StrokeState
+import hivens.look.stroke.api.drawStroke
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
@@ -38,7 +41,7 @@ import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Status
 
 /**
- * A group of settings: its title, then its rows on one plane with a hairline
+ * A group of settings: its title, then its rows on one plane with a divider
  * between each pair.
  *
  * The title is set in the ink, not the accent. The accent marks what is selected
@@ -46,7 +49,7 @@ import hivens.ui.theme.Status
  * [danger] group is the exception that earns colour: its title says what clicking
  * in it can cost.
  *
- * The hairlines are drawn by the group from where its rows land, so a caller lists
+ * The dividers are drawn by the group from where its rows land, so a caller lists
  * rows and never places a divider, and a row that draws nothing (a setting that
  * does not apply here) leaves no doubled line behind it.
  */
@@ -136,25 +139,26 @@ fun NxSettingBlock(
 }
 
 /**
- * Lays its children out in a column and draws a hairline in the gap between each
- * pair that has a height. Where the lines go is decided by the placement and read
- * by the draw, so it is held as state the draw observes rather than worked out
- * twice.
+ * Lays its children out in a column and draws the look's divider in the gap
+ * between each pair that has a height, a gap as tall as the divider is wide.
+ * Where the lines go is decided by the placement and read by the draw, so it is
+ * held as state the draw observes rather than worked out twice.
  */
 @Composable
 private fun RuledColumn(modifier: Modifier, content: @Composable () -> Unit) {
-    val line = NxInk.line
+    val line = SolidColor(NxInk.line)
+    val divider = Stroke.divider
     var rules by remember { mutableStateOf(emptyList<Int>()) }
     Layout(
         content  = content,
         modifier = modifier.drawBehind {
-            val thickness = 1.dp.toPx()
-            rules.forEach { y -> drawRect(line, Offset(0f, y.toFloat()), Size(size.width, thickness)) }
+            val middle = divider.style(StrokeState.Rest, this).width / 2
+            rules.forEach { y -> drawStroke(divider, Offset(0f, y + middle), Offset(size.width, y + middle), line) }
         },
     ) { measurables, constraints ->
         val loose = constraints.copy(minHeight = 0)
         val placeables = measurables.map { it.measure(loose) }.filter { it.height > 0 }
-        val gap = 1.dp.roundToPx()
+        val gap = divider.width().roundToPx().coerceAtLeast(1)
         val height = placeables.sumOf { it.height } + gap * (placeables.size - 1).coerceAtLeast(0)
         layout(constraints.maxWidth, height.coerceIn(constraints.minHeight, constraints.maxHeight)) {
             var y = 0

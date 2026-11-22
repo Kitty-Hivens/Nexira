@@ -3,17 +3,17 @@ package hivens.ui.nx
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextDecoration
 import hivens.look.shape.api.Shape
+import hivens.look.stroke.api.Stroke
+import hivens.look.stroke.api.collectStrokeState
+import hivens.look.stroke.api.stroke
 import hivens.ui.layers.layerTrigger
 import hivens.ui.theme.Motion
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -53,7 +53,7 @@ internal fun NxPill(
     label: Color,
     modifier: Modifier = Modifier,
     /**
-     * The hairline around the shell.
+     * The colour of the edge around the shell.
      *
      * The same axis the other two colours are on, and for the same reason: a
      * muted fact and a green "installed" want different outlines, and nothing
@@ -73,9 +73,11 @@ internal fun NxPill(
     onClick: (() -> Unit)? = null,
 ) {
     val shape = Shape.capsule
+    val edge = Stroke.edge
     val interaction = remember { MutableInteractionSource() }
-    val hovered by interaction.collectIsHoveredAsState()
-    val pressed by interaction.collectIsPressedAsState()
+    val state = interaction.collectStrokeState()
+    val hovered = state.hovered
+    val pressed = state.pressed
     // A tag that leads somewhere says so the way a link does, with the underline
     // under the pointer, and gives a little under the press the way the catalogue's
     // own tag does. No ripple: a square wash over a pill this small is a smear.
@@ -95,7 +97,7 @@ internal fun NxPill(
             .height(pillHeight)
             .clip(shape)
             .background(container)
-            .then(if (border.alpha > 0f) Modifier.border(pillBorder, border, shape) else Modifier)
+            .then(if (border.alpha > 0f) Modifier.stroke(edge, border, shape, state) else Modifier)
             .padding(horizontal = pillPadding),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(pillGap),
@@ -120,9 +122,9 @@ internal fun NxPill(
 }
 
 /**
- * Measured off the reference's tag, not chosen: 14 normal, a hairline, eight in
- * from each end, and four between a mark and its word. The ends are the look's
- * capsule.
+ * Measured off the reference's tag, not chosen: 14 normal, eight in from each end,
+ * and four between a mark and its word. The ends are the look's capsule and the
+ * outline its edge.
  *
  * The label used to be labelSmall, 11 and medium. In a sidebar block whose title
  * is 18 and whose group labels are 16, an 11 chip read as a footnote to the
@@ -134,6 +136,5 @@ internal fun NxPill(
 private val pillHeight = 24.dp
 private val pillPadding = 8.dp
 private val pillGap = 4.dp
-private val pillBorder = 1.dp
 private val dotSize = 7.dp
 private const val PRESSED_SCALE = 0.95f
