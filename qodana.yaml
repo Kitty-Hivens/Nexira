@@ -104,4 +104,10 @@ bootstrap: >-
   
 #Qodana supports other languages, for example, Python, JavaScript, TypeScript, Go, C#, PHP
 #For all supported languages see https://www.jetbrains.com/help/qodana/linters.html
-linter: jetbrains/qodana-jvm-community:2026.2
+#
+# The Android community linter rather than the plain JVM one: most modules are
+# multiplatform with an Android target, and without the Android plugin the import
+# leaves their shared and Android source sets partly unresolved. The JVM linter's
+# sanity report listed a different hundred unresolved library references on each
+# run over the same code.
+linter: jetbrains/qodana-jvm-android:2026.2
