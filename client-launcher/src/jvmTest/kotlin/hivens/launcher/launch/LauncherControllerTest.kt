@@ -1283,16 +1283,74 @@ class LauncherControllerTest {
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
     }
 
+    /**
+     * The other half of the same guard: a 2FA session that was minted just now is
+     * not sent back for another code. Without `!mintedNow` the demand fires again on
+     * the session the code just produced -- an endless prompt loop.
+     */
     @Test
-    fun `a session minted for this launch is not sent back for another code`() {
-        // The relaunch that answers a 2FA demand carries the session the code just
-        // produced. Without telling it apart from a stored one, the same demand fires
-        // again and the user is asked for code after code -- an endless prompt loop.
-        val minted = SessionData(playerName = "tester", accessToken = "fresh", twoFactor = true, mintedNow = true)
-        val stored = minted.copy(mintedNow = false)
+    fun `a session minted for this launch is not sent back for another code`() = runTest {
+        credentialsManager.saveAccount(
+            SessionData(playerName = "tester", uuid = "u", accessToken = "stored", cachedPassword = "pw", twoFactor = true),
+            "smartycraft",
+        )
+        coEvery { authService.login("tester", "pw", "Industrial") } returns
+            SessionData(playerName = "tester", uuid = "u", accessToken = "fresh")
 
-        assertTrue(minted.twoFactor && minted.mintedNow, "the freshly unlocked session is marked")
-        assertTrue(stored.twoFactor && !stored.mintedNow, "one restored from disk is not")
+        val session = capturePackSession(
+            SessionData(
+                playerName = "tester", uuid = "u", accessToken = "unlocked",
+                twoFactor = true, mintedNow = true,
+            ),
+            packInstance = scBoundPackInstance(),
+        )
+
+        assertEquals("fresh", session?.accessToken, "no TwoFactorExpired: the launch went on to spawn")
+        coVerify(exactly = 1) { authService.login("tester", "pw", "Industrial") }
+    }
+
+    @Test
+    fun `a stored two-factor session requires a fresh code for a pack launch`() = runTest {
+        every { settingsService.getSettings() } returns SettingsData()
+        coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
+
+        credentialsManager.saveAccount(
+            SessionData(
+                playerName = "tester",
+                uuid = "u",
+                accessToken = "stored-token",
+                cachedPassword = "pw",
+                twoFactor = true,
+                mintedNow = false,
+            ),
+            "smartycraft",
+        )
+
+        val controller = newController(this)
+        controller.launchPackInstance(
+            currentSession = SessionData(
+                playerName = "tester",
+                uuid = "u",
+                accessToken = "stored-token",
+                cachedPassword = "pw",
+                twoFactor = true,
+                mintedNow = false,
+            ),
+            packInstance = scBoundPackInstance(),
+        )
+        advanceUntilIdle()
+
+        val state = controller.state.value
+        assertIs<LaunchState.Error>(state)
+        assertEquals(LaunchError.TwoFactorExpired, state.reason)
+
+        coVerify(exactly = 0) { authService.login(any(), any(), any()) }
+        coVerify(exactly = 0) {
+            launcherService.launchPackClient(
+                any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(),
+            )
+        }
     }
 
     /**
