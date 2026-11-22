@@ -32,8 +32,8 @@ class SkinViewState(
 
     private val pitchState = mutableFloatStateOf(initialPitch.coerceIn(-PITCH_LIMIT, PITCH_LIMIT))
     var pitch: Float
-        get() = pitchState.value
-        set(value) { pitchState.value = value.coerceIn(-PITCH_LIMIT, PITCH_LIMIT) }
+        get() = pitchState.floatValue
+        set(value) { pitchState.floatValue = value.coerceIn(-PITCH_LIMIT, PITCH_LIMIT) }
 
     /** Pose clock, ms. The view's frame loop writes it (scaled by the motion
      *  multiplier); the draw reads it, so a pose change invalidates exactly

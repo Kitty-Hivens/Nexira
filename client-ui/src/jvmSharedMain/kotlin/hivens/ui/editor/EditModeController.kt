@@ -1,6 +1,7 @@
 package hivens.ui.editor
 
 import androidx.compose.runtime.State
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.screens.custom.ScreenIcons
@@ -174,11 +175,11 @@ class EditModeController(
     // the side rails steal), while the edit boolean is per-surface-host
     // remember-state. The tick bridges the two. Read-only outward: only
     // requestEditToggle mutates it.
-    private val _editToggleSignal = mutableStateOf(0)
+    private val _editToggleSignal = mutableIntStateOf(0)
     val editToggleSignal: State<Int> = _editToggleSignal
 
     fun requestEditToggle() {
-        _editToggleSignal.value++
+        _editToggleSignal.intValue++
     }
 
     // Whether a host is currently in edit mode, which is the edit session. Reported by
@@ -212,11 +213,11 @@ class EditModeController(
 
     // Ctrl+N (window-level) bumps this; ShellRightRegion observes it and flips
     // its own collapsed prop. Same focus-independent bridge as the edit toggle.
-    private val _rightRailToggleSignal = mutableStateOf(0)
+    private val _rightRailToggleSignal = mutableIntStateOf(0)
     val rightRailToggleSignal: State<Int> = _rightRailToggleSignal
 
     fun requestRightRailToggle() {
-        _rightRailToggleSignal.value++
+        _rightRailToggleSignal.intValue++
     }
 
     // `slots` comes from the widget's descriptor and pre-seeds the

@@ -32,6 +32,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
@@ -142,7 +143,7 @@ fun NxTabRow(
             Box(Modifier.height(MARK_HEIGHT)) {
                 if (placed) {
                     Box(
-                        Modifier.offset(x = travel.value)
+                        Modifier.offset { IntOffset(travel.value.roundToPx(), 0) }
                             .size(width = MARK_WIDTH, height = MARK_HEIGHT)
                             .background(NxColor.lead()),
                     )

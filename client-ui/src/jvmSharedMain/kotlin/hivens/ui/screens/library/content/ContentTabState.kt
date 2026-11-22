@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -820,7 +821,7 @@ internal class ContentTabState(
      * is not open. The count is the question -- "update 52 projects?" -- so it is
      * what gets held rather than a bare boolean.
      */
-    var pendingUpdateAll by mutableStateOf(0)
+    var pendingUpdateAll by mutableIntStateOf(0)
         private set
 
     fun requestUpdateAll() {

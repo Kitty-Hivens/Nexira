@@ -1,6 +1,8 @@
 package hivens.widget.api
 
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
@@ -200,9 +202,9 @@ class WidgetScope private constructor(
 
     // How often what factories made for an id was dropped, as snapshot state, so a
     // composable that read the key reads it again once it was.
-    private val revisions = ConcurrentHashMap<String, MutableState<Int>>()
+    private val revisions = ConcurrentHashMap<String, MutableIntState>()
 
-    private fun revisionOf(id: String): MutableState<Int> = revisions.computeIfAbsent(id) { mutableStateOf(0) }
+    private fun revisionOf(id: String): MutableIntState = revisions.computeIfAbsent(id) { mutableIntStateOf(0) }
 
     // The keys this thread is making a source for right now, to catch a factory
     // that reads its own key before it recurses into a stack overflow.
@@ -288,7 +290,7 @@ class WidgetScope private constructor(
         (slotOf(key.id).value as WidgetDataSource<T>?)?.let { return it }
         if (level == ScopeLevel.App) registry.find(key)?.let { return it }
         // Read before the factory is looked up, so a reader that finds none reads again once one is registered.
-        val _ = revisionOf(key.id).value
+        val _ = revisionOf(key.id).intValue
         val factory = registry.factoryFor(key) ?: return null
         synchronized(lock) {
             if (closed) return null
@@ -386,7 +388,7 @@ class WidgetScope private constructor(
         if (closed) return null
         (commandSlotOf(key.id).value as WidgetCommand<P>?)?.let { return it }
         if (level == ScopeLevel.App) commands.find(key)?.let { return it }
-        val _ = revisionOf(COMMAND_MARK + key.id).value
+        val _ = revisionOf(COMMAND_MARK + key.id).intValue
         val factory = commands.factoryFor(key) ?: return null
         val marked = COMMAND_MARK + key.id
         synchronized(lock) {
@@ -452,8 +454,8 @@ class WidgetScope private constructor(
         }
         dropped.forEach { if (it is AutoCloseable) it.closeLogged("a source of a module that changed") }
         ids.forEach { id ->
-            revisionOf(id).value += 1
-            revisionOf(COMMAND_MARK + id).value += 1
+            revisionOf(id).intValue += 1
+            revisionOf(COMMAND_MARK + id).intValue += 1
         }
         kids.forEach { it.forgetMade(ids) }
     }
@@ -469,8 +471,8 @@ class WidgetScope private constructor(
      * state, so a composable that asked whether [id] is answered asks again after [forgetMade].
      */
     internal fun watch(id: String) {
-        val _ = revisionOf(id).value
-        val _ = revisionOf(COMMAND_MARK + id).value
+        val _ = revisionOf(id).intValue
+        val _ = revisionOf(COMMAND_MARK + id).intValue
     }
 
     /** Where [id] lives and what answers it, as the registries of this tree have it. Sources first. */

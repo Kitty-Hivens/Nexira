@@ -72,8 +72,8 @@ class Scene3DState(val root: Node = Node()) {
 
     private val pitchState = mutableFloatStateOf(0f)
     var cameraPitch: Float
-        get() = pitchState.value
-        set(value) { pitchState.value = value.coerceIn(-PITCH_LIMIT, PITCH_LIMIT) }
+        get() = pitchState.floatValue
+        set(value) { pitchState.floatValue = value.coerceIn(-PITCH_LIMIT, PITCH_LIMIT) }
 
     internal var revision: Int by mutableIntStateOf(0)
 

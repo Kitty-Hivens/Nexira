@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.catalogue.api.BROWSE_KINDS
 import hivens.catalogue.api.BrowseSort
@@ -527,9 +528,9 @@ internal fun KindTile(
         verticalArrangement = Arrangement.spacedBy(5.dp, Alignment.CenterVertically),
     ) {
         if (sourceIcon != null) {
-            SourceMark(sourceIcon, tint = ink, size = 22.dp, fill = solid, modifier = Modifier.offset(y = (-2).dp * lift))
+            SourceMark(sourceIcon, tint = ink, size = 22.dp, fill = solid, modifier = Modifier.offset { IntOffset(0, ((-2).dp * lift).roundToPx()) })
         } else {
-            Symbol(icon, contentDescription = null, tint = ink, fill = solid, size = 22.dp, modifier = Modifier.offset(y = (-2).dp * lift))
+            Symbol(icon, contentDescription = null, tint = ink, fill = solid, size = 22.dp, modifier = Modifier.offset { IntOffset(0, ((-2).dp * lift).roundToPx()) })
         }
         Text(
             label,
@@ -559,7 +560,7 @@ private fun SourceSwitch(sources: List<SourceView>, selected: String, onSelect: 
         val index = sources.indexOfFirst { it.id == selected }.coerceAtLeast(0)
         val at by animateDpAsState(cell * index, animationSpec = Motion.track.of(), label = "sourceThumb")
         Box(
-            Modifier.offset(x = at).width(cell).fillMaxSize()
+            Modifier.offset { IntOffset(at.roundToPx(), 0) }.width(cell).fillMaxSize()
                 .clip(MaterialTheme.shapes.small)
                 .background(NxColor.wash(NxColor.lead(), 0.22f)),
         )

@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -226,7 +227,7 @@ private fun <T> SelectList(
     // Keyed on the list: a footer that changes what the list holds (snapshots shown
     // or hidden) does so under an open popup, and an index kept from the old list
     // pointed past the end of the new one or at somebody else's row.
-    var active by remember(options) { mutableStateOf(selectedIndex.coerceAtLeast(0)) }
+    var active by remember(options) { mutableIntStateOf(selectedIndex.coerceAtLeast(0)) }
 
     LaunchedEffect(options) {
         if (selectedIndex >= 0) listState.scrollToItem(selectedIndex)

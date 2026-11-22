@@ -33,6 +33,7 @@ import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.PointerInputModifierNode
 import androidx.compose.ui.platform.AccessibilityManager
 import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.InterceptPlatformTextInput
 import androidx.compose.ui.platform.LocalAccessibilityManager
 import androidx.compose.ui.platform.LocalClipboard
@@ -333,6 +334,9 @@ internal fun BoxScope.OutsidePress(onPress: () -> Unit) {
 private data object InputGateElement : ModifierNodeElement<InputGateNode>() {
     override fun create() = InputGateNode()
     override fun update(node: InputGateNode) = Unit
+    override fun InspectorInfo.inspectableProperties() {
+        name = "inputGate"
+    }
 }
 
 private class InputGateNode : Modifier.Node(), PointerInputModifierNode {
@@ -344,6 +348,9 @@ private class OutsidePressElement(val onPress: () -> Unit) : ModifierNodeElement
     override fun create() = OutsidePressNode(onPress)
     override fun update(node: OutsidePressNode) {
         node.onPress = onPress
+    }
+    override fun InspectorInfo.inspectableProperties() {
+        name = "outsidePress"
     }
     override fun equals(other: Any?) = other is OutsidePressElement && other.onPress === onPress
     override fun hashCode() = System.identityHashCode(onPress)

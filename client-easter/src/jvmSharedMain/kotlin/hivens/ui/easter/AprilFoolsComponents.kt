@@ -7,6 +7,7 @@ import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -272,8 +273,8 @@ fun AprilFoolsCloseDialog(
     val escapes   = ChaosState.closeButtonEscapes
     val surrendered = escapes >= surrenderAfter
 
-    var closeOffX by remember { mutableStateOf(0f) }
-    var closeOffY by remember { mutableStateOf(0f) }
+    var closeOffX by remember { mutableFloatStateOf(0f) }
+    var closeOffY by remember { mutableFloatStateOf(0f) }
     val animCloseX by animateFloatAsState(closeOffX, spring(stiffness = 520f, dampingRatio = 0.6f), label = "cdx")
     val animCloseY by animateFloatAsState(closeOffY, spring(stiffness = 520f, dampingRatio = 0.6f), label = "cdy")
 

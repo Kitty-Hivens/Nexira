@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
@@ -12,7 +13,10 @@
     <application
         android:name=".NexiraApp"
         android:label="Nexira"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher"
         android:allowBackup="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
         android:allowNativeHeapPointerTagging="false">
 
 
@@ -28,7 +32,7 @@
             </intent-filter>
         </activity>
 
-        <!-- The game's window: one surface, the game draws into it from its own process. One screen in a task of its own, so the notification comes back to it instead of opening a second. -->
+        <!-- The game's window: one surface, the game draws into it from its own process. One screen in a task of its own, so the notification comes back to it instead of opening a second. Landscape on purpose: where Android 16 ignores the lock on a large screen, the game runs in the window it is given. -->
         <activity
             android:name=".host.GameActivity"
             android:exported="false"
@@ -37,6 +41,7 @@
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|keyboard|navigation|uiMode|density|locale|layoutDirection"
             android:screenOrientation="sensorLandscape"
+            tools:ignore="DiscouragedApi"
             android:windowSoftInputMode="adjustNothing|stateHidden" />
 
         <!-- The game's JVM lives here, in a process of its own: it is one per process and cannot be made again. -->
@@ -50,9 +55,11 @@
                 android:value="Keeps a running game alive while its screen is not in front" />
         </service>
 
+        <!-- Exported for the system's media controllers, which bind through the MediaSessionService action. Media3 decides per controller what it may do. -->
         <service
             android:name=".PlaybackService"
             android:exported="true"
+            tools:ignore="ExportedService"
             android:foregroundServiceType="mediaPlayback">
             <intent-filter>
                 <action android:name="androidx.media3.session.MediaSessionService" />

@@ -6,6 +6,7 @@ import androidx.compose.ui.focus.FocusState
 import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.platform.InspectorInfo
 
 /**
  * Marks a text field that holds the keyboard for as long as it is on screen: a
@@ -24,6 +25,9 @@ fun Modifier.persistentInput(): Modifier = this then PersistentInputElement
 private data object PersistentInputElement : ModifierNodeElement<PersistentInputNode>() {
     override fun create() = PersistentInputNode()
     override fun update(node: PersistentInputNode) = Unit
+    override fun InspectorInfo.inspectableProperties() {
+        name = "persistentInput"
+    }
 }
 
 /**

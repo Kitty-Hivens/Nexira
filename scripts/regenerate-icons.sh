@@ -15,6 +15,7 @@
 #   resources/icons/icon.icns                                        (macOS Compose iconFile, via png2icns)
 #   resources/icons/256x256.png                                      (AppImage)
 #   resources/icons/512x512.png                                      (AppImage)
+#   android-app/src/main/res/drawable-nodpi/ic_launcher_foreground.png (Android adaptive icon)
 #
 # Note: icon.ico is intentionally NOT under composeResources/drawable/.
 # Compose Resources groups by stem, so colocating icon.ico with icon.png
@@ -91,6 +92,19 @@ else
     echo "      existing $HICOLOR/icon.icns kept; Compose macOS build will use it as-is"
 fi
 
+# ── Android launcher icon ───────────────────────────────────────────────────
+echo "── app-icon.png  →  Android adaptive icon foreground ──────────────────"
+
+# The foreground layer of the adaptive icon in android-app (mipmap-anydpi/ic_launcher.xml),
+# also its monochrome layer: a themed icon is drawn from the alpha alone, and the feather
+# is lines on nothing. The layer is 108 dp, of which a launcher's mask may show only the
+# middle 66 dp, so the feather is fitted well inside that: 252 of 432 px at xxxhdpi.
+ANDROID_RES="$ROOT/android-app/src/main/res"
+mkdir -p "$ANDROID_RES/drawable-nodpi"
+"${IM[@]}" "$APP_SRC" -resize 252x252 -background none -gravity center -extent 432x432 -strip \
+    -define png:color-type=6 -define png:compression-level=9 \
+    "$ANDROID_RES/drawable-nodpi/ic_launcher_foreground.png"
+
 # ── Tray icon ───────────────────────────────────────────────────────────────
 echo "── tray-icon.png  →  favicon.png ──────────────────────────────────────"
 
@@ -108,4 +122,5 @@ ls -la \
     "$HICOLOR/icon.ico" \
     "$HICOLOR/icon.icns" \
     "$HICOLOR/256x256.png" \
-    "$HICOLOR/512x512.png"
+    "$HICOLOR/512x512.png" \
+    "$ANDROID_RES/drawable-nodpi/ic_launcher_foreground.png"

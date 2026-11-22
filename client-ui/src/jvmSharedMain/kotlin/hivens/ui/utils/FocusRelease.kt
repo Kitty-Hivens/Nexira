@@ -14,6 +14,7 @@ import androidx.compose.ui.node.DelegatingNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.PointerInputModifierNode
 import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.unit.IntSize
 
@@ -43,6 +44,9 @@ fun Modifier.releaseFocusOnPress(): Modifier = this then ReleaseFocusElement
 private data object ReleaseFocusElement : ModifierNodeElement<ReleaseFocusNode>() {
     override fun create() = ReleaseFocusNode()
     override fun update(node: ReleaseFocusNode) = Unit
+    override fun InspectorInfo.inspectableProperties() {
+        name = "releaseFocusOnPress"
+    }
 }
 
 /**
@@ -82,6 +86,9 @@ private data class HoldFocusElement(val restore: () -> Unit) : ModifierNodeEleme
     override fun create() = HoldFocusNode(restore)
     override fun update(node: HoldFocusNode) {
         node.restore = restore
+    }
+    override fun InspectorInfo.inspectableProperties() {
+        name = "holdFocusOnPress"
     }
 }
 

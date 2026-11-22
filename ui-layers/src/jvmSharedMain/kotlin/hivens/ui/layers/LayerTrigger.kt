@@ -8,6 +8,7 @@ import androidx.compose.ui.focus.requestFocus
 import androidx.compose.ui.node.CompositionLocalConsumerModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.currentValueOf
+import androidx.compose.ui.platform.InspectorInfo
 
 /**
  * Marks a control a layer can be opened from with the keyboard: a button, a menu's
@@ -31,6 +32,9 @@ fun Modifier.layerTrigger(): Modifier = this then LayerTriggerElement
 private data object LayerTriggerElement : ModifierNodeElement<LayerTriggerNode>() {
     override fun create() = LayerTriggerNode()
     override fun update(node: LayerTriggerNode) = Unit
+    override fun InspectorInfo.inspectableProperties() {
+        name = "layerTrigger"
+    }
 }
 
 /**

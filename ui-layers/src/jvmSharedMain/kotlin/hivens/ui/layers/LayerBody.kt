@@ -6,6 +6,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.PointerInputModifierNode
+import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.IntSize
 
 /**
@@ -22,6 +23,9 @@ fun Modifier.layerBody(): Modifier = this then LayerBodyElement
 private data object LayerBodyElement : ModifierNodeElement<LayerBodyNode>() {
     override fun create() = LayerBodyNode()
     override fun update(node: LayerBodyNode) = Unit
+    override fun InspectorInfo.inspectableProperties() {
+        name = "layerBody"
+    }
 }
 
 /**

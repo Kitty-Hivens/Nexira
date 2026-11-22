@@ -2,6 +2,8 @@ package hivens.ui.easter
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.IntSize
@@ -31,7 +33,7 @@ object AprilFools {
     /** Multiplier on every chaos animation duration. 1.0 = base motion,
      *  0.0 = instant snap. Nothing varies it since the style axis went; AppShell
      *  sets it, and this is the seam a reduce-motion preference would arrive by. */
-    var styleAnimationMultiplier: Float by mutableStateOf(1f)
+    var styleAnimationMultiplier: Float by mutableFloatStateOf(1f)
 
     /** When true, chaos surfaces render without tonal / button elevation. Set by
      *  AppShell; the token it used to mirror is gone, so it is constant today. */
@@ -171,7 +173,7 @@ class FloatingButton(
 
     // ── Legs state ────────────────────────────────────────────────────────────
     var hasLegs  by mutableStateOf(false)
-    var legCycle by mutableStateOf(0f)   // 0..1 walking cycle
+    var legCycle by mutableFloatStateOf(0f)   // 0..1 walking cycle
 
     // Every phase but IDLE draws in the overlay. FLEEING was left out on the strength
     // of a design where it stayed in the layout, while the engine hides the original
@@ -208,12 +210,12 @@ object ChaosState {
     var shakeOffset by mutableStateOf(Offset.Zero)
 
     /** Global tilt angle in degrees -- drifts slowly */
-    var globalTiltDeg by mutableStateOf(0f)
+    var globalTiltDeg by mutableFloatStateOf(0f)
 
     // ── Close dialog ──────────────────────────────────────────────────────────
 
     var showCloseDialog   by mutableStateOf(false)
-    var closeButtonEscapes by mutableStateOf(0)
+    var closeButtonEscapes by mutableIntStateOf(0)
 
     // ── Registration ──────────────────────────────────────────────────────────
 

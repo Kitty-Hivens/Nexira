@@ -8,6 +8,7 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.config.Branding
@@ -75,7 +76,7 @@ internal fun DiagnosticsSection(
     // active impl actually renders a panel: a build that resolves the NoOp has an
     // empty DebugPanel(), and a 5-tap there would toggle a hidden state that renders
     // to nothing.
-    var debugTapCount  by remember { mutableStateOf(0) }
+    var debugTapCount  by remember { mutableIntStateOf(0) }
     var showAprilDebug by remember { mutableStateOf(false) }
     val debugPanelBringIntoView = remember { BringIntoViewRequester() }
     val titleModifier = if (af.providesDebugPanel) {

@@ -60,6 +60,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.unit.toSize
 import androidx.compose.ui.layout.IntrinsicMeasurable
 import androidx.compose.ui.layout.IntrinsicMeasureScope
@@ -980,6 +981,14 @@ private data class OuterPaddingElement(val start: Dp, val top: Dp, val end: Dp, 
         node.top = top
         node.end = end
         node.bottom = bottom
+    }
+
+    override fun InspectorInfo.inspectableProperties() {
+        name = "outerPadding"
+        properties["start"] = start
+        properties["top"] = top
+        properties["end"] = end
+        properties["bottom"] = bottom
     }
 }
 

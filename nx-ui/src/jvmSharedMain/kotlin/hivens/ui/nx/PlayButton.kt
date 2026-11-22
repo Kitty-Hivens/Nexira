@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.icons.IconKey
@@ -259,7 +260,7 @@ private fun Plate(
                 // Transport glyphs are solid, the way every player and launcher draws
                 // them; the rest keep the outline the icon set reads in.
                 fill               = if (icon == NxIcon.PlayArrow || icon == NxIcon.Stop) 1f else 0f,
-                modifier           = Modifier.offset(x = glyphNudge),
+                modifier           = Modifier.offset { IntOffset(glyphNudge.roundToPx(), 0) },
             )
         }
         if (words) {

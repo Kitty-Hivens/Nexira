@@ -18,6 +18,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -189,11 +191,11 @@ private fun FacetRow(label: String, on: Boolean, onToggle: (Boolean) -> Unit) {
 
 @Composable
 private fun PerfHud(modifier: Modifier) {
-    var fps by remember { mutableStateOf(0) }
-    var frameMs10 by remember { mutableStateOf(0) } // tenths of a ms
-    var heapUsed by remember { mutableStateOf(0L) }
-    var heapMax by remember { mutableStateOf(0L) }
-    var rss by remember { mutableStateOf(-1L) }
+    var fps by remember { mutableIntStateOf(0) }
+    var frameMs10 by remember { mutableIntStateOf(0) } // tenths of a ms
+    var heapUsed by remember { mutableLongStateOf(0L) }
+    var heapMax by remember { mutableLongStateOf(0L) }
+    var rss by remember { mutableLongStateOf(-1L) }
     // The resolved backend. The property this used to read is a request the
     // launcher never makes, so the HUD reported "?" even on a shell that had
     // fallen back to software -- the one reading a perf HUD exists to catch.

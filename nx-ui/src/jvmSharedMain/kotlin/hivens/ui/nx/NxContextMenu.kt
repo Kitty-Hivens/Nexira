@@ -27,9 +27,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableIntState
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -152,11 +154,11 @@ fun NxContextMenu(
     val density = LocalDensity.current
     val gapPx = with(density) { MENU_GAP.roundToPx() }
     val origin = remember { mutableStateOf(TransformOrigin(1f, 0f)) }
-    val anchorWidth = remember { mutableStateOf(0) }
+    val anchorWidth = remember { mutableIntStateOf(0) }
     val provider = remember(gapPx, align, origin, matchAnchorWidth) {
         MenuBelowAnchor(align, gapPx, origin, anchorWidth.takeIf { matchAnchorWidth })
     }
-    val floor = if (matchAnchorWidth) with(density) { anchorWidth.value.toDp() } else 0.dp
+    val floor = if (matchAnchorWidth) with(density) { anchorWidth.intValue.toDp() } else 0.dp
     NxMenuPopup(provider, origin, expanded, onDismissRequest, onShownChange, returnFocus) {
         NxMenuSurface(modifier, maxOf(minWidth, floor), maxOf(maxWidth, floor), maxHeight, footer, content)
     }
@@ -461,7 +463,7 @@ internal class MenuBelowAnchor(
     private val gapPx: Int,
     private val origin: MutableState<TransformOrigin>,
     /** Non-null when the caller wants the trigger's width reported back to it. */
-    private val anchorWidth: MutableState<Int>? = null,
+    private val anchorWidth: MutableIntState? = null,
 ) : PopupPositionProvider {
     override fun calculatePosition(
         anchorBounds: IntRect,
@@ -469,7 +471,7 @@ internal class MenuBelowAnchor(
         layoutDirection: LayoutDirection,
         popupContentSize: IntSize,
     ): IntOffset {
-        anchorWidth?.let { if (it.value != anchorBounds.width) it.value = anchorBounds.width }
+        anchorWidth?.let { if (it.intValue != anchorBounds.width) it.intValue = anchorBounds.width }
         val rtl = layoutDirection == LayoutDirection.Rtl
         val leading = if (rtl) anchorBounds.right - popupContentSize.width else anchorBounds.left
         val trailing = if (rtl) anchorBounds.left else anchorBounds.right - popupContentSize.width

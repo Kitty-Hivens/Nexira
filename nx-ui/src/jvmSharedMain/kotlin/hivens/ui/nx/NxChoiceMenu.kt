@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -98,9 +99,9 @@ fun NxChoiceMenu(
     val density = LocalDensity.current
     val gapPx = with(density) { CHOICE_GAP.roundToPx() }
     val origin = remember { mutableStateOf(TransformOrigin(0f, 0f)) }
-    val anchorWidth = remember { mutableStateOf(0) }
+    val anchorWidth = remember { mutableIntStateOf(0) }
     val provider = remember(gapPx, align, origin) { MenuBelowAnchor(align, gapPx, origin, anchorWidth) }
-    val floor = with(density) { anchorWidth.value.toDp() }
+    val floor = with(density) { anchorWidth.intValue.toDp() }
     NxMenuPopup(provider, origin, expanded, onDismissRequest, onShownChange, returnFocus, yieldsToField) {
         NxChoiceSurface(modifier, maxOf(minWidth, floor), maxOf(maxWidth, floor), maxHeight, footer, content)
     }

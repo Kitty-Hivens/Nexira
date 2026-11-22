@@ -31,6 +31,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -325,7 +326,7 @@ private fun GalleryLightbox(
         // Live horizontal drag offset of the photo. Drag pages it; pulling past the
         // first / last shot meets resistance and springs back like jelly (rubber-band).
         val offsetX = remember(images) { Animatable(0f) }
-        var boxW by remember(images) { mutableStateOf(1f) }
+        var boxW by remember(images) { mutableFloatStateOf(1f) }
         val jelly = spring<Float>(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow)
         val gallerySlide = Motion.panelSlide.of<Float>()
 

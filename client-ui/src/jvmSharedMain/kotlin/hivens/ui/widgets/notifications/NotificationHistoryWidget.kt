@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -136,7 +137,7 @@ fun NotificationHistoryWidget(instance: WidgetInstance) {
     // panel -- once there is nothing to show, the expanded drawer is just an empty
     // box, so it folds shut on its own.
     val clearOffset = remember { Animatable(0f) }
-    var panelWidthPx by remember { mutableStateOf(1f) }
+    var panelWidthPx by remember { mutableFloatStateOf(1f) }
     val animatedClear: () -> Unit = {
         scope.launch {
             clearOffset.animateTo(panelWidthPx)
@@ -357,7 +358,7 @@ private fun SwipeableHistoryRow(
 ) {
     val scope = rememberCoroutineScope()
     val offsetX = remember { Animatable(0f) }
-    var widthPx by remember { mutableStateOf(1f) }
+    var widthPx by remember { mutableFloatStateOf(1f) }
     val dismiss by rememberUpdatedState(onDismiss)
     Box(
         modifier = Modifier

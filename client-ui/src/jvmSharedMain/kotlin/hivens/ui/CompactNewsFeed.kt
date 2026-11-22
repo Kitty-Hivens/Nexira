@@ -11,6 +11,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.mutableIntStateOf
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.*
@@ -104,7 +105,7 @@ private fun CompactNewsFeedOf(
     // The page to ask for next, and whether the archive has one. The feed is
     // walked a page at a time: the rail opens on one page and the rest arrive as
     // the reader reaches the end of what is loaded.
-    var nextPage by remember { mutableStateOf(2) }
+    var nextPage by remember { mutableIntStateOf(2) }
     var exhausted by remember { mutableStateOf(false) }
     // The feed fell back to the dashboard's three. It looks complete -- one page,
     // nothing after it -- so without this the rail would settle for the floor
@@ -114,7 +115,7 @@ private fun CompactNewsFeedOf(
     // re-runs on (a) initial composition, (b) an SSL bypass grant for the
     // host, (c) an explicit retry click, so a first-call failure doesn't
     // strand the strip at "no news" forever.
-    var retryTick by remember { mutableStateOf(0) }
+    var retryTick by remember { mutableIntStateOf(0) }
 
     // Both loaders latch a flag before suspending, so both release it in a
     // finally: a cancelled load that left `loadingMore` set would end paging for

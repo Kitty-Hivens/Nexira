@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -74,7 +75,7 @@ internal fun PackRuntimeSection(
 
     // Auto-heap resolution mirrors the old settings tab: the adaptive profile when
     // enabled and present, else the physical-memory heuristic.
-    var resolvedAutoMb by remember { mutableStateOf(AutomaticHeap.compute(SystemMemory.heapBudgetMb())) }
+    var resolvedAutoMb by remember { mutableIntStateOf(AutomaticHeap.compute(SystemMemory.heapBudgetMb())) }
     LaunchedEffect(instanceDir) {
         val adaptiveOn = settingsService.getSettings().adaptiveMemoryEnabled
         val derivedMb = if (adaptiveOn) withContext(Dispatchers.IO) { profilerStore.readProfile(instanceDir)?.derivedHeapMb } else null

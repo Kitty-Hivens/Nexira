@@ -198,7 +198,7 @@ internal fun LogCanvas(
     // Continuous edge auto-scroll: while a drag-select parks the pointer at the top
     // or bottom edge, keep scrolling and extending the selection to the pointer even
     // though no new pointer events fire.
-    var autoScroll by remember { mutableStateOf(0) } // -1 up, 0 off, +1 down
+    var autoScroll by remember { mutableIntStateOf(0) } // -1 up, 0 off, +1 down
     var dragPos by remember { mutableStateOf(Offset.Zero) }
     LaunchedEffect(autoScroll) {
         if (autoScroll == 0) return@LaunchedEffect

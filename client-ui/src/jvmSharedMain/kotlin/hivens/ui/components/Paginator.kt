@@ -14,7 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -49,7 +49,7 @@ fun <T> PagedContent(
     val pageCount = (items.size + pageSize - 1) / pageSize
     // Reset to the first page when the data set or page size changes -- a stale
     // index could otherwise point past the new last page.
-    var page by remember(items.size, pageSize) { mutableStateOf(0) }
+    var page by remember(items.size, pageSize) { mutableIntStateOf(0) }
     val clamped = page.coerceIn(0, pageCount - 1)
     val start = clamped * pageSize
     val pageItems = items.subList(start, minOf(start + pageSize, items.size))

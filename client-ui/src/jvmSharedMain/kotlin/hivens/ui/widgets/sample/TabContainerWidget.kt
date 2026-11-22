@@ -13,7 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -69,7 +69,7 @@ fun TabContainerWidget(instance: WidgetInstance) {
     val count = p.tabCount.coerceIn(1, labels.size)
 
     // Keyed on instanceId so two tab containers keep independent selection.
-    var active by remember(instance.instanceId) { mutableStateOf(0) }
+    var active by remember(instance.instanceId) { mutableIntStateOf(0) }
     val activeIdx = active.coerceIn(0, count - 1)
 
     Column(Modifier.fillMaxWidth()) {

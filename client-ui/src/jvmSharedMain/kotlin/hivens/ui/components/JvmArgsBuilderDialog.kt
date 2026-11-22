@@ -1,4 +1,5 @@
 package hivens.ui.components
+import androidx.compose.runtime.mutableIntStateOf
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxDialog
@@ -55,7 +56,7 @@ fun JvmArgsBuilderDialog(
     val s = nexiraStrings()
     var config by remember { mutableStateOf(initial) }
     var selectedPresetId by remember { mutableStateOf<String?>(null) }
-    var selectedTabIdx by remember { mutableStateOf(0) }
+    var selectedTabIdx by remember { mutableIntStateOf(0) }
 
     val tabs = remember(s) {
         listOf(
