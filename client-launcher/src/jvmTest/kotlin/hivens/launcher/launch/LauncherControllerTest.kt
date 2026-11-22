@@ -1286,7 +1286,7 @@ class LauncherControllerTest {
     /**
      * The other half of the same guard: a 2FA session that was minted just now is
      * not sent back for another code. Without `!mintedNow` the demand fires again on
-     * the session the code just produced -- an endless prompt loop.
+     * the session the code just produced, and the player is asked for code after code.
      */
     @Test
     fun `a session minted for this launch is not sent back for another code`() = runTest {
@@ -1309,35 +1309,25 @@ class LauncherControllerTest {
         coVerify(exactly = 1) { authService.login("tester", "pw", "Industrial") }
     }
 
+    /**
+     * The first half of the guard: a 2FA session restored from the store is not
+     * carried into a pack launch. The launch stops for a fresh code before it signs in
+     * or spawns, since any login made since may have spent the stored token. The
+     * account is saved with its password, so without the guard the launch would get
+     * as far as signing in, and the test would see it.
+     */
     @Test
     fun `a stored two-factor session requires a fresh code for a pack launch`() = runTest {
         every { settingsService.getSettings() } returns SettingsData()
         coEvery { javaManagerService.getJavaPath(any()) } returns Path.of("/opt/jdk8/bin/java")
-
-        credentialsManager.saveAccount(
-            SessionData(
-                playerName = "tester",
-                uuid = "u",
-                accessToken = "stored-token",
-                cachedPassword = "pw",
-                twoFactor = true,
-                mintedNow = false,
-            ),
-            "smartycraft",
+        val stored = SessionData(
+            playerName = "tester", uuid = "u", accessToken = "stored-token", cachedPassword = "pw",
+            twoFactor = true, mintedNow = false,
         )
+        credentialsManager.saveAccount(stored, "smartycraft")
 
         val controller = newController(this)
-        controller.launchPackInstance(
-            currentSession = SessionData(
-                playerName = "tester",
-                uuid = "u",
-                accessToken = "stored-token",
-                cachedPassword = "pw",
-                twoFactor = true,
-                mintedNow = false,
-            ),
-            packInstance = scBoundPackInstance(),
-        )
+        controller.launchPackInstance(currentSession = stored, packInstance = scBoundPackInstance())
         advanceUntilIdle()
 
         val state = controller.state.value
@@ -1347,8 +1337,10 @@ class LauncherControllerTest {
         coVerify(exactly = 0) { authService.login(any(), any(), any()) }
         coVerify(exactly = 0) {
             launcherService.launchPackClient(
-                any(), any(), any(), any(), any(), any(), any(),
-                any(), any(), any(), any(), any(), any(),
+                sessionData = any(), manifest = any(), runtime = any(), clientRootPath = any(),
+                javaPathOverride = any(), adaptiveEnabled = any(),
+                redirectAuthHost = any(), useNetworkAgent = any(),
+                useSmartycraftAuthLib = any(), boundLaunch = any(), seal = any(), displayName = any(), onLog = any(),
             )
         }
     }
