@@ -105,10 +105,11 @@ bootstrap: >-
 #Qodana supports other languages, for example, Python, JavaScript, TypeScript, Go, C#, PHP
 #For all supported languages see https://www.jetbrains.com/help/qodana/linters.html
 #
-# The Android community linter rather than the plain JVM one: most modules are
-# multiplatform with an Android target, and without the Android plugin the import
-# leaves their shared and Android source sets partly unresolved. The JVM linter's
-# sanity report listed a different hundred unresolved library references on each
-# run over the same code. 2026.3, because 2026.2's Android plugin refuses the
-# project's AGP 9.5 at import.
-linter: jetbrains/qodana-jvm-android:2026.3
+# The JVM linter, not the Android one. Most modules are multiplatform with an Android
+# target, and the JVM linter's import leaves their shared and Android source sets partly
+# unresolved: its sanity report lists about a hundred unresolved library references, a
+# different set on each run over the same code. The Android linter would import them,
+# but its Android plugin refuses the project's AGP at import: 2026.2 supports AGP up to
+# 9.1.0, 2026.3 up to 9.4.0, and the project is on 9.5.0. Move to it once a release
+# supports the AGP in use.
+linter: jetbrains/qodana-jvm-community:2026.2
