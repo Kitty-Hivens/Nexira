@@ -2,6 +2,7 @@ package hivens.ui.utils
 
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 /**
  * Classification of a game-process log line. Drives colour + filter UX in
@@ -20,7 +21,7 @@ enum class LogType { INFO, ERROR, WARN, DIVIDER }
 data class LogEntry(
     val text: String,
     val type: LogType,
-    val timestamp: String = SimpleDateFormat("HH:mm:ss").format(Date()),
+    val timestamp: String = SimpleDateFormat("HH:mm:ss", Locale.ROOT).format(Date()),
     /**
      * Foreground-colour / bold runs recovered from the line's ANSI escapes, over
      * offsets into [text]. Empty for the common uncoloured line; the console

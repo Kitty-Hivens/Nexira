@@ -77,6 +77,9 @@ fun HostedWindow(
     val registered = remember(host, backend) { Registered(host, backend, scope) }
     val app = LocalScope.current
     val level = app?.let { rememberChildScope(it, ScopeLevel.Window) }
+    // In the composition, before LevelHost composes the content that reads the window.
+    // An effect runs after that content, which would find no window on its first pass.
+    @Suppress("RememberReturnType")
     if (level != null) remember(level, backend) { level.provideWindow(backend) }
     val families = remember(level) { level?.launcherServices?.find<SurfaceFamilies>() ?: SurfaceFamilies() }
     CompositionLocalProvider(

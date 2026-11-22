@@ -1045,6 +1045,9 @@ private fun buildBypassScopedSsl(bypasses: SslBypassStore): Pair<SSLSocketFactor
         .filterIsInstance<X509ExtendedTrustManager>()
         .first()
 
+    // Custom on purpose: it hands every check to the platform's manager except for a
+    // host the person granted a bypass, matched by the peer's name, see above.
+    @Suppress("CustomX509TrustManager")
     val trustManager = object : X509ExtendedTrustManager() {
         override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String, socket: Socket?) {
             if (granted(bypasses, peerHostOf(socket))) return

@@ -12,10 +12,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import org.slf4j.LoggerFactory
-import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
+import kotlin.io.path.listDirectoryEntries
 import kotlin.io.path.name
 
 /**
@@ -200,7 +200,7 @@ class I18nEngine(
         val declarations = HashMap<String, LanguageDeclaration>()
         val tables = HashMap<String, MutableMap<String, Map<String, String>>>()
         val problems = ArrayList<String>()
-        val folders = runCatching { Files.list(dir).use { it.filter(Path::isDirectory).sorted().toList() } }
+        val folders = runCatching { dir.listDirectoryEntries().filter { it.isDirectory() }.sorted() }
             .getOrElse {
                 problems += "the translations folder $dir could not be read: ${it.message}"
                 emptyList()
@@ -213,7 +213,7 @@ class I18nEngine(
                 return@forEach
             }
             tags += tag
-            val files = runCatching { Files.list(folder).use { it.filter(Path::isRegularFile).sorted().toList() } }
+            val files = runCatching { folder.listDirectoryEntries().filter { it.isRegularFile() }.sorted() }
                 .getOrElse {
                     problems += "the translations of '$tag' could not be read: ${it.message}"
                     return@forEach

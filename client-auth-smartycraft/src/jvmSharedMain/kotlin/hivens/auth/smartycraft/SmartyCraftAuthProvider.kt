@@ -247,6 +247,8 @@ class SmartyCraftAuthProvider(
         }
     }
 
+    // ECB because the server encrypts the session that way: this reads what it sends.
+    @Suppress("GetInstance")
     private fun decryptAES(base64Cipher: String, key: String): String {
         val secretKey = SecretKeySpec(key.toByteArray(StandardCharsets.UTF_8), "AES")
         val cipher = Cipher.getInstance("AES/ECB/PKCS5Padding")

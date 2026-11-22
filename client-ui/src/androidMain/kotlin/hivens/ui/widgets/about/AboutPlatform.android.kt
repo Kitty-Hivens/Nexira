@@ -3,12 +3,12 @@ package hivens.ui.widgets.about
 import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import hivens.core.data.LauncherUpdate
 
 @Composable
 internal actual fun rememberDisplayInfo(): String {
-    val metrics = LocalContext.current.resources.displayMetrics
+    val metrics = LocalResources.current.displayMetrics
     return remember(metrics) {
         "${metrics.widthPixels}x${metrics.heightPixels} · ${metrics.densityDpi} dpi · ${"%.2f".format(metrics.density)}x"
     }

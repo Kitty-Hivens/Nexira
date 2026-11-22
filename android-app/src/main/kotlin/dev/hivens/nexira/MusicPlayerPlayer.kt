@@ -2,6 +2,7 @@ package dev.hivens.nexira
 
 import android.graphics.Bitmap
 import android.os.Looper
+import androidx.annotation.OptIn
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.media3.common.C
@@ -9,6 +10,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.Player
 import androidx.media3.common.SimpleBasePlayer
+import androidx.media3.common.util.UnstableApi
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import hivens.ui.audio.PlaybackState
@@ -30,6 +32,7 @@ import java.io.ByteArrayOutputStream
  * flows into the state the session wants and turns the session's commands back into
  * calls on the service, which is the same job the MPRIS bridge does on the desktop.
  */
+@OptIn(UnstableApi::class) // SimpleBasePlayer, which Media3 still marks unstable
 class MusicPlayerPlayer(
     private val service: MusicPlayerService,
     scope: CoroutineScope,

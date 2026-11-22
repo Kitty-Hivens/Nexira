@@ -478,22 +478,24 @@ private suspend fun PointerInputScope.pageTurns(
     horizontal: Boolean,
     pagePx: () -> Int,
     turns: CoroutineScope,
-) = awaitPointerEventScope {
-    var turning: Job? = null
-    while (true) {
-        val event = awaitPointerEvent(PointerEventPass.Initial)
-        if (event.type != PointerEventType.Scroll) continue
-        val change = event.changes.firstOrNull() ?: continue
-        if (change.isConsumed) continue
-        val delta = change.scrollDelta
-        val along = if (horizontal && delta.x != 0f) delta.x else delta.y
-        if (along == 0f) continue
-        change.consume()
-        val page = pagePx()
-        if (page <= 0 || turning?.isActive == true) continue
-        val current = (state.value.toFloat() / page).roundToInt()
-        val target = ((current + if (along > 0f) 1 else -1) * page).coerceIn(0, state.maxValue)
-        turning = turns.launch { state.animateScrollTo(target) }
+) {
+    awaitPointerEventScope {
+        var turning: Job? = null
+        while (true) {
+            val event = awaitPointerEvent(PointerEventPass.Initial)
+            if (event.type != PointerEventType.Scroll) continue
+            val change = event.changes.firstOrNull() ?: continue
+            if (change.isConsumed) continue
+            val delta = change.scrollDelta
+            val along = if (horizontal && delta.x != 0f) delta.x else delta.y
+            if (along == 0f) continue
+            change.consume()
+            val page = pagePx()
+            if (page <= 0 || turning?.isActive == true) continue
+            val current = (state.value.toFloat() / page).roundToInt()
+            val target = ((current + if (along > 0f) 1 else -1) * page).coerceIn(0, state.maxValue)
+            turning = turns.launch { state.animateScrollTo(target) }
+        }
     }
 }
 
@@ -565,31 +567,33 @@ private suspend fun PointerInputScope.mapGestures(
     insidePage: Boolean,
     panOnPrimary: Boolean,
     wheelStep: Float,
-) = awaitPointerEventScope {
-    while (true) {
-        val event = awaitPointerEvent()
-        val change = event.changes.firstOrNull() ?: continue
-        when (event.type) {
-            PointerEventType.Scroll -> {
-                if (insidePage || change.isConsumed) continue
-                var delta = change.scrollDelta
-                if (event.keyboardModifiers.isShiftPressed && delta.x == 0f) delta = Offset(delta.y, 0f)
-                pan.value -= delta * wheelStep
-                change.consume()
-            }
-            PointerEventType.Press -> {
-                val wanted = (panOnPrimary && event.buttons.isPrimaryPressed) || event.buttons.isTertiaryPressed
-                if (!wanted || change.isConsumed) continue
-                val started = awaitTouchSlopOrCancellation(change.id) { moved, over ->
-                    pan.value += over
-                    moved.consume()
-                } ?: continue
-                drag(started.id) { moved ->
-                    pan.value += moved.positionChange()
-                    moved.consume()
+) {
+    awaitPointerEventScope {
+        while (true) {
+            val event = awaitPointerEvent()
+            val change = event.changes.firstOrNull() ?: continue
+            when (event.type) {
+                PointerEventType.Scroll -> {
+                    if (insidePage || change.isConsumed) continue
+                    var delta = change.scrollDelta
+                    if (event.keyboardModifiers.isShiftPressed && delta.x == 0f) delta = Offset(delta.y, 0f)
+                    pan.value -= delta * wheelStep
+                    change.consume()
                 }
+                PointerEventType.Press -> {
+                    val wanted = (panOnPrimary && event.buttons.isPrimaryPressed) || event.buttons.isTertiaryPressed
+                    if (!wanted || change.isConsumed) continue
+                    val started = awaitTouchSlopOrCancellation(change.id) { moved, over ->
+                        pan.value += over
+                        moved.consume()
+                    } ?: continue
+                    drag(started.id) { moved ->
+                        pan.value += moved.positionChange()
+                        moved.consume()
+                    }
+                }
+                else -> Unit
             }
-            else -> Unit
         }
     }
 }

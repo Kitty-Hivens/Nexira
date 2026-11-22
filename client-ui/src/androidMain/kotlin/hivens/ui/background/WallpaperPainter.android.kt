@@ -11,7 +11,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import hivens.ui.theme.WallpaperTone
 import hivens.ui.theme.wallpaperToneFromImage
 import kotlinx.coroutines.Dispatchers
@@ -41,7 +41,7 @@ internal actual fun rememberWallpaperPainter(
     onTone: (WallpaperTone) -> Unit,
     onAudioVolume: (Float) -> Unit,
 ): Painter? {
-    val maxHeight = LocalContext.current.resources.displayMetrics.heightPixels
+    val maxHeight = LocalResources.current.displayMetrics.heightPixels
     var resolved by remember(file) { mutableStateOf<Resolved?>(null) }
     LaunchedEffect(file, maxHeight) {
         resolved = withContext(Dispatchers.IO) { resolve(file, maxHeight) }

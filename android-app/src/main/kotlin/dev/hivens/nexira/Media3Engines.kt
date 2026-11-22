@@ -4,11 +4,13 @@ import android.content.Context
 import android.net.Uri
 import android.os.Looper
 import android.util.Log
+import androidx.annotation.OptIn
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import hivens.ui.audio.EngineState
 import hivens.ui.audio.PlaybackEngine
@@ -29,6 +31,8 @@ class Media3Engines(
     private val looper: Looper,
 ) : PlaybackEngines {
 
+    // setLooper is still marked unstable in Media3, and the player has to run on this thread.
+    @OptIn(UnstableApi::class)
     override fun open(file: Path): PlaybackEngine {
         check(Looper.myLooper() === looper) { "a Media3 player is opened on its own thread" }
         val player = ExoPlayer.Builder(context)

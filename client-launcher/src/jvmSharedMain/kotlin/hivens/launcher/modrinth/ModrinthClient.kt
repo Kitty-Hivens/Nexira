@@ -33,7 +33,6 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import java.io.IOException
 import java.net.URLEncoder
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 import java.nio.file.Path
 
@@ -104,8 +103,8 @@ class ModrinthClient(
      * Cached briefly by its URL, see [ModrinthCaches.search].
      */
     suspend fun searchModpacks(query: String, offset: Int = 0, limit: Int = 40): ModrinthSearchResponse {
-        val q = URLEncoder.encode(query, StandardCharsets.UTF_8)
-        val facets = URLEncoder.encode("""[["project_type:modpack"]]""", StandardCharsets.UTF_8)
+        val q = formEncoded(query)
+        val facets = formEncoded("""[["project_type:modpack"]]""")
         val url = "$API_BASE/v2/search?query=$q&facets=$facets&offset=$offset&limit=$limit"
         return caches.search.get(url) { getJson(url) }
     }
@@ -190,9 +189,9 @@ class ModrinthClient(
         limit: Int = 40,
         index: String = "relevance",
     ): ModrinthSearchResponse {
-        val q = URLEncoder.encode(query, StandardCharsets.UTF_8)
-        val expression = URLEncoder.encode(searchExpression(projectType, filters), StandardCharsets.UTF_8)
-        val order = URLEncoder.encode(index, StandardCharsets.UTF_8)
+        val q = formEncoded(query)
+        val expression = formEncoded(searchExpression(projectType, filters))
+        val order = formEncoded(index)
         val url = "$API_BASE/v2/search?query=$q&new_filters=$expression&index=$order&offset=$offset&limit=$limit"
         return caches.search.get(url) { getJson(url) }
     }
@@ -374,3 +373,10 @@ class ModrinthClient(
         }
     }
 }
+
+/**
+ * [text] as a query parameter value, UTF-8, a space as `+`. The charset is named, not
+ * passed as a `Charset`: that overload of [URLEncoder.encode] exists on Android only
+ * from API 33, and below it the call fails at run time.
+ */
+private fun formEncoded(text: String): String = URLEncoder.encode(text, "UTF-8")

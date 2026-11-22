@@ -70,6 +70,10 @@ fun Symbol(
         },
         contentAlignment = Alignment.Center,
     ) {
+        // Density's public toSp, which lint resolves through an interface it reads as
+        // restricted. Not worked out from fontScale by hand: that would lose the
+        // non-linear font scaling toSp applies.
+        @Suppress("RestrictedApi")
         val px = with(LocalDensity.current) { maxHeight.toSp() }
         // Remembered per axis value: every icon on screen built a fresh settings
         // object and font family on each composition, so a list of rows recomposing

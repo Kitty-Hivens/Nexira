@@ -239,7 +239,7 @@ object EarlyLoadingScreen {
     }
 
     private const val KEY = "earlyWindowControl"
-    private const val BOM = "﻿"
+    private const val BOM = "\uFEFF"
 
     /**
      * The key, bare or quoted either way, then its value, then whatever follows the

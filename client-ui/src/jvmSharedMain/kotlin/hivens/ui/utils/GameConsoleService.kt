@@ -24,6 +24,7 @@ import java.io.File
 import java.io.FileWriter
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 import kotlin.time.Duration.Companion.milliseconds
 
 private val log = LoggerFactory.getLogger("GameConsoleService")
@@ -127,7 +128,7 @@ class GameConsoleService(
     private var historyOffset = 0
     private var sessionFile: File? = null
     private var sessionWriter: BufferedWriter? = null
-    private val fileDateFmt = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss")
+    private val fileDateFmt = SimpleDateFormat("yyyy-MM-dd_HH-mm-ss", Locale.ROOT)
 
     // Unlimited so the cheap producer (trySend on Main) never blocks or drops;
     // a flood backs up in the channel and the drainer batch-empties it.
@@ -377,7 +378,7 @@ class GameConsoleService(
         }
         // Session-start divider goes into BOTH buffer and file so a history
         // reload reconstructs the marker on the same line index as the live view.
-        val time = SimpleDateFormat("HH:mm:ss").format(Date())
+        val time = SimpleDateFormat("HH:mm:ss", Locale.ROOT).format(Date())
         val named = packLabel?.takeIf { it.isNotBlank() }?.let { " -- $it" }.orEmpty()
         val entry = LogEntry("--------- Session started $time$named ---------", LogType.DIVIDER, time)
         buffer.addLast(entry)

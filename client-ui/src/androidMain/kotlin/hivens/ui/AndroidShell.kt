@@ -146,7 +146,9 @@ private fun AndroidShellContent() {
     val appLevel: WidgetScope = koinInject()
     // The app level outlives the Activity, and with it the record of which of its
     // parts could not be made. A shell made again for a new Activity gives them
-    // another try before anything in it reads them.
+    // another try before anything in it reads them. In the composition itself, which an
+    // effect would run after: by then the parts below had already read the failure.
+    @Suppress("RememberReturnType")
     remember(appLevel) { appLevel.retryFailed() }
     val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
     val widgetStateStore: WidgetStateStore = koinInject()

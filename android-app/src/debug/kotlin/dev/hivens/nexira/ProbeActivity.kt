@@ -16,7 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import java.nio.file.Path
+import java.nio.file.Paths
 
 /**
  * Plays files through the shared player, to see the shared code run on a phone.
@@ -89,7 +89,7 @@ class ProbeActivity : Activity() {
         intent.getStringExtra("host")?.takeIf { fresh }?.let { scenario -> Thread { runCatching { HostProbe.run(applicationContext, scenario, intent.getStringExtra("jdk")) }.onFailure { Log.e(TAG, "host probe failed", it) } }.start() }
         if (fresh && intent.getBooleanExtra("xodus", false)) Thread { runCatching { XodusProbe.run(applicationContext) }.onFailure { Log.e(TAG, "xodus probe failed", it) } }.start()
 
-        val files = intent.getStringExtra("files")?.split(',')?.map { Path.of(it.trim()) }
+        val files = intent.getStringExtra("files")?.split(',')?.map { Paths.get(it.trim()) }
         if (files != null) {
             player.open(files)
             if (intent.getBooleanExtra("autoplay", false)) player.play()

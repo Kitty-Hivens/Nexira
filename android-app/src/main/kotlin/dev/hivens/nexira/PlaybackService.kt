@@ -2,6 +2,8 @@ package dev.hivens.nexira
 
 import android.app.PendingIntent
 import android.content.Intent
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 
@@ -34,6 +36,8 @@ class PlaybackService : MediaSessionService() {
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
 
+    // The player is ours, built on SimpleBasePlayer, whose release Media3 marks unstable.
+    @OptIn(UnstableApi::class)
     override fun onDestroy() {
         session?.release()
         session = null

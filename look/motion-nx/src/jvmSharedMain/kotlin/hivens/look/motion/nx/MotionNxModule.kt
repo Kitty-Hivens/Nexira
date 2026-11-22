@@ -44,6 +44,7 @@ import kotlinx.serialization.json.booleanOrNull
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.io.path.readText
 
 /**
  * The nx motion provider as the application carries it: compiled in, and brought in by the look
@@ -194,7 +195,7 @@ internal fun carriedOver(dataDir: Path): Boolean {
     val file = dataDir.resolve(CARRIED_FILE)
     if (!Files.isRegularFile(file)) return false
     return try {
-        val kept = Json.parseToJsonElement(Files.readString(file)) as? JsonObject
+        val kept = Json.parseToJsonElement(file.readText()) as? JsonObject
         (kept?.get("reduceMotion") as? JsonPrimitive)?.booleanOrNull ?: false
     } catch (e: Exception) {
         log.warn("The reduce motion kept in {} could not be read, so motion is not reduced", file, e)

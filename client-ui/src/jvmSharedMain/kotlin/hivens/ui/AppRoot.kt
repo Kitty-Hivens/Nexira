@@ -108,7 +108,8 @@ fun AppRoot(
     // on every AppRoot recompose is wasted work and brushes against coil's
     // "called after the first get()" guard, so gate it behind remember. The
     // calculation runs synchronously in the composition pass -- before any
-    // child image composable triggers a get().
+    // child image composable triggers a get(), which an effect would run after.
+    @Suppress("RememberReturnType")
     remember(routingCallFactory) {
         SingletonImageLoader.setSafe { context ->
             ImageLoader.Builder(context)
