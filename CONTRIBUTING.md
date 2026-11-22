@@ -7,7 +7,7 @@ PRs and forks are welcome. Code is GPL-3.0 — take it and do whatever.
 ## ── Branch model ──
 
 ```
-dev  →  (PR + Qodana CI)  →  stable
+dev  →  (PR + tests + Lint)  →  stable
 ```
 
 All changes go through PRs against `dev`. Direct pushes to `stable` are not allowed.  
@@ -47,8 +47,10 @@ chore(deps): pin JNA to 5.18.1 on Windows
 
 ## ── Code quality ──
 
-Every PR is scanned by [Qodana](https://www.jetbrains.com/qodana/) (`qodana_code_quality.yml`).  
-The scan runs in full mode (`pr-mode: false`) — all files, not just changed ones.
+Every PR runs Android Lint over every module (`lint.yml`), on the Android and the
+desktop targets alike. Warnings fail it as errors do, and its findings are marked on
+the lines of the PR. Run it locally with `./gradlew lint :android-app:lintRelease`.
+The checks the project turns off are in `lint.xml`, each with its reason.
 
 ## ── Testing ──
 

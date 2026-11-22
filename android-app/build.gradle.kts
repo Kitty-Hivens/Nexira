@@ -1,4 +1,5 @@
 import hivens.android.launcherApi
+import hivens.android.launcherLint
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
@@ -84,6 +85,9 @@ android {
             isIncludeAndroidResources = true
         }
     }
+
+    // The libraries lint themselves, see the root build: this covers the app's own code.
+    lint { launcherLint(rootDir) }
 }
 
 kotlin {

@@ -1,3 +1,7 @@
+import com.android.build.api.dsl.KotlinMultiplatformAndroidLibraryTarget
+import com.android.build.api.dsl.Lint
+import hivens.android.launcherLint
+import org.jetbrains.kotlin.gradle.dsl.KotlinMultiplatformExtension
 import java.time.Duration
 
 plugins {
@@ -83,6 +87,23 @@ allprojects {
 }
 
 subprojects {
+    // Android Lint over every module with code: the multiplatform ones, on their Android
+    // and desktop targets both, and the plain Kotlin ones. The standalone lint plugin is
+    // what runs it on a multiplatform module, and that module's Android target reads
+    // its own lint options, so both are set. The app sets its own in android-app.
+    pluginManager.withPlugin("com.android.kotlin.multiplatform.library") {
+        pluginManager.apply("com.android.lint")
+        extensions.configure<Lint> { launcherLint(rootDir) }
+        extensions.configure<KotlinMultiplatformExtension> {
+            targets.withType<KotlinMultiplatformAndroidLibraryTarget>().configureEach {
+                lint { launcherLint(rootDir) }
+            }
+        }
+    }
+    pluginManager.withPlugin("org.jetbrains.kotlin.jvm") {
+        pluginManager.apply("com.android.lint")
+        extensions.configure<Lint> { launcherLint(rootDir) }
+    }
     afterEvaluate {
         if (plugins.hasPlugin("java")) {
             // kotlin("test") carries its own junit-bom, so a module that never

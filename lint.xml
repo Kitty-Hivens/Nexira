@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Android Lint over every module, see buildSrc's LauncherLint.kt. Each check turned off
+    here says why. A check left on reports as an error.
+-->
+<lint>
+    <!--
+        Compose's naming and parameter conventions. Ours differ on purpose: composable
+        members named for what they do (decorate, provideService, which is widget API that
+        modules compile against), and modifier parameters whose default is not a bare
+        Modifier. They describe the shape of our API, not a defect in it.
+    -->
+    <issue id="ModifierParameter" severity="ignore" />
+    <issue id="ComposableNaming" severity="ignore" />
+    <issue id="ModifierFactoryExtensionFunction" severity="ignore" />
+
+    <!--
+        A newer library version is out. Asked over the network, so it would turn every pull
+        request red on the day something upstream publishes, whatever the request changed.
+        Versions move through Dependabot's pull requests instead.
+    -->
+    <issue id="NewerVersionAvailable" severity="ignore" />
+    <issue id="GradleDependency" severity="ignore" />
+
+    <!-- Asks for androidx core KTX extensions (String.toUri) the project does not depend on. -->
+    <issue id="UseKtx" severity="ignore" />
+
+    <!--
+        The app is built for arm64 only: the JDK and the LWJGL natives it runs the game on
+        are built for nothing else, and its JVM shim has to match them.
+    -->
+    <issue id="ChromeOsAbiSupport" severity="ignore" />
+</lint>

@@ -41,29 +41,26 @@ jobs:
   #     leaves COMMENTED reviews ("If Codex has suggestions, it will
   #     comment; otherwise it will react with 👍" — Codex docs). The
   #     presence of a Codex review entry proves the bot processed the diff.
-  #   - Weak (Qodana): a `github-actions` comment whose body starts with
-  #     `# Qodana`. Qodana posts findings via the comment API, NOT the
-  #     review API, so it never shows in `.reviews[]`. We detect it by
-  #     bot-author + body marker. Qodana is configured `on: pull_request`
-  #     with `post-pr-comment: true`, so this engagement signal is
-  #     independent of Codex availability.
+  #   - Weak (Lint): the Lint job of lint.yml passed on the PR's head commit,
+  #     read from that commit's check runs. Lint runs on every pull request and
+  #     fails on any finding, so a pass says the diff was analysed and came out
+  #     clean, which a bot's comment alone never said. It is independent of
+  #     Codex availability.
   #
   # Failure modes this catches:
   #   1. Direct/force push to stable bypassing PR (no merging PR for SHA).
-  #   2. PR merged but BOTH Codex AND Qodana failed to engage — both rate-
-  #      limited or both bots disabled. See [[release_protection_model]]
-  #      memory for the why-not-tighter explanation.
+  #   2. PR merged with no non-author review AND no passing Lint on its head
+  #      commit: Codex silent and Lint red, missing or still running.
   #   3. Compromised maintainer account opens a PR + self-merges without
   #      bots wired up. Branch protection on stable handles the merge
   #      attempt; this gate handles any release that squeezed through.
   #
-  # Trust model honesty: this is two independent bot-signals, neither of
-  # which inspects code semantics rigorously. Two bots saying "ok" still
-  # is not "a competent human reviewed the diff". Strengthening requires
-  # a non-bot APPROVED review.
+  # Trust model honesty: neither signal inspects code semantics rigorously.
+  # A bot's review and a clean lint still are not "a competent human reviewed
+  # the diff". Strengthening requires a non-bot APPROVED review.
   #
-  # `GH_TOKEN: secrets.GITHUB_TOKEN` has the `pull_requests: read` scope by
-  # default. No extra setup needed.
+  # `GH_TOKEN: secrets.GITHUB_TOKEN` with the permissions below reads the PR
+  # and the check runs of its head commit. No extra setup needed.
   # ─────────────────────────────────────────────────────────────────────────
   review-gate:
     name: Review Gate
@@ -71,6 +68,7 @@ jobs:
     permissions:
       pull-requests: read
       contents: read
+      checks: read
     steps:
       - name: Verify HEAD originates from a reviewed PR
         # Nightlies are unreviewed bleeding-dev builds (tagged off dev HEAD, no
@@ -110,9 +108,9 @@ jobs:
             exit 1
           fi
           echo "Found PR #$PR — checking review engagement..."
-          # Pull author + reviews + comments in one shot so we can correctly
-          # exclude self-reviews and detect Qodana's comment-API engagement.
-          PR_JSON=$(gh pr view "$PR" --repo "$GH_REPO" --json author,reviews,comments)
+          # Author, reviews and the head commit in one shot, so self-reviews are
+          # excluded and the head commit's checks can be read.
+          PR_JSON=$(gh pr view "$PR" --repo "$GH_REPO" --json author,reviews,headRefOid)
           AUTHOR=$(echo "$PR_JSON" | jq -r '.author.login')
           # GitHub's own staleness rule: an APPROVED review is
           # "current" until the same reviewer submits CHANGES_REQUESTED
@@ -148,12 +146,12 @@ jobs:
           # bot signal we have when no human approval exists.
           ANY_REVIEW=$(echo "$PR_JSON" | jq --arg author "$AUTHOR" \
             '[.reviews[] | select(.author.login != $author)] | length')
-          # Qodana posts as `github-actions[bot]` (login `github-actions`)
-          # via the comment API; body starts with `# Qodana ...`. Anchor on
-          # the markdown header start to avoid matching arbitrary text that
-          # happens to mention Qodana lower in a comment.
-          QODANA=$(echo "$PR_JSON" | jq \
-            '[.comments[] | select(.author.login=="github-actions" and (.body | startswith("# Qodana")))] | length')
+          # The Lint job of lint.yml, by its name, on the commit the PR brought.
+          # Only a finished, successful run counts: a red one found something, and
+          # one still running has not said anything yet.
+          HEAD_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
+          LINT=$(gh api "repos/$GH_REPO/commits/$HEAD_SHA/check-runs?check_name=Lint" \
+            --jq '[.check_runs[] | select(.status == "completed" and .conclusion == "success")] | length')
           if [ "$APPROVED" -ge 1 ]; then
             echo "::notice title=Review gate::PR #$PR has $APPROVED approving review(s) from non-authors. Gate passes (strong signal)."
             exit 0
@@ -162,11 +160,11 @@ jobs:
             echo "::notice title=Review gate::PR #$PR has $ANY_REVIEW non-author review entry/entries (no APPROVED — typically Codex COMMENTED state). Gate passes (weak signal)."
             exit 0
           fi
-          if [ "$QODANA" -ge 1 ]; then
-            echo "::notice title=Review gate::PR #$PR has $QODANA Qodana scan comment(s) from github-actions and no other reviewer engagement. Gate passes (weak signal — Qodana fallback). Codex was likely rate-limited."
+          if [ "$LINT" -ge 1 ]; then
+            echo "::notice title=Review gate::PR #$PR has no non-author review, and Lint passed on its head commit ${HEAD_SHA:0:8}. Gate passes (weak signal: a clean lint). Codex was likely rate-limited."
             exit 0
           fi
-          echo "::error title=Review gate::PR #$PR has zero non-author reviews AND zero Qodana scan comments. Likely cause: BOTH Codex (rate-limited / disabled) AND Qodana (workflow failure / disabled) failed to engage. Investigate before tagging."
+          echo "::error title=Review gate::PR #$PR has no non-author review, and Lint did not pass on its head commit ${HEAD_SHA:0:8}: it failed, is still running, or never ran. Look at the Lint workflow on that commit before tagging."
           exit 1
 
   # ─────────────────────────────────────────────────────────────────────────

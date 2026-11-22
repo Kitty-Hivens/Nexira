@@ -1,0 +1,86 @@
+name: Lint
+
+# Android Lint over every module, on every pull request and every push to a working
+# branch. Not filtered by path like the tests: the release workflow's review gate
+# reads this workflow's Lint job on the commit a release PR brings, and that commit
+# can be one that touched only documentation.
+
+on:
+  pull_request:
+  push:
+    branches: [dev, stable]
+
+concurrency:
+  group: lint-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  JAVA_VERSION: '27'
+  JAVA_DISTRIBUTION: 'liberica'
+
+jobs:
+  # Android Lint over every module, see buildSrc's LauncherLint.kt and the root lint.xml.
+  # Warnings fail it as errors do. Its findings go to code scanning, which marks them on
+  # the lines of the pull request. The release workflow's review gate reads this job's
+  # result on the commit a release PR brings, so its name is load-bearing.
+  lint:
+    name: Lint
+    runs-on: ubuntu-26.04
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-java@v6
+        with:
+          distribution: ${{ env.JAVA_DISTRIBUTION }}
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: 'gradle'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Lint reads the modules' Android classpath, so it needs the platform the build
+      # compiles against, the one the Android job installs.
+      - name: Install the SDK platform
+        run: |
+          if [ -z "${ANDROID_HOME:-}" ]; then
+            echo "::error title=Android SDK::ANDROID_HOME is not set on this runner image."
+            exit 1
+          fi
+          sdkmanager="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$sdkmanager" --licenses > /dev/null || true
+          "$sdkmanager" --install "platforms;android-37.2" "build-tools;36.1.0" > /dev/null
+
+      - name: Run Android Lint
+        run: ./gradlew lint :android-app:lintRelease --continue
+
+      # One folder of reports, named by module, for the upload below.
+      - name: Collect the reports
+        if: always()
+        run: |
+          mkdir -p lint-sarif
+          find . -path ./lint-sarif -prune -o -path '*/build/reports/lint-results*.sarif' -print | while read -r f; do
+            module=$(echo "${f#./}" | cut -d/ -f1-2 | tr '/' '-')
+            cp "$f" "lint-sarif/${module}-$(basename "$f")"
+          done
+          ls lint-sarif
+
+      # A pull request from a fork gets a read-only token, which code scanning refuses.
+      # Its findings are still in the log above and in the artifact.
+      - name: Upload the findings to code scanning
+        if: always() && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: lint-sarif
+          category: android-lint
+
+      - name: Upload the reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-reports
+          path: |
+            */build/reports/lint-results*
+            look/*/build/reports/lint-results*

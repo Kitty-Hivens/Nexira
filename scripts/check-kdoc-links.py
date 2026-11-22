@@ -3,7 +3,7 @@
 # name is declared nowhere, which is what a rename, a deletion or a typo
 # leaves behind.
 #
-# The IDE inspection for unresolved KDoc links is off in qodana.yaml on purpose.
+# The IDE's inspection for unresolved KDoc links cannot be used for this.
 # A lower module may link a symbol of an upper module it cannot import, and that
 # link is fine. So this does not resolve a link the way the compiler would. It
 # asks a weaker question that has no such false positives: does the name exist
