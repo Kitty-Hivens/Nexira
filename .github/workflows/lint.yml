@@ -56,16 +56,14 @@ jobs:
       - name: Run Android Lint
         run: ./gradlew lint :android-app:lintRelease --continue
 
-      # One folder of reports, named by module, for the upload below.
-      - name: Collect the reports
+      # Lint writes a report per module and target, each its own run of the same tool.
+      # Code scanning refuses several runs under one category, so they go up as one,
+      # see scripts/merge-sarif.py.
+      - name: Merge the reports
         if: always()
         run: |
-          mkdir -p lint-sarif
-          find . -path ./lint-sarif -prune -o -path '*/build/reports/lint-results*.sarif' -print | while read -r f; do
-            module=$(echo "${f#./}" | cut -d/ -f1-2 | tr '/' '-')
-            cp "$f" "lint-sarif/${module}-$(basename "$f")"
-          done
-          ls lint-sarif
+          find . -path '*/build/reports/lint-results*.sarif' -print0 \
+            | xargs -0 python3 scripts/merge-sarif.py --root "$GITHUB_WORKSPACE" --out lint.sarif
 
       # A pull request from a fork gets a read-only token, which code scanning refuses.
       # Its findings are still in the log above and in the artifact.
@@ -73,7 +71,7 @@ jobs:
         if: always() && (github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository)
         uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: lint-sarif
+          sarif_file: lint.sarif
           category: android-lint
 
       - name: Upload the reports
