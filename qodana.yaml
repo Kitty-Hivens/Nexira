@@ -109,5 +109,6 @@ bootstrap: >-
 # multiplatform with an Android target, and without the Android plugin the import
 # leaves their shared and Android source sets partly unresolved. The JVM linter's
 # sanity report listed a different hundred unresolved library references on each
-# run over the same code.
-linter: jetbrains/qodana-jvm-android:2026.2
+# run over the same code. 2026.3, because 2026.2's Android plugin refuses the
+# project's AGP 9.5 at import.
+linter: jetbrains/qodana-jvm-android:2026.3
