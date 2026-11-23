@@ -115,7 +115,7 @@ include(":client-tray")
 // and asks it, and never keeps a view of the window of its own.
 include(":client-window")
 include(":client-ui")
-// Leaf design-system module (NxUI): tokens, primitives, surfaces, Flexible.
+// Leaf design-system module (NxUI): tokens, primitives, surfaces.
 // client-ui depends on it one-way; it depends on nothing in-tree.
 include(":nx-ui")
 // Layer ordering and the dismiss stack of a window, with no visuals. Below both

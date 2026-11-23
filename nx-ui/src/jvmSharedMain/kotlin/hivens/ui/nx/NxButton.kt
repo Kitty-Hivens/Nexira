@@ -42,8 +42,7 @@ import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Status
 
 /**
- * The one button. Four emphasis roles -- a call site picks a role, not colours. The per-widget freedom the old de-facto base button
- * had (an arbitrary Material ButtonColors) moves up to the Flexible event layer.
+ * The one button. Four emphasis roles -- a call site picks a role, not colours.
  *
  *  - [Primary]     -- filled accent; the one obvious next action (Play, Login). One per screen.
  *  - [Secondary]   -- outlined, transparent; alternative actions (Cancel, Open folder).

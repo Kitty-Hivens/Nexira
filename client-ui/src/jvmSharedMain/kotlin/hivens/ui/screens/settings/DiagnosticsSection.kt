@@ -21,8 +21,6 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.ui.diag.RenderBackend
 import hivens.ui.diag.reportPrompts
 import hivens.ui.easter.LocalAprilFools
-import hivens.ui.flexible.Flexible
-import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxNavRow
@@ -47,9 +45,7 @@ import hivens.ui.theme.Status
  * Diagnostics plane: open logs / crash-reports folders, generate a redacted
  * diagnostic bundle ZIP (lazy-busy gated so a double-tap doesn't fire two parallel
  * writes), and after one exists, open the GitHub issue template prefilled with bundle
- * metadata. Each button goes through the Flexible event layer -- the April Fools
- * chaos event intercepts during the Apr 1-14 window, otherwise it renders as a
- * plain button.
+ * metadata.
  *
  * Hidden gesture: tap the DIAGNOSTICS section title 5 times to reveal the AprilFools
  * debug panel; tap 5 more to hide it. Lets dev exercise the chaos layer without
@@ -147,24 +143,20 @@ internal fun DiagnosticsSection(
 
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.weight(1f)) {
-                Flexible("settings_open_logs_btn", FlexibleKind.Button) {
-                    NxButton(
-                        label    = s.text("settingsOpenLogs"),
-                        onClick  = { SystemActions.openFolder(paths.logsDir.toString()) },
-                        modifier = Modifier.fillMaxWidth(),
-                        style    = NxButtonStyle.Secondary,
-                    )
-                }
+                NxButton(
+                    label    = s.text("settingsOpenLogs"),
+                    onClick  = { SystemActions.openFolder(paths.logsDir.toString()) },
+                    modifier = Modifier.fillMaxWidth(),
+                    style    = NxButtonStyle.Secondary,
+                )
             }
             Box(Modifier.weight(1f)) {
-                Flexible("settings_crash_reports_btn", FlexibleKind.Button) {
-                    NxButton(
-                        label    = s.text("settingsOpenCrashReports"),
-                        onClick  = { SystemActions.openFolder(paths.crashDir.toString()) },
-                        modifier = Modifier.fillMaxWidth(),
-                        style    = NxButtonStyle.Secondary,
-                    )
-                }
+                NxButton(
+                    label    = s.text("settingsOpenCrashReports"),
+                    onClick  = { SystemActions.openFolder(paths.crashDir.toString()) },
+                    modifier = Modifier.fillMaxWidth(),
+                    style    = NxButtonStyle.Secondary,
+                )
             }
             PuppetClick("settings.openLogsDir")      { SystemActions.openFolder(paths.logsDir.toString()) }
             PuppetClick("settings.openCrashReports") { SystemActions.openFolder(paths.crashDir.toString()) }
@@ -174,34 +166,30 @@ internal fun DiagnosticsSection(
         Column {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Box(Modifier.weight(1f)) {
-                    Flexible("settings_create_diag_bundle_btn", FlexibleKind.Button) {
-                        NxButton(
-                            label    = s.text("settingsCreateDiagnosticBundle"),
-                            onClick  = { createBundle(reveal = true) },
-                            modifier = Modifier.fillMaxWidth(),
-                            style    = NxButtonStyle.Secondary,
-                            enabled  = !bundleBusy,
-                        )
-                    }
+                    NxButton(
+                        label    = s.text("settingsCreateDiagnosticBundle"),
+                        onClick  = { createBundle(reveal = true) },
+                        modifier = Modifier.fillMaxWidth(),
+                        style    = NxButtonStyle.Secondary,
+                        enabled  = !bundleBusy,
+                    )
                 }
                 Box(Modifier.weight(1f)) {
-                    Flexible("settings_report_github_btn", FlexibleKind.Button) {
-                        NxButton(
-                            label    = s.text("settingsReportOnGithub"),
-                            onClick  = {
-                                val zip = lastBundlePath ?: return@NxButton
-                                val _ = runCatching {
-                                    // Copy the path so the user can drag-attach from the
-                                    // file manager OR paste it into a comment.
-                                    SystemActions.copyToClipboard(zip.toString())
-                                    SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip, s.reportPrompts()))
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth(),
-                            style    = NxButtonStyle.Secondary,
-                            enabled  = lastBundlePath != null,
-                        )
-                    }
+                    NxButton(
+                        label    = s.text("settingsReportOnGithub"),
+                        onClick  = {
+                            val zip = lastBundlePath ?: return@NxButton
+                            val _ = runCatching {
+                                // Copy the path so the user can drag-attach from the
+                                // file manager OR paste it into a comment.
+                                SystemActions.copyToClipboard(zip.toString())
+                                SystemActions.openUrl(IssueReporter.bundleIssueUrl(zip, s.reportPrompts()))
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        style    = NxButtonStyle.Secondary,
+                        enabled  = lastBundlePath != null,
+                    )
                 }
                 // No reveal under automation: a file manager opening on top of the
                 // window is not something a scripted run can dismiss.
@@ -234,14 +222,12 @@ internal fun DiagnosticsSection(
         // Restart into the boot recovery surface -- disable a broken module or
         // reset corrupted state when the shell starts but misbehaves.
         if (host.restartSupported) {
-            Flexible("settings_restart_recovery_btn", FlexibleKind.Button) {
-                NxButton(
-                    label    = s.text("recoveryRestartInApp"),
-                    onClick  = { host.restartIntoRecovery(paths.dataDir) },
-                    modifier = Modifier.fillMaxWidth(),
-                    style    = NxButtonStyle.Secondary,
-                )
-            }
+            NxButton(
+                label    = s.text("recoveryRestartInApp"),
+                onClick  = { host.restartIntoRecovery(paths.dataDir) },
+                modifier = Modifier.fillMaxWidth(),
+                style    = NxButtonStyle.Secondary,
+            )
             PuppetClick("settings.restartRecovery") { host.restartIntoRecovery(paths.dataDir) }
         }
     }

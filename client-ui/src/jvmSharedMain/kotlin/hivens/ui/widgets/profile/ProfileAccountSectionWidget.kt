@@ -38,8 +38,6 @@ import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.AccountView
 import hivens.ui.LoginPanel
 import hivens.ui.components.rememberSignOutRequest
-import hivens.ui.flexible.Flexible
-import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -134,13 +132,11 @@ private fun SmartyCraftAccount(account: AccountView, othersLeft: Boolean) {
                 state = rememberSkinViewState(initialAnimation = Cycles.idle()),
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Flexible("profile_upload_skin_btn", FlexibleKind.Button) {
-                    NxButton(
-                        label = s.text("profileUploadSkin"),
-                        onClick = uploader.pick,
-                        style = NxButtonStyle.Primary,
-                    )
-                }
+                NxButton(
+                    label = s.text("profileUploadSkin"),
+                    onClick = uploader.pick,
+                    style = NxButtonStyle.Primary,
+                )
                 IconButton(onClick = uploader.refresh) {
                     Symbol(NxIcon.Refresh, s.text("profileRefresh"), tint = NxInk.quiet)
                 }
@@ -148,14 +144,12 @@ private fun SmartyCraftAccount(account: AccountView, othersLeft: Boolean) {
             SkinUploadStatusLine(uploader.status)
         }
 
-        Flexible("profile_sc_signout_btn", FlexibleKind.Button) {
-            NxButton(
-                label = s.text("profileSignOutSmartycraft"),
-                onClick = signOut,
-                modifier = Modifier.widthIn(min = 200.dp),
-                style = NxButtonStyle.Secondary,
-            )
-        }
+        NxButton(
+            label = s.text("profileSignOutSmartycraft"),
+            onClick = signOut,
+            modifier = Modifier.widthIn(min = 200.dp),
+            style = NxButtonStyle.Secondary,
+        )
         PuppetClick("account.signout.smartycraft") { signOut() }
         PuppetClick("account.logout") { signOutAll() }
     }
@@ -184,14 +178,12 @@ private fun AccountPanel(account: AccountView) {
         // Where the two would squeeze the label out of the card, the button goes under it.
         BoxWithConstraints(Modifier.fillMaxWidth()) {
             val topUp: @Composable (Modifier) -> Unit = { modifier ->
-                Flexible("profile_topup_btn", FlexibleKind.Button) {
-                    NxButton(
-                        label = s.text("profileTopUp"),
-                        onClick = { SystemActions.openUrl("https://smartycraft.ru/cabinet") },
-                        modifier = modifier,
-                        style = NxButtonStyle.Secondary,
-                    )
-                }
+                NxButton(
+                    label = s.text("profileTopUp"),
+                    onClick = { SystemActions.openUrl("https://smartycraft.ru/cabinet") },
+                    modifier = modifier,
+                    style = NxButtonStyle.Secondary,
+                )
             }
             if (maxWidth < SIDE_BY_SIDE_FROM) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {

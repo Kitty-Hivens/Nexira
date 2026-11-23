@@ -24,8 +24,6 @@ import hivens.ui.components.channelColor
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.flexible.Flexible
-import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.LocalMonoFamily
@@ -106,14 +104,12 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
                 )
             }
             Spacer(Modifier.height(12.dp))
-            Flexible("about_open_update_btn", FlexibleKind.Button) {
-                NxButton(
-                    label = if (current.update.isCritical) s.text("updateDownloadNow") else s.text("updateDownload"),
-                    onClick = openDialog,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = if (current.update.isCritical) NxButtonStyle.Destructive else NxButtonStyle.Secondary,
-                )
-            }
+            NxButton(
+                label = if (current.update.isCritical) s.text("updateDownloadNow") else s.text("updateDownload"),
+                onClick = openDialog,
+                modifier = Modifier.fillMaxWidth(),
+                style = if (current.update.isCritical) NxButtonStyle.Destructive else NxButtonStyle.Secondary,
+            )
         }
     }
 }

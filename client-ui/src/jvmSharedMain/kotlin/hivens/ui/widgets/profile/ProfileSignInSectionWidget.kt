@@ -30,8 +30,6 @@ import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
-import hivens.ui.flexible.Flexible
-import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.theme.LocalMonoFamily
@@ -108,14 +106,12 @@ private fun MicrosoftAccount(session: AccountView, othersLeft: Boolean) {
         UuidCard(session.uuid)
         // The live skin + cape manager (Mojang-sourced, not the SmartyCraft skin
         // service this section's identity comes from) is the next pass.
-        Flexible("profile_ms_signout_btn", FlexibleKind.Button) {
-            NxButton(
-                label = s.text("profileSignOutMicrosoft"),
-                onClick = { signOut() },
-                modifier = Modifier.widthIn(min = 200.dp),
-                style = NxButtonStyle.Secondary,
-            )
-        }
+        NxButton(
+            label = s.text("profileSignOutMicrosoft"),
+            onClick = { signOut() },
+            modifier = Modifier.widthIn(min = 200.dp),
+            style = NxButtonStyle.Secondary,
+        )
         PuppetClick("account.signout.microsoft") { signOut() }
     }
 }

@@ -50,8 +50,6 @@ import hivens.accounts.api.SkinUploadStatus
 import hivens.i18n.api.Strings
 import hivens.ui.accounts.outcomeOf
 import hivens.ui.components.DestructiveConfirmDialog
-import hivens.ui.flexible.Flexible
-import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -419,27 +417,23 @@ private fun Wardrobe(session: SessionView) {
                 ) {
                     if (scSession != null) {
                         skinSel?.let { (file, markId) ->
-                            Flexible("wardrobe_apply_sc_btn", FlexibleKind.Button) {
-                                NxButton(
-                                    label = s.text("wardrobeApplySmartycraft"),
-                                    onClick = { if (!busy) applyToSc(file, isCloak = false, markId = markId) },
-                                    style = NxButtonStyle.Primary,
-                                    enabled = !busy,
-                                )
-                            }
+                            NxButton(
+                                label = s.text("wardrobeApplySmartycraft"),
+                                onClick = { if (!busy) applyToSc(file, isCloak = false, markId = markId) },
+                                style = NxButtonStyle.Primary,
+                                enabled = !busy,
+                            )
                             PuppetClick("wardrobe.applySmartycraft") { if (!busy) applyToSc(file, isCloak = false, markId = markId) }
                         }
                         if (showCapes) {
                             selectedCapeId?.let { id ->
                                 val capeFile = library.file(id).toFile()
-                                Flexible("wardrobe_apply_cape_sc_btn", FlexibleKind.Button) {
-                                    NxButton(
-                                        label = s.text("wardrobeApplyCape"),
-                                        onClick = { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) },
-                                        style = NxButtonStyle.Secondary,
-                                        enabled = !busy,
-                                    )
-                                }
+                                NxButton(
+                                    label = s.text("wardrobeApplyCape"),
+                                    onClick = { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) },
+                                    style = NxButtonStyle.Secondary,
+                                    enabled = !busy,
+                                )
                                 PuppetClick("wardrobe.applyCapeSmartycraft") { if (!busy) applyToSc(capeFile, isCloak = true, markId = id) }
                             }
                         }

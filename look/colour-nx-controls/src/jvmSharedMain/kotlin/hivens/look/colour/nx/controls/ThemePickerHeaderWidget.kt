@@ -13,8 +13,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.i18n.api.strings
 import hivens.themes.api.ThemesKeys
-import hivens.ui.flexible.Flexible
-import hivens.ui.flexible.FlexibleKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.puppet.PuppetClick
@@ -77,13 +75,11 @@ fun ThemePickerHeaderWidget() {
                 fontWeight = FontWeight.Black,
                 color      = NxInk.main,
             )
-            Flexible("theme_picker_apply_btn", FlexibleKind.Button) {
-                NxButton(
-                    label = s.text("themePickerApply"),
-                    onClick = applyAndLeave,
-                    style = NxButtonStyle.Primary,
-                )
-            }
+            NxButton(
+                label = s.text("themePickerApply"),
+                onClick = applyAndLeave,
+                style = NxButtonStyle.Primary,
+            )
         }
     }
 }

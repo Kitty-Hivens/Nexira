@@ -2,10 +2,10 @@ import hivens.android.launcherApi
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
-// Leaf design-system module (NxUI). Holds tokens, primitives, surfaces and the
-// Flexible decorator layer that the rest of the UI builds on. Depends in-tree on
-// ui-layers, which draws nothing, and on the colour axis's contract, whose answers
-// its colours are read from. client-ui depends on it one-way.
+// Leaf design-system module (NxUI). Holds tokens, primitives and surfaces that the
+// rest of the UI builds on. Depends in-tree on ui-layers, which draws nothing, and on
+// the colour axis's contract, whose answers its colours are read from. client-ui
+// depends on it one-way.
 // No application/packaging here, no puppet source-set, no client-core: this is
 // the bottom of the UI graph.
 plugins {

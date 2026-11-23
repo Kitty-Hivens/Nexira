@@ -25,8 +25,6 @@ import hivens.accounts.api.SignInFlow
 import hivens.ui.components.ConfirmCodeDialog
 import hivens.ui.components.MicrosoftSignInButton
 import hivens.ui.components.words
-import hivens.ui.flexible.Flexible
-import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -240,7 +238,7 @@ fun LoginPanel(
         }
         PuppetToggle("login.rememberMe", rememberMe, onValueChange = setRemember)
 
-        // LOG IN -- chaos target (only when not loading, loading state stays reliable)
+        // LOG IN
         if (isLoading) {
             Button(
                 onClick   = {},
@@ -259,29 +257,25 @@ fun LoginPanel(
                 )
             }
         } else {
-            Flexible("login_submit_btn", FlexibleKind.Button) {
-                NxButton(
-                    label     = s.text("loginButton"),
-                    onClick   = { doLogin() },
-                    modifier  = Modifier.fillMaxWidth(),
-                    style     = NxButtonStyle.Primary,
-                    minHeight = 42.dp,
-                )
-            }
+            NxButton(
+                label     = s.text("loginButton"),
+                onClick   = { doLogin() },
+                modifier  = Modifier.fillMaxWidth(),
+                style     = NxButtonStyle.Primary,
+                minHeight = 42.dp,
+            )
         }
         PuppetClick("login.submit", enabled = !isLoading) { doLogin() }
 
-        // REGISTER -- chaos target
+        // REGISTER
         if (registerUrl != null) {
-            Flexible("login_register_btn", FlexibleKind.Button) {
-                NxButton(
-                    label     = s.text("loginRegister"),
-                    onClick   = { SystemActions.openUrl(registerUrl) },
-                    modifier  = Modifier.fillMaxWidth(),
-                    style     = NxButtonStyle.Tertiary,
-                    minHeight = 42.dp,
-                )
-            }
+            NxButton(
+                label     = s.text("loginRegister"),
+                onClick   = { SystemActions.openUrl(registerUrl) },
+                modifier  = Modifier.fillMaxWidth(),
+                style     = NxButtonStyle.Tertiary,
+                minHeight = 42.dp,
+            )
             PuppetClick("login.register") {
                 SystemActions.openUrl(registerUrl)
             }
@@ -290,15 +284,13 @@ fun LoginPanel(
         // PLAY OFFLINE -- offline identity, no network. Reuses the username field
         // as the offline name, which the module keeps for next time.
         if (showOffline) {
-            Flexible("login_offline_btn", FlexibleKind.Button) {
-                NxButton(
-                    label     = s.text("loginPlayOffline"),
-                    onClick   = { playOffline() },
-                    modifier  = Modifier.fillMaxWidth(),
-                    style     = NxButtonStyle.Tertiary,
-                    minHeight = 42.dp,
-                )
-            }
+            NxButton(
+                label     = s.text("loginPlayOffline"),
+                onClick   = { playOffline() },
+                modifier  = Modifier.fillMaxWidth(),
+                style     = NxButtonStyle.Tertiary,
+                minHeight = 42.dp,
+            )
             PuppetClick("login.playOffline") { playOffline() }
         }
 

@@ -30,8 +30,6 @@ import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.ui.Screen
 import hivens.ui.effects.pixelArtBackground
-import hivens.ui.flexible.Flexible
-import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.InitialsAvatar
 import hivens.ui.nx.PlayGround
@@ -182,9 +180,7 @@ fun HomeNewHero(instance: WidgetInstance) {
                         }
                     }
                 }
-                Flexible("home_hero_play_btn", FlexibleKind.Button) {
-                    QuickLaunchButton(quickLaunch = quickLaunch, ground = PlayGround.Media, layout = p.playLayout)
-                }
+                QuickLaunchButton(quickLaunch = quickLaunch, ground = PlayGround.Media, layout = p.playLayout)
             }
 
             val control = quickLaunch.control

@@ -20,8 +20,6 @@ import hivens.accounts.api.ProviderView
 import hivens.accounts.api.SignInError
 import hivens.accounts.api.SignInFlow
 import hivens.i18n.api.Strings
-import hivens.ui.flexible.Flexible
-import hivens.ui.flexible.FlexibleKind
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -78,15 +76,13 @@ fun MicrosoftSignInButton(
     }
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Flexible("login_microsoft_btn", FlexibleKind.Button) {
-            NxButton(
-                label = label ?: s.text("loginMicrosoft"),
-                onClick = { start() },
-                modifier = Modifier.fillMaxWidth(),
-                style = NxButtonStyle.Tertiary,
-                minHeight = 42.dp,
-            )
-        }
+        NxButton(
+            label = label ?: s.text("loginMicrosoft"),
+            onClick = { start() },
+            modifier = Modifier.fillMaxWidth(),
+            style = NxButtonStyle.Tertiary,
+            minHeight = 42.dp,
+        )
         when (flow) {
             SignInFlow.Working -> Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
