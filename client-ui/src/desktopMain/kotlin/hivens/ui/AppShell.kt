@@ -69,9 +69,6 @@ import hivens.ui.diag.RenderBackend
 import hivens.ui.diag.SkinemaGate
 import hivens.ui.diag.UiRecoverySignal
 import hivens.ui.diag.probe
-import hivens.ui.easter.AprilFools
-import hivens.ui.easter.AprilFoolsLoader
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.generated.resources.Res
@@ -358,15 +355,6 @@ private fun FrameWindowScope.ShellContent(
     // look, the system's colour scheme among it, the modules read themselves.
     val words = appLevel.read(ShellLookValues.Words)
 
-    // The chaos engine is a plain singleton rather than a composable, so it is
-    // told what the interface looks like rather than reading it. Both values were
-    // mirrored from the style axis; there is one form now, so they are constants
-    // and this is the seam where a second one would reach the engine again.
-    LaunchedEffect(Unit) {
-        AprilFools.styleAnimationMultiplier = 1f
-        AprilFools.useFlatSurface           = false
-    }
-
     // One-time registry-aware reconcile of the loaded layout graph. The
     // launcher seeds missing bundled-default surfaces/slots but has no
     // WidgetRegistry, so descriptor-declared container child slots are seeded
@@ -518,16 +506,6 @@ private fun FrameWindowScope.ShellContent(
         }
     }
 
-    // April Fools subsystem: provide the resolved lifecycle (Real or NoOp,
-    // chosen by `AprilFoolsLoader`'s SPI scan) to every downstream
-    // Composable. Wrapping at this level means tray/window close handlers
-    // can capture `af` from the enclosing scope and still see the real
-    // chaos flag in dev builds, while production binaries (no service
-    // descriptor on the classpath) get NoOpAprilFools with zero chaos
-    // overhead.
-    val af = AprilFoolsLoader.instance
-
-    CompositionLocalProvider(LocalAprilFools provides af) {
     CompositionLocalProvider(LocalTranslator provides words) {
         val s = nexiraStrings()
 
@@ -741,14 +719,7 @@ private fun FrameWindowScope.ShellContent(
             }
 
             tray.onExit = {
-                SwingUtilities.invokeLater {
-                    // Real impl pops the chaos close-dialog (during April Fools
-                    // window); NoOp invokes onActualClose synchronously. The
-                    // visibility flip is unconditional during chaos so the
-                    // dialog isn't hidden behind a minimized window.
-                    if (af.isActive()) isWindowVisible = true
-                    af.requestCloseDialog { quit() }
-                }
+                SwingUtilities.invokeLater { quit() }
             }
 
             tray.onShowConsole = {
@@ -790,24 +761,20 @@ private fun FrameWindowScope.ShellContent(
         PublishShellLook(look, appLevel, interfaceText, customization)
 
         // ── Main window ────────────────────────────────────────────────
-        // af.requestCloseDialog dispatches: chaos active -> pop the torturous
-        // dialog; chaos inactive -> the close path we'd have taken anyway
-        // (tray-hide if available, else exit). Hoisted so the OS close request
-        // AND the custom caption Close button (LocalChromeClose) share it --
-        // undecorated chrome must keep the same tray-hide / chaos behavior.
+        // The close path: hide to the tray if it is available, else quit. Hoisted so
+        // the OS close request and the custom caption Close button (LocalChromeClose)
+        // share it.
         val onCloseChrome: () -> Unit = {
-            af.requestCloseDialog {
-                if (tray.canBeReady) {
-                    // canBeReady (not isSupported) so we don't kill the launcher
-                    // mid-init while the tray library is still settling D-Bus /
-                    // SNI handshake. If it ultimately fails, the user can quit via
-                    // tray (when it appears) or kill the process -- strictly
-                    // better than exiting on a close request the user clearly
-                    // meant as "minimize".
-                    isWindowVisible = false
-                } else {
-                    quit()
-                }
+            if (tray.canBeReady) {
+                // canBeReady (not isSupported) so we don't kill the launcher
+                // mid-init while the tray library is still settling D-Bus /
+                // SNI handshake. If it ultimately fails, the user can quit via
+                // tray (when it appears) or kill the process -- strictly
+                // better than exiting on a close request the user clearly
+                // meant as "minimize".
+                isWindowVisible = false
+            } else {
+                quit()
             }
         }
         // Window-level callbacks, late-bound: the window itself is created
@@ -961,11 +928,8 @@ private fun FrameWindowScope.ShellContent(
                     )
                 } else {
                     AppRoot(
-                        onRealExit   = quit,
-                        onHideToTray = if (tray.canBeReady) {{ isWindowVisible = false }}
-                        else null,
-                        customization              = customization,
-                        onCustomizationChanged     = { newCustomization ->
+                        customization          = customization,
+                        onCustomizationChanged = { newCustomization ->
                             customization = newCustomization
                             preferences.write("the customization") { customizationManager.save(newCustomization) }
                         },
@@ -1032,7 +996,6 @@ private fun FrameWindowScope.ShellContent(
             } // end CompositionLocalProvider(LocalCustomization)
         }
     }
-    } // end CompositionLocalProvider(LocalAprilFools)
 }
 
 /** Getting a launch ready: the two states that change with every chunk and every file. */

@@ -50,9 +50,9 @@ class RailFocusReturnTest {
                 LayerHost(layers, Modifier.fillMaxSize()) {
                     focusManager = LocalFocusManager.current
                     Column(Modifier.width(64.dp).focusGroup()) {
-                        NavSlot(icon = NxIcon.Home, phase = 0f, active = true, onClick = {})
-                        NavSlot(icon = NxIcon.Star, phase = 0f, active = false, onClick = {})
-                        NavSlot(icon = NxIcon.ExitToApp, phase = 0f, active = false, chaosEligible = false, onClick = { open = true })
+                        NavSlot(icon = NxIcon.Home, active = true, onClick = {})
+                        NavSlot(icon = NxIcon.Star, active = false, onClick = {})
+                        NavSlot(icon = NxIcon.ExitToApp, active = false, onClick = { open = true })
                     }
                     Layer(visible = open, modal = true, onDismissRequest = { open = false }) {
                         Box(Modifier.size(40.dp).focusable())

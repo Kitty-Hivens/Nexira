@@ -27,7 +27,6 @@ import hivens.ui.background.BackgroundManager
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.components.SignOutPrompt
 import hivens.ui.customization.CustomizationSettings
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.theme.NxColor
@@ -88,8 +87,6 @@ internal expect fun ComponentRegistry.Builder.addPlatformDecoders()
  */
 @Composable
 fun AppRoot(
-    onRealExit: () -> Unit,
-    onHideToTray: (() -> Unit)?,
     customization: CustomizationSettings,
     onCustomizationChanged: (CustomizationSettings) -> Unit,
 ) {
@@ -101,7 +98,6 @@ fun AppRoot(
     // news / skin images would diverge from auth and protocol traffic
     // on the same host.
     val routingCallFactory: Call.Factory       = koinInject()
-    val af = LocalAprilFools.current
 
     // Register the routing-aware Coil loader exactly once. setSafe is
     // idempotent (it no-ops once a loader exists), but allocating the factory
@@ -173,8 +169,7 @@ fun AppRoot(
     }
 
     // ── Render: background behind layout ──────────────────────────────────
-    val mousePos    = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
-    val mousePxPos  = remember { mutableStateOf(Offset.Zero) }
+    val mousePos = remember { mutableStateOf(Offset(0.5f, 0.5f)) }
     var windowSize by remember { mutableStateOf(IntSize.Zero) }
     // What the wallpaper tells the themes module: its overall brightness, for the mode
     // that follows the wallpaper between dark and light, and its colours, which the
@@ -219,8 +214,7 @@ fun AppRoot(
                             if (event.type == PointerEventType.Move || (touch && event.type == PointerEventType.Press)) {
                                 val pos = change?.position
                                 if (pos != null && windowSize.width > 0 && windowSize.height > 0) {
-                                    mousePxPos.value = pos
-                                    mousePos.value   = Offset(pos.x / windowSize.width, pos.y / windowSize.height)
+                                    mousePos.value = Offset(pos.x / windowSize.width, pos.y / windowSize.height)
                                 }
                             } else if (touch && event.type == PointerEventType.Release) {
                                 // A finger has no resting place on the glass, so the picture goes back to centre.
@@ -243,37 +237,30 @@ fun AppRoot(
               onAudioVolume    = { volume -> backgroundManager.update { it.copy(audioVolume = volume) } },
           )
 
-          af.WrapContent(
-              pixelCursorState = mousePxPos,
-              windowSize       = windowSize,
-              onRealClose      = onRealExit,
-              onHideTray       = onHideToTray,
-          ) {
-              AppLayout(
-                  appState = appState,
-                  currentScreen = backStack.current,
-                  onScreenChange = backStack::navigate,
-                  onSwitchTab = backStack::switchTo,
-                  onReplaceScreen = backStack::replaceCurrent,
-                  onBack = { backStack.back() },
-                  canGoBack = backStack.canGoBack,
-                  canGoForward = backStack.canGoForward,
-                  onForward = { backStack.forward() },
-                  trail = backStack.trail,
-                  history = backStack.history,
-                  onPopTo = backStack::popTo,
-                  backsAtRoot = backStack.backsAtRoot,
-                  backgroundSettings = backgroundSettings,
-                  onBackgroundSettingsChanged = { change -> backgroundManager.update(change) },
-                  customization              = customization,
-                  onCustomizationChanged     = onCustomizationChanged,
-              )
+          AppLayout(
+              appState = appState,
+              currentScreen = backStack.current,
+              onScreenChange = backStack::navigate,
+              onSwitchTab = backStack::switchTo,
+              onReplaceScreen = backStack::replaceCurrent,
+              onBack = { backStack.back() },
+              canGoBack = backStack.canGoBack,
+              canGoForward = backStack.canGoForward,
+              onForward = { backStack.forward() },
+              trail = backStack.trail,
+              history = backStack.history,
+              onPopTo = backStack::popTo,
+              backsAtRoot = backStack.backsAtRoot,
+              backgroundSettings = backgroundSettings,
+              onBackgroundSettingsChanged = { change -> backgroundManager.update(change) },
+              customization              = customization,
+              onCustomizationChanged     = onCustomizationChanged,
+          )
 
-              NotificationStack()
+          NotificationStack()
 
-              // The window's open sign-out question, asked by whichever widget offered it.
-              SignOutPrompt()
-          }
+          // The window's open sign-out question, asked by whichever widget offered it.
+          SignOutPrompt()
         }
     }
     }

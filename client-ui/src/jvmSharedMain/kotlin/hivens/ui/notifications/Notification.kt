@@ -11,7 +11,6 @@ data class NotifAction(
 )
 
 // progress: null -> no bar, 0..1 -> fraction, NaN -> indeterminate.
-// NaN sentinel matches AprilFoolsProgress.wrap so download ticks pipe through.
 data class NotificationEvent(
     val id: UUID,
     val severity: Severity,

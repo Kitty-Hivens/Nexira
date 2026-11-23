@@ -135,10 +135,6 @@ include(":client-i18n")
 // the profile; kept out of client-ui so the renderer can be exercised on
 // its own.
 include(":client-render3d")
-// The April Fools engine and its companions. A self-contained seasonal
-// surface with three imports into the rest of the tree; separate so it
-// cannot be disturbed by, and cannot disturb, ordinary UI work.
-include(":client-easter")
 include(":widget-model")
 include(":widget-api")
 include(":widget-processor")

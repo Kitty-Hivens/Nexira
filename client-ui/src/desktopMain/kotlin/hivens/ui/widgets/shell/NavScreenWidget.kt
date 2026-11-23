@@ -43,7 +43,6 @@ fun NavScreenLink(instance: WidgetInstance) {
     NavSlot(
         icon        = ScreenIcons.of(spec.icon),
         outlineSwap = true,
-        phase       = 0.8f,
         active      = current is Screen.Custom && current.id == spec.id,
         onClick     = { switchTab(Screen.Custom(spec.id)) },
     )

@@ -54,8 +54,6 @@ import hivens.ui.customization.CustomizationManager
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.debug.IdentitySlotChromeModifier
 import hivens.ui.debug.IdentityWidgetDecorator
-import hivens.ui.easter.AprilFoolsLoader
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.host.HostKoin
@@ -236,148 +234,144 @@ private fun AndroidShellContent() {
 
     if (!lookReady) return
 
-    CompositionLocalProvider(LocalAprilFools provides AprilFoolsLoader.instance) {
-        CompositionLocalProvider(LocalTranslator provides words) {
-            val s = nexiraStrings()
-            val interfaceText = s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle")
+    CompositionLocalProvider(LocalTranslator provides words) {
+        val s = nexiraStrings()
+        val interfaceText = s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle")
 
-            val customizationJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true } }
-            val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
-            var customization by remember { mutableStateOf(customizationManager.load()) }
+        val customizationJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true } }
+        val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
+        var customization by remember { mutableStateOf(customizationManager.load()) }
 
-            val layoutGraph by remember(layoutGraphRepo) { layoutGraphRepo.observe() }.collectAsState()
-            val modules by widgetModules.state.collectAsState()
-            val surfaceRenderer: WidgetSurfaceRenderer = remember { { spec, content -> WidgetSurface(spec, content) } }
+        val layoutGraph by remember(layoutGraphRepo) { layoutGraphRepo.observe() }.collectAsState()
+        val modules by widgetModules.state.collectAsState()
+        val surfaceRenderer: WidgetSurfaceRenderer = remember { { spec, content -> WidgetSurface(spec, content) } }
 
-            CompositionLocalProvider(
-                LocalCustomization provides customization,
-                LocalLayoutGraph provides layoutGraph,
-                LocalWidgetRegistry provides modules.registry,
-                LocalWidgetServiceRegistry provides widgetServiceRegistry,
-                LocalWidgetDataRegistry provides widgetDataRegistry,
-                LocalScope provides appLevel,
-                LocalWidgetCommandRegistry provides widgetCommandRegistry,
-                LocalWidgetStateHost provides widgetStateStore,
-                LocalWidgetDecorator provides IdentityWidgetDecorator,
-                LocalSlotChromeModifier provides IdentitySlotChromeModifier,
-                LocalWidgetSurfaceRenderer provides surfaceRenderer,
-                LocalWidgetEntrance provides PlayedWidgetEntrance,
-                LocalViewportScrollbar provides NxViewportScrollbar,
-                LocalMapControls provides NxMapControls,
-                LocalUseCustomChrome provides false,
-                LocalRightRailSheet provides true,
-            ) {
-              // Every axis of the look the manager answers, around all the window draws.
-              // The shell knows none of them: it wraps what it draws in the one value.
-              appLevel.read(ShellLookValues.Look).Provide {
-              // The one window a phone has, the Activity, registered with the host and
-              // given its level for as long as this shell draws it.
-              HostedWindow(WindowId.Main, WindowOwner.Launcher, rememberActivityWindow()) {
-                // A notification action opens here. The Activity is in front whenever
-                // one can be tapped, so there is nothing to raise.
-                MainWindowNavigation(raise = {})
-                // The window's layers and its dismiss stack, at the root of its level and around
-                // the theme, as on the desktop: the host belongs to the window, and a layer takes
-                // its theme from where it is opened.
-                val layers = rememberWindowLayers()
-                // Escape becomes the activity's back here, the path the system's own back
-                // takes: the dismiss stack's handler first, then the history, then the hold.
-                val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
-                val escape = remember(layers, backDispatcher) {
-                    EscapeAsBack(layers.dismiss) { backDispatcher?.onBackPressed() }
-                }
-                // Around the layers rather than inside the window's own content, so a key
-                // from a menu or a dialog that holds the focus passes these hooks as well.
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        // The shell's keys are read here, so they stop when nothing in the
-                        // shell holds the focus, as after Escape takes it from a field.
-                        .keepsFocus()
-                        .onPreviewKeyEvent { ev ->
-                            layers.dismiss.onPreviewKeyEvent(ev)
-                            val resolved = resolveShellChord(
-                                event = ev,
-                                debugOverlayAvailable = false,
-                                editing = editModeController.isEditing,
-                                fieldFocused = layers.dismiss.fieldFocused,
-                                modalOpen = layers.modalOpen,
-                            )
-                            when (resolved.chord) {
-                                ShellChord.ToggleEditMode -> editModeController.requestEditToggle()
-                                ShellChord.ToggleRightRail -> editModeController.requestRightRailToggle()
-                                ShellChord.UndoEdit -> editModeController.undo()
-                                ShellChord.RedoEdit -> editModeController.redo()
-                                ShellChord.ToggleDebugOverlay, null -> Unit
-                            }
-                            resolved.consume
+        CompositionLocalProvider(
+            LocalCustomization provides customization,
+            LocalLayoutGraph provides layoutGraph,
+            LocalWidgetRegistry provides modules.registry,
+            LocalWidgetServiceRegistry provides widgetServiceRegistry,
+            LocalWidgetDataRegistry provides widgetDataRegistry,
+            LocalScope provides appLevel,
+            LocalWidgetCommandRegistry provides widgetCommandRegistry,
+            LocalWidgetStateHost provides widgetStateStore,
+            LocalWidgetDecorator provides IdentityWidgetDecorator,
+            LocalSlotChromeModifier provides IdentitySlotChromeModifier,
+            LocalWidgetSurfaceRenderer provides surfaceRenderer,
+            LocalWidgetEntrance provides PlayedWidgetEntrance,
+            LocalViewportScrollbar provides NxViewportScrollbar,
+            LocalMapControls provides NxMapControls,
+            LocalUseCustomChrome provides false,
+            LocalRightRailSheet provides true,
+        ) {
+          // Every axis of the look the manager answers, around all the window draws.
+          // The shell knows none of them: it wraps what it draws in the one value.
+          appLevel.read(ShellLookValues.Look).Provide {
+          // The one window a phone has, the Activity, registered with the host and
+          // given its level for as long as this shell draws it.
+          HostedWindow(WindowId.Main, WindowOwner.Launcher, rememberActivityWindow()) {
+            // A notification action opens here. The Activity is in front whenever
+            // one can be tapped, so there is nothing to raise.
+            MainWindowNavigation(raise = {})
+            // The window's layers and its dismiss stack, at the root of its level and around
+            // the theme, as on the desktop: the host belongs to the window, and a layer takes
+            // its theme from where it is opened.
+            val layers = rememberWindowLayers()
+            // Escape becomes the activity's back here, the path the system's own back
+            // takes: the dismiss stack's handler first, then the history, then the hold.
+            val backDispatcher = LocalOnBackPressedDispatcherOwner.current?.onBackPressedDispatcher
+            val escape = remember(layers, backDispatcher) {
+                EscapeAsBack(layers.dismiss) { backDispatcher?.onBackPressed() }
+            }
+            // Around the layers rather than inside the window's own content, so a key
+            // from a menu or a dialog that holds the focus passes these hooks as well.
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    // The shell's keys are read here, so they stop when nothing in the
+                    // shell holds the focus, as after Escape takes it from a field.
+                    .keepsFocus()
+                    .onPreviewKeyEvent { ev ->
+                        layers.dismiss.onPreviewKeyEvent(ev)
+                        val resolved = resolveShellChord(
+                            event = ev,
+                            debugOverlayAvailable = false,
+                            editing = editModeController.isEditing,
+                            fieldFocused = layers.dismiss.fieldFocused,
+                            modalOpen = layers.modalOpen,
+                        )
+                        when (resolved.chord) {
+                            ShellChord.ToggleEditMode -> editModeController.requestEditToggle()
+                            ShellChord.ToggleRightRail -> editModeController.requestRightRailToggle()
+                            ShellChord.UndoEdit -> editModeController.undo()
+                            ShellChord.RedoEdit -> editModeController.redo()
+                            ShellChord.ToggleDebugOverlay, null -> Unit
                         }
-                        // A hardware Escape, after whatever holds the focus has had it and
-                        // before the root of the window takes it for a focus step: made back
-                        // here, as the system never does once the root has taken it. A held
-                        // key's repeats stop here.
-                        .onKeyEvent(escape::onKeyEvent),
-                ) {
-                LayerHost(layers, Modifier.fillMaxSize()) {
-                val themeReveal = rememberThemeReveal()
-                NxTheme(interfaceText = interfaceText) {
-                    ThemeRevealHost(themeReveal) {
-                        // The system bars and the caption of a freeform window are the system's, so the
-                        // layout yields room to them instead of drawing under.
-                        // Drawn edge to edge: each region paints under the system bars and pads its own
-                        // content by them (see the shell regions), so nothing is padded out here.
-                        Box(Modifier.fillMaxSize().background(NxColor.page)) {
-                            AppRoot(
-                                onRealExit = {},
-                                onHideToTray = null,
-                                customization = customization,
-                                onCustomizationChanged = { updated ->
-                                    customization = updated
-                                    preferences.write("the customization") { customizationManager.save(updated) }
-                                },
-                            )
+                        resolved.consume
+                    }
+                    // A hardware Escape, after whatever holds the focus has had it and
+                    // before the root of the window takes it for a focus step: made back
+                    // here, as the system never does once the root has taken it. A held
+                    // key's repeats stop here.
+                    .onKeyEvent(escape::onKeyEvent),
+            ) {
+            LayerHost(layers, Modifier.fillMaxSize()) {
+            val themeReveal = rememberThemeReveal()
+            NxTheme(interfaceText = interfaceText) {
+                ThemeRevealHost(themeReveal) {
+                    // The system bars and the caption of a freeform window are the system's, so the
+                    // layout yields room to them instead of drawing under.
+                    // Drawn edge to edge: each region paints under the system bars and pads its own
+                    // content by them (see the shell regions), so nothing is padded out here.
+                    Box(Modifier.fillMaxSize().background(NxColor.page)) {
+                        AppRoot(
+                            customization = customization,
+                            onCustomizationChanged = { updated ->
+                                customization = updated
+                                preferences.write("the customization") { customizationManager.save(updated) }
+                            },
+                        )
 
-                            // The one Back the window's dismiss stack has, closing what Escape would.
-                            // After AppRoot, so it is asked before the navigation's own Back, which
-                            // gets the gesture only when nothing is open.
-                            BackHandler(enabled = layers.dismiss.handlesBack) { layers.dismiss.dismissTop() }
+                        // The one Back the window's dismiss stack has, closing what Escape would.
+                        // After AppRoot, so it is asked before the navigation's own Back, which
+                        // gets the gesture only when nothing is open.
+                        BackHandler(enabled = layers.dismiss.handlesBack) { layers.dismiss.dismissTop() }
 
-                            // The console over the whole window, as a modal layer: Escape and back close
-                            // it through the window's stack, and the keyboard goes back to the rail entry
-                            // that opened it. Drawn in place it had nowhere to give the keyboard back to.
-                            Layer(
-                                visible = gameConsole.shouldShowConsole,
-                                modal = true,
-                                onDismissRequest = { gameConsole.hide() },
-                                dismissOnOutsidePress = false,
-                            ) {
-                                val settingsStore: ConsoleSettingsStore = koinInject()
-                                val consoleSettings by settingsStore.settings.collectAsState()
-                                NxSurface(SurfaceKind.Page, Modifier.fillMaxSize()) {
-                                    // The bars, the gesture bar among them, the strip along the bottom where a swipe is
-                                    // the system's, and the keyboard: the status row at the bottom lay under the gesture
-                                    // bar with its toggle cut off. Not safeDrawing, which also keeps out the cutout, and a
-                                    // phone on its side reports its camera as a band the height of the screen.
-                                    val clear = WindowInsets.statusBars
-                                        .union(WindowInsets.navigationBars)
-                                        .union(WindowInsets.mandatorySystemGestures.only(WindowInsetsSides.Bottom))
-                                        .union(WindowInsets.tappableElement)
-                                        .union(WindowInsets.ime)
-                                    Box(Modifier.fillMaxSize().windowInsetsPadding(clear)) {
-                                        ConsoleContent(settings = consoleSettings, onSettingsChange = settingsStore::update)
-                                    }
+                        // The console over the whole window, as a modal layer: Escape and back close
+                        // it through the window's stack, and the keyboard goes back to the rail entry
+                        // that opened it. Drawn in place it had nowhere to give the keyboard back to.
+                        Layer(
+                            visible = gameConsole.shouldShowConsole,
+                            modal = true,
+                            onDismissRequest = { gameConsole.hide() },
+                            dismissOnOutsidePress = false,
+                        ) {
+                            val settingsStore: ConsoleSettingsStore = koinInject()
+                            val consoleSettings by settingsStore.settings.collectAsState()
+                            NxSurface(SurfaceKind.Page, Modifier.fillMaxSize()) {
+                                // The bars, the gesture bar among them, the strip along the bottom where a swipe is
+                                // the system's, and the keyboard: the status row at the bottom lay under the gesture
+                                // bar with its toggle cut off. Not safeDrawing, which also keeps out the cutout, and a
+                                // phone on its side reports its camera as a band the height of the screen.
+                                val clear = WindowInsets.statusBars
+                                    .union(WindowInsets.navigationBars)
+                                    .union(WindowInsets.mandatorySystemGestures.only(WindowInsetsSides.Bottom))
+                                    .union(WindowInsets.tappableElement)
+                                    .union(WindowInsets.ime)
+                                Box(Modifier.fillMaxSize().windowInsetsPadding(clear)) {
+                                    ConsoleContent(settings = consoleSettings, onSettingsChange = settingsStore::update)
                                 }
                             }
                         }
-                        TwoFactorPromptHost()
-                        CertificatePromptHost()
                     }
+                    TwoFactorPromptHost()
+                    CertificatePromptHost()
                 }
-                } // end LayerHost
-                } // end key hooks
-              }
-              } // end Look.Provide
             }
+            } // end LayerHost
+            } // end key hooks
+          }
+          } // end Look.Provide
         }
     }
 }

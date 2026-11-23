@@ -208,7 +208,6 @@ kotlin {
                 implementation(project(":ui-puppet"))
                 implementation(project(":client-i18n"))
                 implementation(project(":client-render3d"))
-                implementation(project(":client-easter"))
 
                 implementation(libs.filekit.core)
                 implementation(libs.filekit.dialogs.compose)

@@ -26,7 +26,7 @@ val LocalComposeWindow = staticCompositionLocalOf<ComposeWindow?> { null }
 /** The window's state and the way to change it (see [WindowHost]). Null outside the launcher's window. */
 val LocalWindowHost = staticCompositionLocalOf<WindowHost?> { null }
 
-/** The window's real close path (tray-hide-or-exit + chaos dialog). Default no-op
+/** The window's real close path (tray-hide-or-exit). Default no-op
  *  so a widget previewed outside the window does not crash. */
 val LocalChromeClose = staticCompositionLocalOf<() -> Unit> { {} }
 

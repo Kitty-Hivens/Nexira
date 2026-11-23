@@ -21,7 +21,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * Can a widget be lifted into the chaos overlay without being rebuilt?
+ * Can a widget be lifted into an overlay without being rebuilt?
  *
  * The decorator that wraps every widget is handed the content lambda, so moving
  * one into an overlay is a question of where that lambda is invoked, not of

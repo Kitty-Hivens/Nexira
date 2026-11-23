@@ -1,14 +1,9 @@
 package hivens.ui.screens.settings
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.relocation.BringIntoViewRequester
-import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import hivens.config.Branding
@@ -20,7 +15,6 @@ import hivens.ui.platform.rememberHostActions
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.diag.RenderBackend
 import hivens.ui.diag.reportPrompts
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxNavRow
@@ -33,7 +27,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.yield
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -47,53 +40,20 @@ import hivens.ui.theme.Status
  * writes), and after one exists, open the GitHub issue template prefilled with bundle
  * metadata.
  *
- * Hidden gesture: tap the DIAGNOSTICS section title 5 times to reveal the AprilFools
- * debug panel; tap 5 more to hide it. Lets dev exercise the chaos layer without
- * changing the system date.
- *
  * About link at the bottom: a standalone shortcut to the AboutScreen, self-describing
  * with version + license, so it carries no section header of its own.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun DiagnosticsSection(
     paths: PlatformPaths,
     onOpenAbout: () -> Unit,
 ) {
-    val s  = nexiraStrings()
-    val af = LocalAprilFools.current
+    val s = nexiraStrings()
     val host = rememberHostActions()
     // Read at bundle time rather than composition time: recovery can switch a
     // module off mid-session, and the bundle should say what is off now.
     val settingsService: ISettingsService = koinInject()
     val disabledModules = { settingsService.getSettings().disabledModules }
-
-    // April Fools debug panel -- secret unlock. Only wire the 5-tap gesture when the
-    // active impl actually renders a panel: a build that resolves the NoOp has an
-    // empty DebugPanel(), and a 5-tap there would toggle a hidden state that renders
-    // to nothing.
-    var debugTapCount  by remember { mutableIntStateOf(0) }
-    var showAprilDebug by remember { mutableStateOf(false) }
-    val debugPanelBringIntoView = remember { BringIntoViewRequester() }
-    val titleModifier = if (af.providesDebugPanel) {
-        Modifier.clickable {
-            debugTapCount++
-            if (debugTapCount >= 5) {
-                debugTapCount  = 0
-                showAprilDebug = !showAprilDebug
-            }
-        }
-    } else {
-        Modifier
-    }
-    LaunchedEffect(showAprilDebug) {
-        if (showAprilDebug) {
-            // Wait one frame so the panel is laid out before the scroll request;
-            // bringIntoView() against a not-yet-positioned target is a no-op.
-            yield()
-            val _ = runCatching { debugPanelBringIntoView.bringIntoView() }
-        }
-    }
 
     // Beacon: one-click ZIP for support -- bundles redacted logs, crash reports, action
     // ring and system info. Generation runs off the Compose UI thread (a 200 MB log cap
@@ -134,13 +94,7 @@ internal fun DiagnosticsSection(
         }
     }
 
-    NxSection(s.text("settingsSectionDiagnostics"), titleModifier = titleModifier) {
-        if (af.providesDebugPanel && showAprilDebug) {
-            Box(Modifier.bringIntoViewRequester(debugPanelBringIntoView)) {
-                af.DebugPanel()
-            }
-        }
-
+    NxSection(s.text("settingsSectionDiagnostics")) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             Box(Modifier.weight(1f)) {
                 NxButton(

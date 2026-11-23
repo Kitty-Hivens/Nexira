@@ -35,7 +35,7 @@ import kotlin.math.roundToInt
  * Custom caption buttons for the undecorated window: minimize, maximize/restore,
  * close. Glyphs are vector-drawn (not font icons) so they need no font-subset
  * entry. Close routes through [onClose] -- pass the SAME lambda the window's
- * onCloseRequest uses so tray-hide / chaos-dialog behavior is preserved.
+ * onCloseRequest uses so tray-hide behavior is preserved.
  *
  * Each button takes the full height of the bar it sits in, as the system's own
  * caption buttons do, so its hover fill reads as a button and not as a patch

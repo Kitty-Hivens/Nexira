@@ -21,8 +21,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import hivens.config.Branding
 import hivens.ui.BuildConfig
-import hivens.ui.easter.GibberishMode
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.favicon
 import hivens.ui.i18n.nexiraStrings
@@ -37,10 +35,7 @@ import java.util.Date
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 
-// Logo + title + version + build-date + description card. The
-// AprilFools wrapper occasionally corrupts these strings -- left
-// column embraces the chaos. Right column (system info, links)
-// stays readable on purpose.
+// Logo + title + version + build-date + description card.
 @Serializable
 data class AboutLogoProps(
     @PropLabel("widget.about.logo.title") val title: String = "",
@@ -60,7 +55,6 @@ data class AboutLogoProps(
 @Composable
 fun AboutLogoWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutLogoProps>()
-    val af = LocalAprilFools.current
     val s = nexiraStrings()
 
     Column(
@@ -75,7 +69,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
         Spacer(Modifier.height(16.dp))
 
         Text(
-            text       = af.maybeGibberish(p.title.ifBlank { Branding.TITLE }, probability = 0.15f),
+            text       = p.title.ifBlank { Branding.TITLE },
             style      = MaterialTheme.typography.headlineMedium,
             fontWeight = FontWeight.Black,
             color      = NxInk.main,
@@ -89,11 +83,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
                     .padding(horizontal = 10.dp, vertical = 4.dp),
             ) {
                 Text(
-                    text       = af.maybeGibberish(
-                        "v${Branding.VERSION.removePrefix("v")}",
-                        probability = 0.30f,
-                        mode        = GibberishMode.FAKE_VER,
-                    ),
+                    text       = "v${Branding.VERSION.removePrefix("v")}",
                     style      = MaterialTheme.typography.labelLarge,
                     color      = NxColor.lead(),
                     fontWeight = FontWeight.Bold,
@@ -113,7 +103,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
             }
             Spacer(Modifier.height(8.dp))
             Text(
-                text  = af.maybeGibberish(s.text("aboutBuildDate", buildDate), probability = 0.25f),
+                text  = s.text("aboutBuildDate", buildDate),
                 style = MaterialTheme.typography.bodySmall,
                 color = NxInk.quiet.copy(alpha = 0.6f),
             )
@@ -122,10 +112,7 @@ fun AboutLogoWidget(instance: WidgetInstance) {
         if (p.showTagline) {
             Spacer(Modifier.height(16.dp))
             Text(
-                text      = af.maybeGibberish(
-                    s.text("aboutDescription", Branding.UPSTREAM_NAME),
-                    probability = 0.20f,
-                ),
+                text      = s.text("aboutDescription", Branding.UPSTREAM_NAME),
                 style     = MaterialTheme.typography.bodyMedium,
                 color     = NxInk.quiet,
                 textAlign = TextAlign.Center,

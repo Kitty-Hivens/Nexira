@@ -82,7 +82,7 @@ val checkTranslations = tasks.register<TranslationCheckTask>("checkTranslations"
     english.set("en")
     // The main sources of the modules that read the launcher's own words. A test may look
     // up a key of another namespace, a module's, which English here has no business with.
-    listOf("client-ui", "client-easter", "android-app").forEach { module ->
+    listOf("client-ui", "android-app").forEach { module ->
         sources.from(layout.settingsDirectory.dir("$module/src").asFileTree.matching { include("*Main/**/*.kt", "main/**/*.kt") })
     }
 }

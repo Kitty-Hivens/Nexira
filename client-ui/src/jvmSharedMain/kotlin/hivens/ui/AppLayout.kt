@@ -407,9 +407,7 @@ fun AppSidebar(
     val consoleVisible = rememberScopedSource(Sources.ConsoleVisible).valueOrNull() == true
     val setConsoleVisible = rememberScopedCommand(Commands.SetConsoleVisible)
 
-    // Puppet: sidebar navigation. Direct onScreenChange calls keep
-    // test runs deterministic regardless of the AprilFools chaos
-    // wrapper inside the nav-buttons widget.
+    // Puppet: sidebar navigation.
     PuppetClick("nav.home")     { onSwitchTab(Screen.Home) }
     PuppetClick("nav.library")  { onSwitchTab(Screen.Library) }
     PuppetClick("nav.browse")   { onSwitchTab(Screen.Browse) }

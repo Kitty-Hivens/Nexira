@@ -1,11 +1,5 @@
 package hivens.ui.widgets.shell
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,13 +13,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import hivens.accounts.api.AccountKeys
@@ -34,7 +26,6 @@ import hivens.ui.Screen
 import hivens.ui.components.rememberSignOutRequest
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.customization.NavSelectionStyle
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -48,8 +39,6 @@ import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import kotlin.math.sin
-import kotlin.random.Random
 import kotlinx.serialization.Serializable
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -61,7 +50,7 @@ import hivens.ui.theme.Status
 // each item and the layout graph carries the rail's shape.
 //
 // Per-target behaviour (icon, action, active-highlight, enable/visibility,
-// tint, April Fools eligibility) resolves in the composable, NOT on the
+// tint) resolves in the composable, NOT on the
 // enum: it reads composition locals + koin and the enum must stay a plain
 // serializable value.
 @Serializable
@@ -90,14 +79,12 @@ fun NavEntry(instance: WidgetInstance) {
         NavTarget.Home -> NavSlot(
             icon         = NxIcon.Home,
             outlineSwap  = true,
-            phase        = 0.0f,
             active       = screen is Screen.Home,
             onClick      = { switchTab(Screen.Home) },
         )
         NavTarget.Library -> NavSlot(
             icon         = NxIcon.Star,
             outlineSwap  = true,
-            phase        = 0.55f,
             // A project page and a build's page belong here too: both are opened
             // from a pack's content tab, so the rail went dark the moment a reader
             // followed a mod out of the pack they were standing in.
@@ -108,28 +95,24 @@ fun NavEntry(instance: WidgetInstance) {
         NavTarget.Browse -> NavSlot(
             icon         = NxIcon.Search,
             outlineSwap  = true,
-            phase        = 1.65f,
             active       = screen is Screen.Browse || screen is Screen.CataloguePackDetail,
             onClick      = { switchTab(Screen.Browse) },
         )
         NavTarget.Profile -> NavSlot(
             icon         = NxIcon.Person,
             outlineSwap  = true,
-            phase        = 1.1f,
             active       = screen is Screen.Profile,
             onClick      = { switchTab(Screen.Profile) },
         )
         NavTarget.Wardrobe -> NavSlot(
             icon         = NxIcon.Palette,
             outlineSwap  = true,
-            phase        = 1.6f,
             active       = screen is Screen.Wardrobe,
             onClick      = { switchTab(Screen.Wardrobe) },
         )
         NavTarget.Settings -> NavSlot(
             icon         = NxIcon.Settings,
             outlineSwap  = true,
-            phase        = 2.2f,
             active       = screen is Screen.Settings || screen is Screen.ThemePicker ||
                 screen is Screen.BackgroundSettings,
             onClick      = { switchTab(Screen.Settings) },
@@ -137,7 +120,6 @@ fun NavEntry(instance: WidgetInstance) {
         NavTarget.About -> NavSlot(
             icon         = NxIcon.Info,
             outlineSwap  = true,
-            phase        = 3.3f,
             active       = screen is Screen.About,
             onClick      = { switchTab(Screen.About) },
         )
@@ -145,11 +127,9 @@ fun NavEntry(instance: WidgetInstance) {
             val visible = rememberScopedSource(Sources.ConsoleVisible).valueOrNull() ?: return
             val setVisible = rememberScopedCommand(Commands.SetConsoleVisible) ?: return
             NavSlot(
-                icon          = NxIcon.Build,
-                phase         = 0.0f,
-                active        = visible,
-                chaosEligible = false,
-                onClick       = { setVisible(!visible) },
+                icon    = NxIcon.Build,
+                active  = visible,
+                onClick = { setVisible(!visible) },
             )
         }
         NavTarget.Logout -> {
@@ -161,12 +141,10 @@ fun NavEntry(instance: WidgetInstance) {
             // Asks first, through the window's sign-out question.
             val signOut = rememberSignOutRequest() ?: return
             NavSlot(
-                icon          = NxIcon.ExitToApp,
-                phase         = 0.0f,
-                active        = false,
-                chaosEligible = false,
-                iconTint      = NxColor.status(Status.Error).copy(alpha = 0.75f),
-                onClick       = signOut,
+                icon     = NxIcon.ExitToApp,
+                active   = false,
+                iconTint = NxColor.status(Status.Error).copy(alpha = 0.75f),
+                onClick  = signOut,
             )
         }
     }
@@ -174,10 +152,8 @@ fun NavEntry(instance: WidgetInstance) {
 
 // Shared rail-item render. Screen-agnostic: callers pass a resolved onClick
 // plus active/enabled flags, so service actions (Console / Logout) reuse it
-// just like screen-nav targets. [chaosEligible] gates the April Fools
-// behaviour -- the 30% click-swallow AND the out-of-phase bounce -- so the
-// console toggle and logout stay stable and always work. [iconTint] overrides
-// the rail tint (logout's destructive red); null keeps the default.
+// just like screen-nav targets. [iconTint] overrides the rail tint (logout's
+// destructive red); null keeps the default.
 //
 // The active-item highlight is user-configurable via [NavSelectionStyle]
 // (Pill is the original Material capsule). The decoration is drawn behind /
@@ -189,44 +165,13 @@ fun NavEntry(instance: WidgetInstance) {
 @Composable
 internal fun NavSlot(
     icon: IconKey,
-    phase: Float,
     active: Boolean,
     enabled: Boolean = true,
-    chaosEligible: Boolean = true,
     iconTint: Color? = null,
     outlineSwap: Boolean = false,
     onClick: () -> Unit,
 ) {
-    val af = LocalAprilFools.current
     val cz = LocalCustomization.current
-
-    val bounceAmp = if (chaosEligible && af.isActive()) af.intensity() * 18f else 0f
-    // Only run the infinite transition during April Fools. Otherwise a 0-amplitude
-    // bounce still subscribes to an infinite-transition State and recomposes every
-    // rail item every frame forever -- the rail is mounted app-wide, so the
-    // launcher never reaches Compose idle (perpetual 60fps wakeups, battery drain).
-    val offsetY = if (bounceAmp != 0f) {
-        val transition = rememberInfiniteTransition(label = "nav-bounce-$phase")
-        val cycle by transition.animateFloat(
-            initialValue  = 0f,
-            targetValue   = (2f * Math.PI).toFloat(),
-            animationSpec = infiniteRepeatable(
-                animation = tween(
-                    durationMillis = (2200 - af.intensity() * 1400).toInt().coerceAtLeast(600),
-                    easing = LinearEasing,
-                ),
-                repeatMode = RepeatMode.Restart,
-            ),
-            label = "nav-bounce-cycle-$phase",
-        )
-        sin(cycle + phase) * bounceAmp
-    } else {
-        0f
-    }
-
-    val gated = {
-        if (!chaosEligible || !af.isActive() || Random.nextFloat() > 0.30f) onClick()
-    }
 
     // Selection accent: the user's nav override, else the theme primary -- so
     // by default it tracks the palette / accent override. Shared by the icon
@@ -246,62 +191,60 @@ internal fun NavSlot(
     val fill = accent.copy(alpha = 0.22f)
     val interaction = remember { MutableInteractionSource() }
 
-    Box(Modifier.graphicsLayer { translationY = offsetY }) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                // Taller than the icon so the slots tile flush (rail spacing is 0)
-                // and the breathing room between buttons stays inside the hit area.
-                .height(54.dp)
-                // Sign out asks first, in a dialog that gives the keyboard back here.
-                .layerTrigger()
-                .selectable(
-                    selected          = active,
-                    enabled           = enabled,
-                    role              = Role.Tab,
-                    interactionSource = interaction,
-                    // The hover/press state layer is user-toggleable; off leaves
-                    // the active item marked only by its NavSelectionStyle.
-                    indication        = if (cz.navHoverHighlight) LocalIndication.current else null,
-                    onClick           = gated,
-                ),
-            contentAlignment = Alignment.Center,
-        ) {
-            if (active) {
-                when (cz.navSelectionStyle) {
-                    NavSelectionStyle.Pill ->
-                        Box(Modifier.size(width = 44.dp, height = 32.dp).clip(RoundedCornerShape(50)).background(fill))
-                    NavSelectionStyle.Square ->
-                        Box(Modifier.size(width = 40.dp, height = 36.dp).clip(MaterialTheme.shapes.small).background(fill))
-                    NavSelectionStyle.Circle ->
-                        Box(Modifier.size(40.dp).clip(CircleShape).background(fill))
-                    NavSelectionStyle.LeftBar ->
-                        Box(
-                            Modifier
-                                .align(Alignment.CenterStart)
-                                .padding(start = 6.dp)
-                                .size(width = 3.dp, height = 26.dp)
-                                .clip(RoundedCornerShape(2.dp))
-                                .background(accent),
-                        )
-                    NavSelectionStyle.Dot ->
-                        Box(
-                            Modifier
-                                .align(Alignment.BottomCenter)
-                                .padding(bottom = 7.dp)
-                                .size(5.dp)
-                                .clip(CircleShape)
-                                .background(accent),
-                        )
-                    NavSelectionStyle.None -> Unit
-                }
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            // Taller than the icon so the slots tile flush (rail spacing is 0)
+            // and the breathing room between buttons stays inside the hit area.
+            .height(54.dp)
+            // Sign out asks first, in a dialog that gives the keyboard back here.
+            .layerTrigger()
+            .selectable(
+                selected          = active,
+                enabled           = enabled,
+                role              = Role.Tab,
+                interactionSource = interaction,
+                // The hover/press state layer is user-toggleable; off leaves
+                // the active item marked only by its NavSelectionStyle.
+                indication        = if (cz.navHoverHighlight) LocalIndication.current else null,
+                onClick           = onClick,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (active) {
+            when (cz.navSelectionStyle) {
+                NavSelectionStyle.Pill ->
+                    Box(Modifier.size(width = 44.dp, height = 32.dp).clip(RoundedCornerShape(50)).background(fill))
+                NavSelectionStyle.Square ->
+                    Box(Modifier.size(width = 40.dp, height = 36.dp).clip(MaterialTheme.shapes.small).background(fill))
+                NavSelectionStyle.Circle ->
+                    Box(Modifier.size(40.dp).clip(CircleShape).background(fill))
+                NavSelectionStyle.LeftBar ->
+                    Box(
+                        Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(start = 6.dp)
+                            .size(width = 3.dp, height = 26.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(accent),
+                    )
+                NavSelectionStyle.Dot ->
+                    Box(
+                        Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(bottom = 7.dp)
+                            .size(5.dp)
+                            .clip(CircleShape)
+                            .background(accent),
+                    )
+                NavSelectionStyle.None -> Unit
             }
-            Symbol(icon = icon,
-                contentDescription = null,
-                tint               = iconColor,
-                fill               = iconFill,
-                modifier           = Modifier.size(24.dp),
-            )
         }
+        Symbol(icon = icon,
+            contentDescription = null,
+            tint               = iconColor,
+            fill               = iconFill,
+            modifier           = Modifier.size(24.dp),
+        )
     }
 }

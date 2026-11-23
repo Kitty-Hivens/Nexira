@@ -48,8 +48,6 @@ EXEMPT = {
     # be taken where these defaults are declared, and console scrolling is
     # navigation rather than interface motion.
     "client-ui/src/jvmSharedMain/kotlin/hivens/ui/screens/console/LogScrollState.kt": {"literal-duration"},
-    # The easter engine scales its own set pieces through that mirrored value.
-    "client-easter": {"literal-duration"},
 }
 
 

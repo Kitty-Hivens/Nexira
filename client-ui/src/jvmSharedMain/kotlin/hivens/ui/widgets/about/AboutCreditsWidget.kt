@@ -23,8 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import hivens.ui.BuildConfig
-import hivens.ui.easter.GibberishMode
-import hivens.ui.easter.LocalAprilFools
 import hivens.ui.i18n.nexiraStrings
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -36,9 +34,7 @@ import hivens.ui.theme.NxColor
 
 // Credits + technology list + license. Self-scrolls because the
 // content is long; the surface does not impose a verticalScroll on
-// the slot. AprilFools occasionally corrupts these strings (role
-// scramble, tech-name zalgo, license-text lorem) -- the left column
-// embraces the chaos.
+// the slot.
 @Serializable
 data class AboutCreditsProps(
     // Overrides only the top "Авторы" section header; the Технологии and
@@ -62,7 +58,6 @@ data class AboutCreditsProps(
 @Composable
 fun AboutCreditsWidget(instance: WidgetInstance) {
     val p = instance.rememberProps<AboutCreditsProps>()
-    val af = LocalAprilFools.current
     val s = nexiraStrings()
 
     Column(
@@ -89,11 +84,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
                     color      = NxInk.main,
                 )
                 Text(
-                    text  = af.maybeGibberish(
-                        "Architect & Developer",
-                        probability = 0.35f,
-                        mode        = GibberishMode.SCRAMBLED,
-                    ),
+                    text  = "Architect & Developer",
                     style = MaterialTheme.typography.bodySmall,
                     color = NxColor.lead(),
                 )
@@ -118,14 +109,14 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
                 Text("•", color = NxColor.lead(), fontWeight = FontWeight.Bold)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text       = af.maybeGibberish(name, probability = 0.20f, mode = GibberishMode.ZALGO),
+                    text       = name,
                     fontWeight = FontWeight.Medium,
                     color      = NxInk.main,
                     style      = MaterialTheme.typography.bodyMedium,
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text     = "— ${af.maybeGibberish(desc, probability = 0.40f, mode = GibberishMode.JARGON)}",
+                    text     = "— $desc",
                     color    = NxInk.quiet,
                     style    = MaterialTheme.typography.bodyMedium,
                 )
@@ -137,11 +128,7 @@ fun AboutCreditsWidget(instance: WidgetInstance) {
         Spacer(Modifier.height(8.dp))
 
         Text(
-            text  = af.maybeGibberish(
-                s.text("aboutLicenseText"),
-                probability = 0.45f,
-                mode        = GibberishMode.LOREM,
-            ),
+            text  = s.text("aboutLicenseText"),
             style = MaterialTheme.typography.bodySmall,
             color = NxInk.quiet,
         )
