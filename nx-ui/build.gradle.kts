@@ -62,6 +62,8 @@ kotlin {
                 api(project(":look:stroke-api"))
                 // What every plane here is made of: the surface axis's answers, the same way.
                 api(project(":look:surface-api"))
+                // How long what is transient waits here: the timing axis's answers, the same way.
+                api(project(":look:timing-api"))
             }
         }
 

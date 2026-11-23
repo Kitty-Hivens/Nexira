@@ -17,6 +17,8 @@ import hivens.look.stroke.nx.StrokeNxModule
 import hivens.look.surface.api.SurfaceModule
 import hivens.look.surface.nx.SurfaceNxModule
 import hivens.look.surface.nx.controls.SurfaceNxControls
+import hivens.look.timing.api.TimingModule
+import hivens.look.timing.nx.TimingNxModule
 import hivens.packs.PacksModule
 import hivens.source.mirror.MirrorSourceModule
 import hivens.source.modrinth.ModrinthSourceModule
@@ -36,6 +38,7 @@ val CompiledModules: List<CompiledModule> =
         ShapeModule, ShapeNxModule,
         StrokeModule, StrokeNxModule,
         SurfaceModule, SurfaceNxModule, SurfaceNxControls,
+        TimingModule, TimingNxModule,
         PacksModule, AccountsModule, CatalogueModule, MirrorSourceModule, ModrinthSourceModule,
     )
 

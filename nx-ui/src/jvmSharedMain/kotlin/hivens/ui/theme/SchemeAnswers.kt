@@ -10,6 +10,7 @@ import hivens.look.manager.api.Status as LookStatus
 import hivens.look.shape.api.Shape
 import hivens.look.stroke.api.Stroke
 import hivens.look.surface.api.Surface
+import hivens.look.timing.api.Timing
 import hivens.look.motion.api.Motion as MotionAxis
 
 /**
@@ -46,11 +47,11 @@ fun Scheme.colourAnswers(): ColourAnswers {
 
 /**
  * [content] drawn in [theme], in its dark scheme or its light one by [dark], moving as nx moves, with
- * its decorative movement held still by [reduceMotion], and in nx's corners, strokes and planes,
- * whatever the look around answers: the theme's answers provided for the colour axis, nx's for the
- * motion axis ([nxMotionAnswers]), the shape axis ([nxShapeAnswers]), the stroke axis
- * ([nxStrokeAnswers]) and the surface axis ([nxSurfaceAnswers]), and the bridge ([NxTheme]) set from
- * them. For what draws one theme on purpose, a preview of it or a render of a component in it.
+ * its decorative movement held still by [reduceMotion], and in nx's corners, strokes, planes and
+ * waits, whatever the look around answers: the theme's answers provided for the colour axis, nx's for
+ * the motion axis ([nxMotionAnswers]), the shape axis ([nxShapeAnswers]), the stroke axis
+ * ([nxStrokeAnswers]), the surface axis ([nxSurfaceAnswers]) and the timing axis ([nxTimingAnswers]),
+ * and the bridge ([NxTheme]) set from them. For what draws one theme on purpose, a preview of it or a render of a component in it.
  */
 @Composable
 fun NxThemed(
@@ -68,6 +69,7 @@ fun NxThemed(
         Shape.local provides nxShapeAnswers(),
         Stroke.local provides nxStrokeAnswers(),
         Surface.local provides nxSurfaceAnswers(blurs = true),
+        Timing.local provides nxTimingAnswers(),
     ) {
         NxTheme(uiFamily = uiFamily, content = content)
     }

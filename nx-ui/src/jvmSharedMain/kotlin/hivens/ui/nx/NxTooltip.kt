@@ -64,6 +64,8 @@ import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 import hivens.ui.theme.NxInk
 import hivens.ui.surface.SurfaceKind
+import hivens.look.timing.api.Timing
+import hivens.look.timing.api.TooltipKind
 import hivens.look.shape.api.Shape as ShapeAxis
 
 /**
@@ -87,7 +89,8 @@ enum class NxTooltipPlacement { FollowCursor, BelowAnchor }
  */
 @Immutable
 data class NxTooltipBehaviour(
-    val delayMillis: Int,
+    /** How long it waits under the pointer. Null is the look's wait for its [kind]. */
+    val delayMillis: Int? = null,
     val placement: NxTooltipPlacement,
     val maxWidth: Dp,
     /**
@@ -114,6 +117,8 @@ data class NxTooltipBehaviour(
      * it off to one side of the thing it names.
      */
     val centred: Boolean = false,
+    /** What it is for, which the look's wait is asked by. */
+    val kind: TooltipKind = TooltipKind.Label,
 ) {
     companion object {
         /**
@@ -126,7 +131,7 @@ data class NxTooltipBehaviour(
          * other floating layer in the library goes, which is under its trigger.
          */
         val Label = NxTooltipBehaviour(
-            delayMillis = 400,
+            kind = TooltipKind.Label,
             placement = NxTooltipPlacement.BelowAnchor,
             maxWidth = 280.dp,
             contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
@@ -143,7 +148,7 @@ data class NxTooltipBehaviour(
 
         /** Explains it. Anchored, so it stays still while it is read. */
         val Explain = NxTooltipBehaviour(
-            delayMillis = 600,
+            kind = TooltipKind.Explain,
             placement = NxTooltipPlacement.BelowAnchor,
             maxWidth = 360.dp,
             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 10.dp),
@@ -152,7 +157,7 @@ data class NxTooltipBehaviour(
 
         /** Shows it. A picture earns a longer wait and more room. */
         val Preview = NxTooltipBehaviour(
-            delayMillis = 700,
+            kind = TooltipKind.Preview,
             placement = NxTooltipPlacement.BelowAnchor,
             maxWidth = 320.dp,
             contentPadding = PaddingValues(10.dp),
@@ -200,7 +205,8 @@ fun NxTooltip(
 
     // The delay belongs to the appearance only. Hiding is immediate, because a
     // tooltip that lingers after the pointer has moved on is a tooltip in the way.
-    LaunchedEffect(wanted, behaviour.delayMillis) {
+    val wait = behaviour.delayMillis ?: Timing.tooltipDelay(behaviour.kind)
+    LaunchedEffect(wanted, wait) {
         if (!wanted) {
             shown = false
             return@LaunchedEffect
@@ -208,7 +214,7 @@ fun NxTooltip(
         // Zero means now, not "suspend for zero". A delay of nothing still parks the
         // coroutine until the dispatcher comes back round, which is a frame the
         // caller did not ask to wait for.
-        if (behaviour.delayMillis > 0) delay(behaviour.delayMillis.milliseconds)
+        if (wait > 0) delay(wait.milliseconds)
         shown = true
     }
 

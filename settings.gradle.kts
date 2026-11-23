@@ -225,5 +225,8 @@ include(":look:surface-api")
 include(":look:surface-nx")
 // The UI that steers the nx surface provider: the blur switch.
 include(":look:surface-nx-controls")
+include(":look:timing-api")
+// The nx timing provider: how long nx's tooltips wait, with no settings of its own.
+include(":look:timing-nx")
 include(":profiler-agent")
 include(":authlib-agent")

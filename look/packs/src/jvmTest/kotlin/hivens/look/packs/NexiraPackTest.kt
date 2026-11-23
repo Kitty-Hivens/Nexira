@@ -21,6 +21,8 @@ import hivens.look.stroke.api.Stroke
 import hivens.look.stroke.api.StrokeModule
 import hivens.look.surface.api.Surface
 import hivens.look.surface.api.SurfaceModule
+import hivens.look.timing.api.Timing
+import hivens.look.timing.api.TimingModule
 import hivens.look.manager.api.LookAnswers
 import hivens.look.manager.api.LookApi
 import hivens.look.manager.api.LookAxis
@@ -50,18 +52,18 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
- * The default pack names nx for colour, motion, shape, stroke and surface, the axes that exist, and
- * the look manager takes the colour axis and the pack from the modules compiled in, read here the way
- * the boot window reads them.
+ * The default pack names nx for every axis that exists, colour, motion, shape, stroke, surface and
+ * timing, and the look manager takes the colour axis and the pack from the modules compiled in, read
+ * here the way the boot window reads them.
  */
 class NexiraPackTest {
 
     @Test
     fun `the default pack names the nx family for every axis that exists, and no axis that does not exist`() {
         assertEquals(LookApi.DEFAULT_PACK, NexiraPack.id)
-        assertEquals(mapOf(Colour.id to "nx", Motion.id to "nx", Shape.id to "nx", Stroke.id to "nx", Surface.id to "nx"), NexiraPack.providers)
+        assertEquals(mapOf(Colour.id to "nx", Motion.id to "nx", Shape.id to "nx", Stroke.id to "nx", Surface.id to "nx", Timing.id to "nx"), NexiraPack.providers)
         val axes = (ColourModule.contributions + MotionModule.contributions + ShapeModule.contributions + StrokeModule.contributions +
-            SurfaceModule.contributions)
+            SurfaceModule.contributions + TimingModule.contributions)
             .filterIsInstance<LookAxis<*>>().map { it.id }.toSet()
         assertTrue(axes.containsAll(NexiraPack.providers.keys), "the pack names an axis no look module brings: ${NexiraPack.providers.keys - axes}")
         assertEquals(listOf<Any>(NexiraPack), LookPacksModule.contributions)
