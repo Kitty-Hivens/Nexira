@@ -32,9 +32,9 @@ import hivens.ui.theme.plateSurface
  * something other than what I am looking at".
  *
  * A field the spec leaves empty takes what the look answers for a widget's plate: the
- * shape axis's corners ([plateOutline]) and the surface axis's opacity, blur and edge
- * ([plateSurface]). A value the spec names is drawn as named. The shadow is the
- * widget's own and none where it names none.
+ * shape axis's corners ([plateOutline]) and the surface axis's opacity and edge
+ * ([plateSurface]). A value the spec names is drawn as named. The shadow and the blur
+ * are the widget's own, and none where it names none.
  *
  * Padding is NOT here. It moved to [hivens.widget.model.Placement.padding] and is
  * applied by the slot wrapper as an outer inset, so it reserves space around the
@@ -49,11 +49,11 @@ fun WidgetSurface(spec: SurfaceSpec, content: @Composable () -> Unit) {
         kind = fill.kind(),
         shape = spec.shape.toShape(plateOutline),
         opacity = spec.opacity ?: plate.opacity,
-        // The plate's radius, never the kind's. A widget asking only for a
-        // translucent plate once got the chrome's 18dp of frosted glass it never
+        // None where the widget names none, never the kind's. A widget asking only for
+        // a translucent plate once got the chrome's 18dp of frosted glass it never
         // requested, under the whole home surface, because an empty radius fell
         // through to the plane's kind.
-        blurDp = spec.blurDp ?: plate.blurDp,
+        blurDp = spec.blurDp ?: 0f,
         // The plate's edge, never the kind's, for the same reason.
         borderWidthDp = spec.border.widthDp ?: plate.edgeDp,
         borderColor = borderColor(spec),

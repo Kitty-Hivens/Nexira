@@ -24,9 +24,4 @@ object Surface : LookAxis<SurfaceAnswers>(SurfaceApi.AXIS, SurfaceApi.VERSION, S
     val plate: PlateAnswer
         @Composable @ReadOnlyComposable
         get() = local.current.plate
-
-    /** See [SurfaceAnswers.blurs]. */
-    val blurs: Boolean
-        @Composable @ReadOnlyComposable
-        get() = local.current.blurs
 }

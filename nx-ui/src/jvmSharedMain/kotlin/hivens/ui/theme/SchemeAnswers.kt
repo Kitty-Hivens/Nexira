@@ -71,7 +71,7 @@ fun NxThemed(
         MotionAxis.local provides nxMotionAnswers(reduceMotion),
         Shape.local provides nxShapeAnswers(),
         Stroke.local provides nxStrokeAnswers(),
-        Surface.local provides nxSurfaceAnswers(blurs = true),
+        Surface.local provides nxSurfaceAnswers(),
         Timing.local provides nxTimingAnswers(),
         Feedback.local provides nxFeedbackAnswers(),
         Type.local provides nxTypeAnswers(),

@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
@@ -17,8 +16,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.look.surface.api.Surface
-import hivens.ui.theme.nxSurfaceAnswers
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -69,18 +66,6 @@ class BackdropBlurRenderTest {
     }
 
     /**
-     * The switch has to reach the pixels, not just the settings file, and a radius the
-     * surface names is switched off with the rest: a look that does not blur does not.
-     */
-    @Test
-    fun `the blur switch turns it off`() {
-        val on = scanline(blurDp = 18f)
-        val off = scanline(blurDp = 18f, blurEnabled = false)
-        assertTrue(off.spread > 60, "switched off, the stripes should survive: ${off.spread}")
-        assertTrue(on.spread < off.spread / 4, "switched on, they should not: ${on.spread} against ${off.spread}")
-    }
-
-    /**
      * The radius was a preset's private constant: 18 on one, 28 on another, and no
      * way to reach either. A surface names its own now, and the name decides in
      * both directions -- including a named zero, which is a decision rather than
@@ -113,17 +98,14 @@ class BackdropBlurRenderTest {
     private fun scanline(
         blurDp: Float?,
         plate: Color? = null,
-        blurEnabled: Boolean = true,
     ): Sample {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
             NxThemed(TestTheme, dark = true) {
-                CompositionLocalProvider(Surface.local provides nxSurfaceAnswers(blurs = blurEnabled)) {
                 Box(Modifier.fillMaxSize().drawBehind { stripes() }) {
                     if (plate != null) {
                         Box(Modifier.fillMaxSize().drawBehind { drawRect(plate) })
                     }
                     Plate(blurDp)
-                }
                 }
             }
         }
@@ -131,7 +113,7 @@ class BackdropBlurRenderTest {
         scene.close()
         File(OUT).mkdirs()
         val named = blurDp?.toInt()?.toString() ?: "inherited"
-        val name = "backdrop-blur-$named${if (plate != null) "-over-plate" else ""}${if (blurEnabled) "" else "-off"}.png"
+        val name = "backdrop-blur-$named${if (plate != null) "-over-plate" else ""}.png"
         image.encodeToData(EncodedImageFormat.PNG)?.bytes?.let { File(OUT, name).writeBytes(it) }
 
         val bmp = Bitmap.makeFromImage(image)
@@ -145,7 +127,7 @@ class BackdropBlurRenderTest {
         val spread = sqrt(lum.sumOf { (it - mean) * (it - mean) } / lum.size)
         val mid = bmp.getColor(SX + SW / 2, y)
         val s = Sample(spread, (mid shr 16) and 0xFF, (mid shr 8) and 0xFF)
-        println("BackdropBlurRenderTest: blur=$blurDp plate=${plate != null} enabled=$blurEnabled -> $s")
+        println("BackdropBlurRenderTest: blur=$blurDp plate=${plate != null} -> $s")
         return s
     }
 

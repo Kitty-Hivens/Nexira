@@ -25,9 +25,8 @@ public final class hivens/look/surface/api/Plane {
 
 public final class hivens/look/surface/api/PlaneAnswer {
 	public static final field $stable I
-	public fun <init> (IIFFFLhivens/look/surface/api/PlaneMaterial;)V
+	public fun <init> (IIFFLhivens/look/surface/api/PlaneMaterial;)V
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getBlurDp ()F
 	public final fun getContentDepth ()I
 	public final fun getDepth ()I
 	public final fun getEdgeDp ()F
@@ -59,9 +58,8 @@ public final class hivens/look/surface/api/PlanesKt {
 
 public final class hivens/look/surface/api/PlateAnswer {
 	public static final field $stable I
-	public fun <init> (Ljava/lang/Float;FF)V
+	public fun <init> (Ljava/lang/Float;F)V
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getBlurDp ()F
 	public final fun getEdgeDp ()F
 	public final fun getOpacity ()Ljava/lang/Float;
 	public fun hashCode ()I
@@ -71,7 +69,6 @@ public final class hivens/look/surface/api/PlateAnswer {
 public final class hivens/look/surface/api/Surface : hivens/look/manager/api/LookAxis {
 	public static final field $stable I
 	public static final field INSTANCE Lhivens/look/surface/api/Surface;
-	public final fun getBlurs (Landroidx/compose/runtime/Composer;I)Z
 	public fun getLabel ()Ljava/lang/String;
 	public final fun getPlate (Landroidx/compose/runtime/Composer;I)Lhivens/look/surface/api/PlateAnswer;
 	public final fun plane (Lhivens/look/surface/api/SurfaceKind;Lhivens/look/surface/api/Plane;ILandroidx/compose/runtime/Composer;I)Lhivens/look/surface/api/PlaneAnswer;
@@ -80,17 +77,14 @@ public final class hivens/look/surface/api/Surface : hivens/look/manager/api/Loo
 public final class hivens/look/surface/api/SurfaceAnswers {
 	public static final field $stable I
 	public static final field Companion Lhivens/look/surface/api/SurfaceAnswers$Companion;
-	public final fun getBlurs ()Z
 	public final fun getPlate ()Lhivens/look/surface/api/PlateAnswer;
 	public final fun plane (Lhivens/look/surface/api/SurfaceKind;Lhivens/look/surface/api/Plane;I)Lhivens/look/surface/api/PlaneAnswer;
 }
 
 public final class hivens/look/surface/api/SurfaceAnswers$Builder {
 	public static final field $stable I
-	public final fun getBlurs ()Ljava/lang/Boolean;
 	public final fun getPlane ()Lkotlin/jvm/functions/Function3;
 	public final fun getPlate ()Lhivens/look/surface/api/PlateAnswer;
-	public final fun setBlurs (Ljava/lang/Boolean;)V
 	public final fun setPlane (Lkotlin/jvm/functions/Function3;)V
 	public final fun setPlate (Lhivens/look/surface/api/PlateAnswer;)V
 }

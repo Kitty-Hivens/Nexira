@@ -221,10 +221,8 @@ include(":look:stroke-api")
 // The nx stroke provider: nx's strokes, with no settings of its own.
 include(":look:stroke-nx")
 include(":look:surface-api")
-// The nx surface provider: nx's planes, and whether glass blurs, kept in its own settings.
+// The nx surface provider: nx's planes, with no settings of its own.
 include(":look:surface-nx")
-// The UI that steers the nx surface provider: the blur switch.
-include(":look:surface-nx-controls")
 include(":look:timing-api")
 // The nx timing provider: how long nx's tooltips wait, with no settings of its own.
 include(":look:timing-nx")

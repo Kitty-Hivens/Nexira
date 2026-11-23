@@ -44,7 +44,6 @@ class HostBoundaryTest {
         "import hivens.look.stroke.nx.StrokeNxModule",
         "import hivens.look.surface.api.SurfaceModule",
         "import hivens.look.surface.nx.SurfaceNxModule",
-        "import hivens.look.surface.nx.controls.SurfaceNxControls",
         "import hivens.look.timing.api.TimingModule",
         "import hivens.look.timing.nx.TimingNxModule",
         "import hivens.look.feedback.api.FeedbackModule",

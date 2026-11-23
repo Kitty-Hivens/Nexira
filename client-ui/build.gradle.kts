@@ -203,7 +203,6 @@ kotlin {
                 // nothing of them beyond their CompiledModule, and draws their widgets by kind.
                 implementation(project(":look:colour-nx-controls"))
                 implementation(project(":look:motion-nx-controls"))
-                implementation(project(":look:surface-nx-controls"))
                 implementation(project(":nx-ui"))
                 implementation(project(":ui-layers"))
                 implementation(project(":ui-puppet"))

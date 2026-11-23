@@ -7,8 +7,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 /**
  * One plane as the look answers it: the step of the ladder its body is drawn in ([depth]) and the
  * step what it holds counts from ([contentDepth]), how much of its body covers what is behind it
- * ([opacity], 0 to 1), how far it blurs what shows through ([blurDp]), how wide its edge is ([edgeDp],
- * zero for none), and what it is made of ([material]).
+ * ([opacity], 0 to 1), how wide its edge is ([edgeDp], zero for none), and what it is made of
+ * ([material]). Whether and how far a plane blurs what is behind it is its own, and no look answers it.
  *
  * The colour of a step is the colour axis's, which whatever draws the plane reads and hands the
  * material. Nothing here moves a layout: a plane's size and its padding are its own.
@@ -18,18 +18,17 @@ class PlaneAnswer(
     val depth: Int,
     val contentDepth: Int,
     val opacity: Float,
-    val blurDp: Float,
     val edgeDp: Float,
     val material: PlaneMaterial,
 ) {
     override fun equals(other: Any?): Boolean =
         other is PlaneAnswer && other.depth == depth && other.contentDepth == contentDepth && other.opacity == opacity &&
-            other.blurDp == blurDp && other.edgeDp == edgeDp && other.material == material
+            other.edgeDp == edgeDp && other.material == material
 
-    override fun hashCode(): Int = listOf(depth, contentDepth, opacity, blurDp, edgeDp, material).hashCode()
+    override fun hashCode(): Int = listOf(depth, contentDepth, opacity, edgeDp, material).hashCode()
 
     override fun toString(): String =
-        "PlaneAnswer(depth=$depth, contentDepth=$contentDepth, opacity=$opacity, blurDp=$blurDp, edgeDp=$edgeDp, material=$material)"
+        "PlaneAnswer(depth=$depth, contentDepth=$contentDepth, opacity=$opacity, edgeDp=$edgeDp, material=$material)"
 }
 
 /**
@@ -70,19 +69,18 @@ fun DrawScope.drawPlaneBody(material: PlaneMaterial, body: Color, backdrop: (Dra
 
 /**
  * What a widget's own plate takes for a field its node leaves empty: its opacity (null where the
- * plane's kind decides it), how far it blurs ([blurDp]) and how wide its edge is ([edgeDp]). A value
+ * plane's kind decides it) and how wide its edge is ([edgeDp]). A value
  * set on the node is stronger. The plate's corners are the shape axis's.
  */
 @Immutable
 class PlateAnswer(
     val opacity: Float?,
-    val blurDp: Float,
     val edgeDp: Float,
 ) {
     override fun equals(other: Any?): Boolean =
-        other is PlateAnswer && other.opacity == opacity && other.blurDp == blurDp && other.edgeDp == edgeDp
+        other is PlateAnswer && other.opacity == opacity && other.edgeDp == edgeDp
 
-    override fun hashCode(): Int = listOf(opacity, blurDp, edgeDp).hashCode()
+    override fun hashCode(): Int = listOf(opacity, edgeDp).hashCode()
 
-    override fun toString(): String = "PlateAnswer(opacity=$opacity, blurDp=$blurDp, edgeDp=$edgeDp)"
+    override fun toString(): String = "PlateAnswer(opacity=$opacity, edgeDp=$edgeDp)"
 }

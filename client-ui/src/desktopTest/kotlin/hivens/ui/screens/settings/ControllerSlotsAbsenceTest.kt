@@ -24,7 +24,6 @@ import hivens.core.data.SettingsData
 import hivens.i18n.ShippedLanguages
 import hivens.look.colour.nx.controls.ColourNxControls
 import hivens.look.motion.nx.controls.MotionNxControls
-import hivens.look.surface.nx.controls.SurfaceNxControls
 import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.i18n.NexiraStrings
@@ -67,8 +66,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * The host screens whose slots the look providers' controls fill, with none of colour, motion and
- * surface drawn by nx: the settings Appearance section and the Appearance studio's theme island take exactly the room
+ * The host screens whose slots the look providers' controls fill, with neither colour nor motion drawn
+ * by nx: the settings Appearance section and the Appearance studio's theme island take exactly the room
  * they would take if those slots were not in them at all.
  *
  * "Not there" is measured, not drawn by hand: the same screen with a block of [PROBE] in each of the
@@ -97,7 +96,6 @@ class ControllerSlotsAbsenceTest {
         listOf(
             ColourNxControls.widgets,
             MotionNxControls.widgets,
-            SurfaceNxControls.widgets,
             object : WidgetRegistry {
                 override fun all(): Map<WidgetKind, WidgetDescriptor> = mapOf(Probe.kind to Probe)
                 override fun get(kind: WidgetKind): WidgetDescriptor? = Probe.takeIf { it.kind == kind }
@@ -106,7 +104,7 @@ class ControllerSlotsAbsenceTest {
     )
 
     // The controls modules' keys and nothing that says what draws the look: no look manager answers,
-    // so nx draws none of colour, motion and surface and the controls are left out.
+    // so nx draws neither colour nor motion and the controls are left out.
     private val data = WidgetDataRegistry()
     private val commands = WidgetCommandRegistry()
 
@@ -116,9 +114,6 @@ class ControllerSlotsAbsenceTest {
         }
         MotionNxControls.contributions.filterIsInstance<KeyContribution>().forEach {
             registerModuleKeys(MotionNxControls.ID, it, data, commands, ContributedServices(), trusted = true)
-        }
-        SurfaceNxControls.contributions.filterIsInstance<KeyContribution>().forEach {
-            registerModuleKeys(SurfaceNxControls.ID, it, data, commands, ContributedServices(), trusted = true)
         }
     }
 
@@ -207,9 +202,9 @@ class ControllerSlotsAbsenceTest {
     fun `the theme island takes the room of one without the controls' slots`() {
         val hidden = islandReach(DefaultLayout.load())
         assertEquals(hidden, islandReach(LayoutGraph.EMPTY), "the controls, left out, take what empty slots take")
-        val probed = islandReach(probed("bg.settings", "theme", "surface", "motion", "theme.link"))
+        val probed = islandReach(probed("bg.settings", "theme", "motion", "theme.link"))
         // Every row of the island is a slot now, so the first of them takes no gap before it.
-        assertEquals(4 * PROBE + 3 * ISLAND_GAP, probed - hidden, "each slot left out takes its block and one gap with it")
+        assertEquals(3 * PROBE + 2 * ISLAND_GAP, probed - hidden, "each slot left out takes its block and one gap with it")
     }
 
     /** A level with no services: the controls' condition is read from keys alone. */

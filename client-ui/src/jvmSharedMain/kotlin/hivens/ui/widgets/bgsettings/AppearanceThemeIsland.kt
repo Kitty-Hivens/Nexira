@@ -19,13 +19,12 @@ import hivens.widget.model.SurfaceId
 
 // Right island of the Appearance studio beside the wallpaper controls, over the live
 // preview: the slots the look's providers' controls are drawn in (dark and light, what
-// decides it, whether planes blur, whether motion is reduced, the way to the theme
-// picker), which hold nothing where they are absent or their provider does not draw.
+// decides it, whether motion is reduced, the way to the theme picker), which hold
+// nothing where they are absent or their provider does not draw.
 // The wallpaper does not colour the theme: it is a picture under the interface,
 // darkened with the theme's own page colour.
 @Composable
 internal fun AppearanceThemeIsland(modifier: Modifier = Modifier) {
-
     // Each row takes its gap itself rather than from the column's spacing, so a slot whose
     // controls are absent takes none, the first one included.
     val gap = Modifier.childGap(ROW_GAP, Orientation.Vertical)
@@ -35,10 +34,6 @@ internal fun AppearanceThemeIsland(modifier: Modifier = Modifier) {
         ) {
             SlotRenderer(SurfaceId(BG_SETTINGS_SURFACE), SlotId("theme"), gap, spacing = ROW_GAP)
 
-            SlotRenderer(SurfaceId(BG_SETTINGS_SURFACE), SlotId("surface"), gap, spacing = ROW_GAP)
-
-            // Beside the blur because it is the same kind of choice: decoration that
-            // costs something, switched off in one place rather than widget by widget.
             SlotRenderer(SurfaceId(BG_SETTINGS_SURFACE), SlotId("motion"), gap, spacing = ROW_GAP)
 
             ModuleEffectRows(gap)

@@ -23,23 +23,19 @@ val plateSurface: PlateSurface
 
 /**
  * nx's planes as the surface axis's answers: what the nx surface provider answers, and what [NxThemed]
- * draws previews and tests in. [blurs] is the person's choice of whether glass blurs at all. Made once
- * for each, so a role is the same value wherever it is read.
+ * draws previews and tests in. Made once, so a role is the same value wherever it is read.
  */
-fun nxSurfaceAnswers(blurs: Boolean): SurfaceAnswers = if (blurs) NxSurface.BLURRING else NxSurface.STILL
+fun nxSurfaceAnswers(): SurfaceAnswers = NxSurface.ANSWERS
 
 /**
  * The nx planes. Depth is relative: a panel and a card one step above what holds them, a field one
  * toward the page, and what floats at the top of the ladder or one above its holder if that is higher.
  * Chrome frames what it holds in the step above it and adds no depth to it. Every body is opaque, and
- * only chrome made glass blurs what is behind it. Every plane but the page and chrome has a bevelled
- * edge of its own material. A widget's plate takes no blur and no edge where its node names none.
+ * every plane but the page and chrome has a bevelled edge of its own material. A widget's plate takes
+ * no edge where its node names none.
  */
 private object NxSurface {
-    val BLURRING: SurfaceAnswers = answers(blurs = true)
-    val STILL: SurfaceAnswers = answers(blurs = false)
-
-    private fun answers(blurs: Boolean): SurfaceAnswers = SurfaceAnswers.build {
+    val ANSWERS: SurfaceAnswers = SurfaceAnswers.build {
         plane = { kind, holder, floating ->
             val step = when (kind) {
                 SurfaceKind.Page -> 0
@@ -53,17 +49,12 @@ private object NxSurface {
                 depth = if (chrome) holder.step + 1 else step,
                 contentDepth = step,
                 opacity = 1f,
-                blurDp = if (chrome) GLASS_BLUR_DP else 0f,
                 edgeDp = if (kind == SurfaceKind.Page || chrome) 0f else EDGE_DP,
                 material = Bevel,
             )
         }
-        plate = PlateAnswer(opacity = null, blurDp = 0f, edgeDp = 0f)
-        this.blurs = blurs
+        plate = PlateAnswer(opacity = null, edgeDp = 0f)
     }
-
-    /** How far glass blurs what is behind it. */
-    private const val GLASS_BLUR_DP = 18f
 
     /** The bevel's width. */
     private const val EDGE_DP = 1f

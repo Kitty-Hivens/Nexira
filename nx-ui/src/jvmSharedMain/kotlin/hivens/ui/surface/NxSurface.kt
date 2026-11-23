@@ -47,15 +47,14 @@ import hivens.look.shape.api.Shape as ShapeAxis
 
 /**
  * A library-owned surface: [kind] is asked of the surface axis, which answers its step,
- * its material, its opacity, its blur and its edge, and so what its content reads
- * against. Every number it draws with can still be named by a caller that has a
+ * its material, its opacity and its edge, and so what its content reads against. Every number it draws with can still be named by a caller that has a
  * reason, which is what a user's own widget plane is, and a value named is stronger
- * than the look. The shadow is the surface's own, not the look's: a caller names one,
- * and the floating kinds cast one where none is named.
+ * than the look. The shadow and the blur are the surface's own, not the look's: a
+ * caller names them, the floating kinds cast a shadow where none is named, and chrome
+ * made glass blurs where no radius is.
  *
  * A blur is drawn only where the body lets something through, since a filter under a
- * body nothing can see through is work thrown away, and only where the look draws
- * blur at all ([Surface.blurs]).
+ * body nothing can see through is work thrown away.
  *
  * Content is handed a [Plane] for this surface, so anything inside knows the colour it
  * is really on, and the theme's main ink as its content colour.
@@ -73,7 +72,7 @@ fun NxSurface(
     shape: Shape = ShapeAxis.card,
     /** Body opacity, 0..1. Null is the look's answer for the kind. */
     opacity: Float? = null,
-    /** How far the surface blurs what is behind it. Null is the look's answer for the kind. */
+    /** How far the surface blurs what is behind it. Null is the kind's own: none but for chrome. */
     blurDp: Float? = null,
     /** Edge width. Null is the look's answer for the kind, zero removes it. */
     borderWidthDp: Float? = null,
@@ -97,7 +96,7 @@ fun NxSurface(
     val colour = fillColor ?: answers.groundDepth(look.depth)
     val alpha = (opacity ?: look.opacity).coerceIn(0f, 1f)
     val body = colour.copy(alpha = colour.alpha * alpha)
-    val blur = if (Surface.blurs) blurDp ?: look.blurDp else 0f
+    val blur = blurDp ?: kind.defaultBlurDp
     val backdrop = rememberBackdropBlur(if (body.alpha < 1f) blur else 0f)
     val edgeWidth = borderWidthDp ?: look.edgeDp
     val edge = if (edgeWidth > 0f) borderColor ?: look.material.edge(colour) else null
@@ -146,6 +145,10 @@ fun NxSurface(
         }
     }
 }
+
+/** How far a surface of this kind blurs what is behind it when it names no radius. */
+private val SurfaceKind.defaultBlurDp: Float
+    get() = if (this == SurfaceKind.Chrome) 18f else 0f
 
 private val SurfaceKind.defaultShadowDp: Float
     get() = when (this) {

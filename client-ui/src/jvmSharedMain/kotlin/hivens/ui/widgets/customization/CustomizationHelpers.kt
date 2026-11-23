@@ -58,7 +58,7 @@ internal val panelLabelWidth: Dp = 120.dp
 /**
  * A slider in a panel row: [label], the track over [range], and the value read out in [format].
  *
- * Where the value may also be left unset, which then follows the theme, [isSet] says whether it is set
+ * Where the value may also be left unset, [isSet] says whether it is set
  * and [onReset] unsets it, from a mark after the readout shown only while it is set. The room for the
  * mark is kept either way, so setting a value never moves the track under the pointer. Null [isSet]
  * is a value that is always set, with no mark and no room for one.

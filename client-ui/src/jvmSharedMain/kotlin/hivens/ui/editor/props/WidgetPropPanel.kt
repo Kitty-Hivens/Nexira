@@ -354,9 +354,9 @@ private fun defaultOpacityOf(spec: SurfaceSpec): Float = plateSurface.opacity ?:
  * offer to add it instead, so no row here can bring a surface into being as a
  * side effect of moving something else.
  *
- * A row whose field the record leaves empty opens on what the theme draws there,
- * and a row whose field is set can be put back to empty on its own, so it follows
- * the theme again without the rest of the plane being reset with it.
+ * A row whose field the record leaves empty opens on what is drawn there, and a row
+ * whose field is set can be put back to empty on its own, without the rest of the
+ * plane being reset with it.
  */
 @Composable
 private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
@@ -392,9 +392,9 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
     )
     LabeledSlider(
         label         = s.text("editorSurfaceBlur"),
-        // The plate's radius when unset, which is what the renderer draws for a
-        // widget that names none, not the radius of the plane's kind.
-        value         = surface.blurDp ?: planeLook.blurDp,
+        // Zero when unset, which is what the renderer draws for a widget that names
+        // no radius.
+        value         = surface.blurDp ?: 0f,
         range         = 0f..40f,
         format        = "%.0f",
         keyStep       = 1f,

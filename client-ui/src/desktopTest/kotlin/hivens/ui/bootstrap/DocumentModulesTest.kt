@@ -9,7 +9,6 @@ import hivens.look.colour.nx.controls.ColourNxControls
 import hivens.look.manager.api.LookApi
 import hivens.look.manager.api.LookKeys
 import hivens.look.motion.nx.controls.MotionNxControls
-import hivens.look.surface.nx.controls.SurfaceNxControls
 import hivens.test.stopThenDelete
 import hivens.themes.Themes
 import hivens.themes.api.ThemesApi
@@ -56,7 +55,7 @@ class DocumentModulesTest {
         // The providers' controls are named beside it: a controller is none of the three, the manager
         // never brings one in, and its keys are in only where a document names it.
         val look = DefaultLayout.modules().filter { it.startsWith("nexira.look") }
-        assertEquals(listOf(LookApi.ID, ColourNxControls.ID, MotionNxControls.ID, SurfaceNxControls.ID), look)
+        assertEquals(listOf(LookApi.ID, ColourNxControls.ID, MotionNxControls.ID), look)
     }
 
     @Test

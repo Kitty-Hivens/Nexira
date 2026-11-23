@@ -46,21 +46,20 @@ class SurfaceApiTest {
     @Test
     fun `every role of the answers is listed here, a provider can fill every one, and every one is asked through Surface`() {
         val roles = publicMembers(SurfaceAnswers::class.java)
-        assertEquals(setOf("plane", "plate", "blurs"), roles, "a role this test does not list goes unchecked below")
+        assertEquals(setOf("plane", "plate"), roles, "a role this test does not list goes unchecked below")
         assertEquals(roles, fillable(), "a role a provider cannot fill can only ever hold its base answer")
         assertEquals(roles, publicMembers(Surface::class.java) - "label", "every role is asked through Surface")
     }
 
     @Test
-    fun `the base planes are flat in the colour of what holds them, opaque, with no edge and no blur, the page at the bottom`() {
+    fun `the base planes are flat in the colour of what holds them, opaque, with no edge, the page at the bottom`() {
         val holder = Plane(3, Color.Gray, Backdrop.Plane)
         SurfaceKind.entries.forEach { kind ->
             val plane = SurfaceAnswers.BASE.plane(kind, holder, floating = 5)
             val step = if (kind == SurfaceKind.Page) 0 else 3
-            assertEquals(PlaneAnswer(step, step, 1f, 0f, 0f, PlaneMaterial.Flat), plane, "$kind")
+            assertEquals(PlaneAnswer(step, step, 1f, 0f, PlaneMaterial.Flat), plane, "$kind")
         }
-        assertEquals(PlateAnswer(null, 0f, 0f), SurfaceAnswers.BASE.plate)
-        assertTrue(SurfaceAnswers.BASE.blurs)
+        assertEquals(PlateAnswer(null, 0f), SurfaceAnswers.BASE.plate)
     }
 
     @Test
@@ -69,26 +68,23 @@ class SurfaceApiTest {
         val empty = SurfaceAnswers.build {}
         assertEquals(SurfaceAnswers.BASE.plane(SurfaceKind.Card, holder, 4), empty.plane(SurfaceKind.Card, holder, 4))
         assertEquals(SurfaceAnswers.BASE.plate, empty.plate)
-        assertEquals(SurfaceAnswers.BASE.blurs, empty.blurs)
 
-        val raised = PlaneAnswer(2, 2, 0.5f, 12f, 1f, PlaneMaterial.Flat)
+        val raised = PlaneAnswer(2, 2, 0.5f, 1f, PlaneMaterial.Flat)
         val own = SurfaceAnswers.build {
             plane = { kind, held, _ -> if (kind == SurfaceKind.Card) raised else SurfaceAnswers.BASE.plane(kind, held, 0) }
-            plate = PlateAnswer(0.8f, 4f, 1f)
-            blurs = false
+            plate = PlateAnswer(0.8f, 1f)
         }
         assertSame(raised, own.plane(SurfaceKind.Card, holder, 4))
-        assertEquals(PlateAnswer(0.8f, 4f, 1f), own.plate)
-        assertEquals(false, own.blurs)
+        assertEquals(PlateAnswer(0.8f, 1f), own.plate)
     }
 
     @Test
     fun `a plane and a plate are values`() {
-        assertEquals(PlaneAnswer(1, 1, 1f, 0f, 1f, PlaneMaterial.Flat), PlaneAnswer(1, 1, 1f, 0f, 1f, PlaneMaterial.Flat))
-        assertEquals(PlaneAnswer(1, 1, 1f, 0f, 1f, PlaneMaterial.Flat).hashCode(), PlaneAnswer(1, 1, 1f, 0f, 1f, PlaneMaterial.Flat).hashCode())
-        assertNotEquals(PlaneAnswer(1, 1, 1f, 0f, 1f, PlaneMaterial.Flat), PlaneAnswer(1, 0, 1f, 0f, 1f, PlaneMaterial.Flat))
-        assertEquals(PlateAnswer(null, 0f, 0f), PlateAnswer(null, 0f, 0f))
-        assertNotEquals(PlateAnswer(null, 0f, 0f), PlateAnswer(1f, 0f, 0f))
+        assertEquals(PlaneAnswer(1, 1, 1f, 1f, PlaneMaterial.Flat), PlaneAnswer(1, 1, 1f, 1f, PlaneMaterial.Flat))
+        assertEquals(PlaneAnswer(1, 1, 1f, 1f, PlaneMaterial.Flat).hashCode(), PlaneAnswer(1, 1, 1f, 1f, PlaneMaterial.Flat).hashCode())
+        assertNotEquals(PlaneAnswer(1, 1, 1f, 1f, PlaneMaterial.Flat), PlaneAnswer(1, 0, 1f, 1f, PlaneMaterial.Flat))
+        assertEquals(PlateAnswer(null, 0f), PlateAnswer(null, 0f))
+        assertNotEquals(PlateAnswer(null, 0f), PlateAnswer(1f, 0f))
     }
 
     @Test
@@ -109,20 +105,18 @@ class SurfaceApiTest {
 
     @Test
     fun `outside any look a widget reads the base answers, and inside one what it provides`() {
-        val own = SurfaceAnswers.build { plate = PlateAnswer(0.5f, 2f, 1f) }
+        val own = SurfaceAnswers.build { plate = PlateAnswer(0.5f, 1f) }
         val seen = HashMap<String, Any?>()
         composeOnce {
             seen["outside"] = Surface.plate
             seen["plane"] = Surface.plane(SurfaceKind.Page, Plane(2, Color.Black, Backdrop.Page), 4)
             CompositionLocalProvider(Surface.local provides own) {
                 seen["inside"] = Surface.plate
-                seen["blurs"] = Surface.blurs
             }
         }
         assertSame(SurfaceAnswers.BASE.plate, seen["outside"])
-        assertEquals(PlaneAnswer(0, 0, 1f, 0f, 0f, PlaneMaterial.Flat), seen["plane"])
+        assertEquals(PlaneAnswer(0, 0, 1f, 0f, PlaneMaterial.Flat), seen["plane"])
         assertSame(own.plate, seen["inside"])
-        assertEquals(true, seen["blurs"])
     }
 
     /** The names of [type]'s public members, a getter by its property's name. */

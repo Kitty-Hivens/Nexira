@@ -12,9 +12,8 @@ import kotlinx.serialization.Serializable
  *
  * The fields decide how the nav-rail selection is drawn.
  *
- * Reduce motion and surface blur are not among them: each is its nx provider's own
- * setting, which reads a choice an older build left in this file once and keeps it from
- * then on.
+ * Reduce motion is not among them: it is the nx motion provider's own setting, which
+ * reads a choice an older build left in this file once and keeps it from then on.
  *
  * An accent override used to live here too, pasting a hex over the theme's colour
  * after the theme was built. Nothing wrote it, and the theme now owns its colours

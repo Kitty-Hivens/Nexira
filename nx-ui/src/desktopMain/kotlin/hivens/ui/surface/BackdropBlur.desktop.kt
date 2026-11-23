@@ -27,8 +27,7 @@ import org.jetbrains.skia.Canvas as SkCanvas
  * not isolate; only alpha does.
  *
  * The result is not cacheable, because the destination it filters can change every
- * frame, which is why a look may switch every blur off in one place
- * ([hivens.look.surface.api.SurfaceAnswers.blurs]) instead of per surface.
+ * frame, so a radius a surface names costs that much on each one.
  */
 @Composable
 internal actual fun rememberBackdropBlur(radiusDp: Float): BackdropBlur? {

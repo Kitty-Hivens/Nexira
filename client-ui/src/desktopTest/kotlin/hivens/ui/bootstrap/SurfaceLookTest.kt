@@ -33,7 +33,7 @@ class SurfaceLookTest {
     @Test
     fun `the boot window and the shell draw nx planes`() {
         val atBoot = requireNotNull(bootValues(dir)[LookKeys.Answers]).of(Surface)
-        assertSame(nxSurfaceAnswers(blurs = true), atBoot)
+        assertSame(nxSurfaceAnswers(), atBoot)
         ModuleAppLevel(dir, CompiledModules, scope, named = documentModules(dir)).use { shell ->
             shell.app.prepareLook()
             assertEquals("nx", shell.value(LookKeys.State).axis(Surface.id)?.family)

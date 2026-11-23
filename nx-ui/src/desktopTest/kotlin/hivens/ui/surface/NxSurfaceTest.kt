@@ -7,20 +7,19 @@ import hivens.ui.theme.Plane
 import hivens.ui.theme.nxSurfaceAnswers
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
  * Depth is relative. What used to be four absolute levels put a card inside a section
  * one rung BELOW the section, a recess on dark and a lift on light, because each word
  * named a rung rather than a relation. The nx surface answers keep it so, and the rest
- * of what nx-ui drew before the surface axis: opaque bodies, glass chrome at 18, a
- * bevelled edge on everything but the page and chrome.
+ * of what nx-ui drew before the surface axis: opaque bodies, and a bevelled edge on
+ * everything but the page and chrome.
  */
 class NxSurfaceTest {
 
     private val top = 4
-    private val nx = nxSurfaceAnswers(blurs = true)
+    private val nx = nxSurfaceAnswers()
 
     private fun plane(kind: SurfaceKind, parentStep: Int) = nx.plane(kind, Plane(parentStep, Color.Gray, Backdrop.Page), top)
 
@@ -67,21 +66,17 @@ class NxSurfaceTest {
     }
 
     @Test
-    fun `every body is opaque, only chrome blurs, and every plane but the page and chrome has an edge`() {
+    fun `every body is opaque, and every plane but the page and chrome has an edge`() {
         for (kind in SurfaceKind.entries) {
             val answer = plane(kind, 1)
             assertEquals(1f, answer.opacity, "$kind")
-            assertEquals(if (kind == SurfaceKind.Chrome) 18f else 0f, answer.blurDp, "$kind")
             assertEquals(if (kind == SurfaceKind.Page || kind == SurfaceKind.Chrome) 0f else 1f, answer.edgeDp, "$kind")
             if (kind != SurfaceKind.Chrome) assertEquals(answer.depth, answer.contentDepth, "$kind")
         }
     }
 
     @Test
-    fun `a widget's plate takes no blur and no edge where its node names none, and blur can be switched off`() {
-        assertEquals(PlateAnswer(null, 0f, 0f), nx.plate)
-        assertTrue(nx.blurs)
-        assertFalse(nxSurfaceAnswers(blurs = false).blurs)
-        assertEquals(nx.plane(SurfaceKind.Chrome, Plane(1, Color.Gray, Backdrop.Page), top), nxSurfaceAnswers(blurs = false).plane(SurfaceKind.Chrome, Plane(1, Color.Gray, Backdrop.Page), top))
+    fun `a widget's plate takes no edge where its node names none`() {
+        assertEquals(PlateAnswer(null, 0f), nx.plate)
     }
 }
