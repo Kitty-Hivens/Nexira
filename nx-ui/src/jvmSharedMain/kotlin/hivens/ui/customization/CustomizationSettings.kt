@@ -10,10 +10,11 @@ import kotlinx.serialization.Serializable
  * Default state is a no-op -- every field is null / 1.0 / false so an
  * unconfigured user sees the same UI as before customization existed.
  *
- * The fields decide whether surfaces blur and how the nav-rail selection is drawn.
+ * The fields decide how the nav-rail selection is drawn.
  *
- * Reduce motion is not one of them: it is the nx motion provider's own setting, which
- * reads a choice an older build left in this file once and keeps it from then on.
+ * Reduce motion and surface blur are not among them: each is its nx provider's own
+ * setting, which reads a choice an older build left in this file once and keeps it from
+ * then on.
  *
  * An accent override used to live here too, pasting a hex over the theme's colour
  * after the theme was built. Nothing wrote it, and the theme now owns its colours
@@ -35,17 +36,6 @@ import kotlinx.serialization.Serializable
  */
 @Serializable
 data class CustomizationSettings(
-    /**
-     * Whether a surface blurs what is behind it at all.
-     *
-     * A backdrop filter cannot be cached: the destination it reads may change on any
-     * frame and Skia has no way to know that it did not. That is cheap on a GPU and
-     * measurably not free without one, so it is worth being able to switch off in one
-     * place rather than per surface. Off leaves every other surface property alone --
-     * the plane keeps its body, its opacity and its shape, it just stops filtering.
-     */
-    val surfaceBlur: Boolean = true,
-
     /**
      * How the active item in the left navigation rail is highlighted.
      * [NavSelectionStyle.Pill] (default) keeps the original Material capsule

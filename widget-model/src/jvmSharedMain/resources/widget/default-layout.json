@@ -1,6 +1,6 @@
 {
   "schema_version": 15,
-  "modules": ["nexira.i18n", "nexira.themes", "nexira.look.manager", "nexira.look.colour.nx.controls", "nexira.look.motion.nx.controls", "nexira.packs", "nexira.accounts", "nexira.catalogue", "nexira.source.mirror", "nexira.source.modrinth"],
+  "modules": ["nexira.i18n", "nexira.themes", "nexira.look.manager", "nexira.look.colour.nx.controls", "nexira.look.motion.nx.controls", "nexira.look.surface.nx.controls", "nexira.packs", "nexira.accounts", "nexira.catalogue", "nexira.source.mirror", "nexira.source.modrinth"],
   "graph": {
     "surfaces": {
       "appshell.backdrop": {
@@ -713,6 +713,20 @@
                   {
                     "kind": "motion.reduce",
                     "instance_id": "motion-reduce-island"
+                  }
+                ],
+                "flow": {
+                  "direction": "vertical",
+                  "wrap": 0,
+                  "uniform": false
+                },
+                "grid": 0
+              },
+              "surface": {
+                "widgets": [
+                  {
+                    "kind": "surface.blur",
+                    "instance_id": "surface-blur-island"
                   }
                 ],
                 "flow": {

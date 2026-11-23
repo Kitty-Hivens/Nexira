@@ -18,6 +18,7 @@ kotlin.sourceSets.named("jvmTest") {
         implementation(project(":look:motion-api"))
         implementation(project(":look:shape-api"))
         implementation(project(":look:stroke-api"))
+        implementation(project(":look:surface-api"))
         implementation(libs.compose.runtime)
     }
 }

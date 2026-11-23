@@ -117,6 +117,7 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 | `nexira.look.motion`  | `:look:motion-api`    | `hivens.look.motion.api`  | Asking movement by role, and answering the motion axis             |
 | `nexira.look.shape`   | `:look:shape-api`     | `hivens.look.shape.api`   | Asking corners and outlines by role, and answering the shape axis  |
 | `nexira.look.stroke`  | `:look:stroke-api`    | `hivens.look.stroke.api`  | Asking strokes by role, and answering the stroke axis              |
+| `nexira.look.surface` | `:look:surface-api`   | `hivens.look.surface.api` | Asking planes by kind, and answering the surface axis              |
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
 
@@ -333,6 +334,14 @@ The stroke axis, `stroke`, comes with the launcher in `:look:stroke-api` (`nexir
 Each role answers a `StrokeRole`, which draws itself. The widget hands it what to draw along, the brush to draw in and the state it is in, and the role decides everything else: its width, its ends and joins, a dash, or a stroke of its own that is doubled, glows or moves. `Modifier.stroke(role, color, shape, state)` outlines a node the way `Modifier.border` does, and `drawStroke(role, ...)` draws an outline, a line or a path in a draw block the way `drawOutline`, `drawLine` and `drawPath` do with a `Stroke` style. The colour is the colour axis's, `Line` for most strokes. The state is a `StrokeState`, the six states Compose knows and no others: hovered, focused, pressed, dragged, enabled and selected. `interactionSource.collectStrokeState(enabled, selected)` collects it from an interaction source, and a widget that passes no state is drawn at rest.
 
 A provider of stroke answers with `StrokeAnswers.build { ... }`, each role a `StrokeRole.solid(...)`, a `StrokeRole.byState { state -> ... }`, or a class of its own extending `StrokeRole`. A role it leaves alone keeps its base answer: a hairline, one device pixel with butt ends and no dash, as Compose strokes where nobody chose a width. The default pack names the `nx` family for stroke.
+
+### Surface
+
+The surface axis, `surface`, comes with the launcher in `:look:surface-api` (`nexira.look.surface`). A widget asks it for a plane by kind, never by a colour or a depth: `Surface.plane(kind, holder, floating)` with a `SurfaceKind` (`Page`, `Chrome`, `Panel`, `Card`, `Field`, `Popup`, `Dialog`, `Notice`), the `Plane` that holds it (`LocalPlane.current`) and the top step of the colour axis's ground. Depth is relative, so a card is placed by whatever holds it. The answer is a `PlaneAnswer`: the step of the ladder its body is drawn in and the step what it holds counts from, its opacity, how far it blurs what shows through it, the width of its edge, and its `PlaneMaterial`, an object that draws the body and makes the edge's colour from it. The colour of a step is the colour axis's. Whatever draws a plane provides a `Plane` to what it holds, and the colour under its content as `LocalGround`.
+
+`Surface.plate` answers what a widget's own plate takes for a field its node leaves empty: its opacity, its blur and its edge. A value set on the node is stronger, and in the editor each field can be put back to empty on its own. `Surface.blurs` says whether the look draws a backdrop blur at all: where it says no, every blur is dropped, one a widget names included, and the plane keeps everything else. A shadow is no part of the look: it is the widget's own, and none where the widget names none.
+
+A provider of surface answers with `SurfaceAnswers.build { ... }`, one rule for every kind in `plane`, the `plate`, and `blurs`. Nothing it answers moves a layout: a plane's size and padding are the widget's. What it leaves alone keeps its base answer: a flat plane in the colour of what holds it, opaque, with no edge and no blur, as Compose draws a surface where nobody chose. The default pack names the `nx` family for surface, whose blur is the person's own choice in its settings.
 
 ## Catalogue sources
 

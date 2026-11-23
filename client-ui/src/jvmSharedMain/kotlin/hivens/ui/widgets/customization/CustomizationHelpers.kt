@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.MaterialTheme
@@ -21,11 +23,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.customization.sliderKeyboardAdjust
+import hivens.ui.i18n.nexiraStrings
+import hivens.ui.icons.NxIcon
+import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSliderTrack
 import hivens.ui.surface.NxSurface
@@ -49,6 +55,14 @@ import hivens.ui.theme.Status
  */
 internal val panelLabelWidth: Dp = 120.dp
 
+/**
+ * A slider in a panel row: [label], the track over [range], and the value read out in [format].
+ *
+ * Where the value may also be left unset, which then follows the theme, [isSet] says whether it is set
+ * and [onReset] unsets it, from a mark after the readout shown only while it is set. The room for the
+ * mark is kept either way, so setting a value never moves the track under the pointer. Null [isSet]
+ * is a value that is always set, with no mark and no room for one.
+ */
 @Composable
 internal fun LabeledSlider(
     label: String,
@@ -57,6 +71,8 @@ internal fun LabeledSlider(
     format: String,
     displayMultiplier: Float = 1f,
     keyStep: Float = (range.endInclusive - range.start) / 100f,
+    isSet: Boolean? = null,
+    onReset: () -> Unit = {},
     onValueChange: (Float) -> Unit,
 ) {
     // The library's row, so a property row and a settings row are one shape. The
@@ -79,12 +95,32 @@ internal fun LabeledSlider(
                 maxLines  = 1,
                 modifier  = Modifier.width(READOUT_WIDTH).padding(start = 6.dp),
             )
+            if (isSet != null) {
+                Box(Modifier.size(RESET_SIZE), contentAlignment = Alignment.Center) {
+                    if (isSet) {
+                        Box(
+                            Modifier.size(RESET_SIZE).clip(CircleShape).clickable(onClick = onReset),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Symbol(
+                                icon               = NxIcon.RestartAlt,
+                                contentDescription = nexiraStrings().text("editorSurfaceFieldReset"),
+                                tint               = NxInk.quiet,
+                                modifier           = Modifier.size(14.dp),
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 /** Enough for "100%" and for a two-decimal fraction, which are the two widest readouts. */
 private val READOUT_WIDTH = 42.dp
+
+/** The mark that unsets a value, and the room kept for it. */
+private val RESET_SIZE = 20.dp
 
 @Composable
 internal fun HexField(

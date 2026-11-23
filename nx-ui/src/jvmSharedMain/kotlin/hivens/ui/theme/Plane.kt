@@ -1,31 +1,12 @@
 package hivens.ui.theme
 
-import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.compositionLocalOf
-import androidx.compose.ui.graphics.Color
+import androidx.compose.runtime.ProvidableCompositionLocal
 
-/** What is behind a plane. */
-enum class Backdrop {
-    /** The theme's own page. */
-    Page,
+/** What is behind a plane, see [hivens.look.surface.api.Backdrop]. */
+typealias Backdrop = hivens.look.surface.api.Backdrop
 
-    /** A user's picture, darkened with the colour of the page. */
-    Wallpaper,
+/** The plane content is drawn on, see [hivens.look.surface.api.Plane]. */
+typealias Plane = hivens.look.surface.api.Plane
 
-    /** Another plane. */
-    Plane,
-}
-
-/**
- * The plane content is drawn on: which step of the ladder it is, the colour actually
- * under the content, and what is behind it.
- *
- * Every surface provides one to what it contains, which is what makes depth relative:
- * a card is one step above whatever holds it, and a line or a wash is made from the
- * colour it is really on rather than from a guess.
- */
-@Immutable
-data class Plane(val step: Int, val color: Color, val over: Backdrop)
-
-/** Null outside a surface; [NxTheme] provides the page. */
-val LocalPlane = compositionLocalOf<Plane?> { null }
+/** The plane content sits on, see [hivens.look.surface.api.LocalPlane]. Null outside a surface; [NxTheme] provides the page. */
+val LocalPlane: ProvidableCompositionLocal<Plane?> = hivens.look.surface.api.LocalPlane

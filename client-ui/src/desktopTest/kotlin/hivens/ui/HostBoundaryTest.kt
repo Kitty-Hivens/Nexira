@@ -42,6 +42,9 @@ class HostBoundaryTest {
         "import hivens.look.shape.nx.ShapeNxModule",
         "import hivens.look.stroke.api.StrokeModule",
         "import hivens.look.stroke.nx.StrokeNxModule",
+        "import hivens.look.surface.api.SurfaceModule",
+        "import hivens.look.surface.nx.SurfaceNxModule",
+        "import hivens.look.surface.nx.controls.SurfaceNxControls",
     )
 
     /** The recovery surface, and the one engine of the launcher's own words it may make. */

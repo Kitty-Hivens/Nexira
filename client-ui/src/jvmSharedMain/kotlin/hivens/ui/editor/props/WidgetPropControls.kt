@@ -336,15 +336,20 @@ internal fun DisclosureRow(label: String, expanded: Boolean, onToggle: () -> Uni
     }
 }
 
-/** A whole-dp slider for one corner or one side, in the range both share. */
+/**
+ * A whole-dp slider for one corner or one side, in the range both share. [isSet] and [onReset] are
+ * [LabeledSlider]'s, for a value that may be left unset.
+ */
 @Composable
-internal fun CornerRow(label: String, value: Float, onChange: (Float) -> Unit) {
+internal fun CornerRow(label: String, value: Float, isSet: Boolean? = null, onReset: () -> Unit = {}, onChange: (Float) -> Unit) {
     LabeledSlider(
         label         = label,
         value         = value,
         range         = 0f..40f,
         format        = "%.0f",
         keyStep       = 1f,
+        isSet         = isSet,
+        onReset       = onReset,
         onValueChange = onChange,
     )
 }

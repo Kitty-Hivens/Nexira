@@ -60,6 +60,8 @@ kotlin {
                 api(project(":look:shape-api"))
                 // What every edge, mark and rule here is drawn by: the stroke axis's answers, the same way.
                 api(project(":look:stroke-api"))
+                // What every plane here is made of: the surface axis's answers, the same way.
+                api(project(":look:surface-api"))
             }
         }
 

@@ -8,7 +8,6 @@ import androidx.compose.ui.graphics.drawscope.drawIntoCanvas
 import androidx.compose.ui.graphics.skiaCanvas
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.LocalCustomization
 import org.jetbrains.skia.FilterTileMode
 import org.jetbrains.skia.ImageFilter
 import org.jetbrains.skia.Rect
@@ -28,12 +27,12 @@ import org.jetbrains.skia.Canvas as SkCanvas
  * not isolate; only alpha does.
  *
  * The result is not cacheable, because the destination it filters can change every
- * frame, which is why [hivens.ui.customization.CustomizationSettings.surfaceBlur]
- * switches the whole thing off in one place instead of per surface.
+ * frame, which is why a look may switch every blur off in one place
+ * ([hivens.look.surface.api.SurfaceAnswers.blurs]) instead of per surface.
  */
 @Composable
 internal actual fun rememberBackdropBlur(radiusDp: Float): BackdropBlur? {
-    if (radiusDp <= 0f || !LocalCustomization.current.surfaceBlur) return null
+    if (radiusDp <= 0f) return null
     val density = LocalDensity.current
     // One native filter per radius per surface, not one per frame.
     val filter = remember(radiusDp, density) {

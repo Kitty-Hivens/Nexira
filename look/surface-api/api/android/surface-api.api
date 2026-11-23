@@ -1,0 +1,138 @@
+public final class hivens/look/surface/api/Backdrop : java/lang/Enum {
+	public static final field Page Lhivens/look/surface/api/Backdrop;
+	public static final field Plane Lhivens/look/surface/api/Backdrop;
+	public static final field Wallpaper Lhivens/look/surface/api/Backdrop;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lhivens/look/surface/api/Backdrop;
+	public static fun values ()[Lhivens/look/surface/api/Backdrop;
+}
+
+public final class hivens/look/surface/api/Plane {
+	public static final field $stable I
+	public synthetic fun <init> (IJLhivens/look/surface/api/Backdrop;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2-0d7_KjU ()J
+	public final fun component3 ()Lhivens/look/surface/api/Backdrop;
+	public final fun copy-bw27NRU (IJLhivens/look/surface/api/Backdrop;)Lhivens/look/surface/api/Plane;
+	public static synthetic fun copy-bw27NRU$default (Lhivens/look/surface/api/Plane;IJLhivens/look/surface/api/Backdrop;ILjava/lang/Object;)Lhivens/look/surface/api/Plane;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColor-0d7_KjU ()J
+	public final fun getOver ()Lhivens/look/surface/api/Backdrop;
+	public final fun getStep ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/look/surface/api/PlaneAnswer {
+	public static final field $stable I
+	public fun <init> (IIFFFLhivens/look/surface/api/PlaneMaterial;)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlurDp ()F
+	public final fun getContentDepth ()I
+	public final fun getDepth ()I
+	public final fun getEdgeDp ()F
+	public final fun getMaterial ()Lhivens/look/surface/api/PlaneMaterial;
+	public final fun getOpacity ()F
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/look/surface/api/PlaneAnswerKt {
+	public static final fun drawPlaneBody-9LQNqLg (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lhivens/look/surface/api/PlaneMaterial;JLkotlin/jvm/functions/Function1;)V
+}
+
+public abstract class hivens/look/surface/api/PlaneMaterial {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/surface/api/PlaneMaterial$Companion;
+	public fun <init> ()V
+	public fun drawBody-bw27NRU (Landroidx/compose/ui/graphics/drawscope/DrawScope;JLkotlin/jvm/functions/Function1;)V
+	public abstract fun edge-l2rxGTc (J)J
+}
+
+public final class hivens/look/surface/api/PlaneMaterial$Companion {
+	public final fun getFlat ()Lhivens/look/surface/api/PlaneMaterial;
+}
+
+public final class hivens/look/surface/api/PlanesKt {
+	public static final fun getLocalPlane ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+}
+
+public final class hivens/look/surface/api/PlateAnswer {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/Float;FF)V
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getBlurDp ()F
+	public final fun getEdgeDp ()F
+	public final fun getOpacity ()Ljava/lang/Float;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/look/surface/api/Surface : hivens/look/manager/api/LookAxis {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/surface/api/Surface;
+	public final fun getBlurs (Landroidx/compose/runtime/Composer;I)Z
+	public fun getLabel ()Ljava/lang/String;
+	public final fun getPlate (Landroidx/compose/runtime/Composer;I)Lhivens/look/surface/api/PlateAnswer;
+	public final fun plane (Lhivens/look/surface/api/SurfaceKind;Lhivens/look/surface/api/Plane;ILandroidx/compose/runtime/Composer;I)Lhivens/look/surface/api/PlaneAnswer;
+}
+
+public final class hivens/look/surface/api/SurfaceAnswers {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/surface/api/SurfaceAnswers$Companion;
+	public final fun getBlurs ()Z
+	public final fun getPlate ()Lhivens/look/surface/api/PlateAnswer;
+	public final fun plane (Lhivens/look/surface/api/SurfaceKind;Lhivens/look/surface/api/Plane;I)Lhivens/look/surface/api/PlaneAnswer;
+}
+
+public final class hivens/look/surface/api/SurfaceAnswers$Builder {
+	public static final field $stable I
+	public final fun getBlurs ()Ljava/lang/Boolean;
+	public final fun getPlane ()Lkotlin/jvm/functions/Function3;
+	public final fun getPlate ()Lhivens/look/surface/api/PlateAnswer;
+	public final fun setBlurs (Ljava/lang/Boolean;)V
+	public final fun setPlane (Lkotlin/jvm/functions/Function3;)V
+	public final fun setPlate (Lhivens/look/surface/api/PlateAnswer;)V
+}
+
+public final class hivens/look/surface/api/SurfaceAnswers$Companion {
+	public final fun build (Lkotlin/jvm/functions/Function1;)Lhivens/look/surface/api/SurfaceAnswers;
+	public final fun getBASE ()Lhivens/look/surface/api/SurfaceAnswers;
+}
+
+public final class hivens/look/surface/api/SurfaceApi {
+	public static final field $stable I
+	public static final field AXIS Ljava/lang/String;
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/look/surface/api/SurfaceApi;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public final class hivens/look/surface/api/SurfaceKind : java/lang/Enum {
+	public static final field Card Lhivens/look/surface/api/SurfaceKind;
+	public static final field Chrome Lhivens/look/surface/api/SurfaceKind;
+	public static final field Dialog Lhivens/look/surface/api/SurfaceKind;
+	public static final field Field Lhivens/look/surface/api/SurfaceKind;
+	public static final field Notice Lhivens/look/surface/api/SurfaceKind;
+	public static final field Page Lhivens/look/surface/api/SurfaceKind;
+	public static final field Panel Lhivens/look/surface/api/SurfaceKind;
+	public static final field Popup Lhivens/look/surface/api/SurfaceKind;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lhivens/look/surface/api/SurfaceKind;
+	public static fun values ()[Lhivens/look/surface/api/SurfaceKind;
+}
+
+public final class hivens/look/surface/api/SurfaceModule : hivens/widget/api/CompiledModule {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/surface/api/SurfaceModule;
+	public fun getApiPackages ()Ljava/util/Map;
+	public fun getBoot ()Lhivens/widget/api/BootAnswers;
+	public fun getContributionKinds ()Ljava/util/List;
+	public fun getContributions ()Ljava/util/List;
+	public fun getId ()Ljava/lang/String;
+	public fun getName ()Ljava/lang/String;
+	public fun getProvides ()Ljava/util/Map;
+	public fun getStrings ()Lhivens/widget/api/ModuleStrings;
+	public fun getWidgets ()Lhivens/widget/api/WidgetRegistry;
+}
+

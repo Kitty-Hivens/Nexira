@@ -95,7 +95,6 @@ class JapaneseUiRenderProbe {
                                 listOf(
                                     s.text("settingsLanguage") to NexiraStrings.translator(language).language.nativeName,
                                     s.text("settingsDarkTheme") to s.text("settingsDarkThemeDesc"),
-                                    s.text("settingsSurfaceBlur") to s.text("settingsSurfaceBlurDesc"),
                                     s.text("settingsCloseAfterLaunch") to s.text("settingsCloseAfterLaunchDesc"),
                                 ),
                             )

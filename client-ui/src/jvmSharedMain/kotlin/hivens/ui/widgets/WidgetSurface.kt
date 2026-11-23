@@ -18,6 +18,7 @@ import hivens.widget.model.parseFill
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.PlateOutline
 import hivens.ui.theme.plateOutline
+import hivens.ui.theme.plateSurface
 
 /**
  * Paints a widget's own surface: the seven values of a [SurfaceSpec], rendered by the
@@ -30,6 +31,11 @@ import hivens.ui.theme.plateOutline
  * first rather than changing the one on screen, which is the shape of "the knob moves
  * something other than what I am looking at".
  *
+ * A field the spec leaves empty takes what the look answers for a widget's plate: the
+ * shape axis's corners ([plateOutline]) and the surface axis's opacity, blur and edge
+ * ([plateSurface]). A value the spec names is drawn as named. The shadow is the
+ * widget's own and none where it names none.
+ *
  * Padding is NOT here. It moved to [hivens.widget.model.Placement.padding] and is
  * applied by the slot wrapper as an outer inset, so it reserves space around the
  * widget rather than shrinking the plane, and so a widget that paints its own plane
@@ -38,21 +44,18 @@ import hivens.ui.theme.plateOutline
 @Composable
 fun WidgetSurface(spec: SurfaceSpec, content: @Composable () -> Unit) {
     val fill = parseFill(spec.fill)
+    val plate = plateSurface
     NxSurface(
         kind = fill.kind(),
         shape = spec.shape.toShape(plateOutline),
-        opacity = spec.opacity,
-        // A widget that does not name a radius gets none. This call site used to
-        // say so by passing a preset that carried no backdrop, and when the presets
-        // went the null started meaning "ask the style" -- so every widget asking
-        // only for a translucent plate got 18dp of frosted glass it never
-        // requested, under the whole home surface. The style's radius is for the
-        // library's own planes, which have no other way to name one.
-        blurDp = spec.blurDp ?: 0f,
-        // A spec that names no border has none: a widget's plane is described
-        // entirely by what is in it, so an unnamed value is nothing rather than
-        // the library's default edge.
-        borderWidthDp = spec.border.widthDp ?: 0f,
+        opacity = spec.opacity ?: plate.opacity,
+        // The plate's radius, never the kind's. A widget asking only for a
+        // translucent plate once got the chrome's 18dp of frosted glass it never
+        // requested, under the whole home surface, because an empty radius fell
+        // through to the plane's kind.
+        blurDp = spec.blurDp ?: plate.blurDp,
+        // The plate's edge, never the kind's, for the same reason.
+        borderWidthDp = spec.border.widthDp ?: plate.edgeDp,
         borderColor = borderColor(spec),
         shadowDp = spec.shadowDp ?: 0f,
         fillColor = (fill as? FillSource.Literal)?.let { Color(it.argb) },

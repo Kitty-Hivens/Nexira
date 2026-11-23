@@ -649,7 +649,7 @@ class JsonMigrationsTest {
             "appshell.topbar/general" to setOf("center", "right"),
             // the colour provider's controls: the picker's header, and the Appearance studio's theme island
             "theme.picker/general" to setOf("header"),
-            "bg.settings/general" to setOf("theme", "theme.link", "motion"),
+            "bg.settings/general" to setOf("theme", "theme.link", "motion", "surface"),
         )
     }
 }

@@ -13,8 +13,8 @@ internal fun interface BackdropBlur {
 
 /**
  * The blur for glass of radius [radiusDp], or null when there is nothing to draw: no
- * radius, the user switched surface blur off, or the host has no way to read what is
- * behind a surface.
+ * radius, or the host has no way to read what is behind a surface. Whether the look
+ * blurs at all is decided before this is asked.
  */
 @Composable
 internal expect fun rememberBackdropBlur(radiusDp: Float): BackdropBlur?

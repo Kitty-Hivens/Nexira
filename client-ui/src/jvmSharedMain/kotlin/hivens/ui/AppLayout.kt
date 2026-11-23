@@ -161,8 +161,6 @@ fun AppLayout(
                         currentSettings   = backgroundSettings,
                         onSettingsChanged = onBackgroundSettingsChanged,
                         onBack            = onBack,
-                        surfaceBlur       = customization.surfaceBlur,
-                        onSurfaceBlurChanged = { onCustomizationChanged(customization.copy(surfaceBlur = it)) },
                     )
 
                 Screen.Library -> LibraryScreen(onScreenChange = onScreenChange)

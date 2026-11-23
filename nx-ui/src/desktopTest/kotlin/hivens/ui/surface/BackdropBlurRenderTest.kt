@@ -17,8 +17,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.customization.CustomizationSettings
-import hivens.ui.customization.LocalCustomization
+import hivens.look.surface.api.Surface
+import hivens.ui.theme.nxSurfaceAnswers
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
@@ -68,7 +68,10 @@ class BackdropBlurRenderTest {
         assertTrue(over.spread < 20, "the plate should read flat under a blur: ${over.spread}")
     }
 
-    /** The switch has to reach the pixels, not just the settings file. */
+    /**
+     * The switch has to reach the pixels, not just the settings file, and a radius the
+     * surface names is switched off with the rest: a look that does not blur does not.
+     */
     @Test
     fun `the blur switch turns it off`() {
         val on = scanline(blurDp = 18f)
@@ -114,7 +117,7 @@ class BackdropBlurRenderTest {
     ): Sample {
         val scene = ImageComposeScene(width = W, height = H, density = Density(1f)) {
             NxThemed(TestTheme, dark = true) {
-                CompositionLocalProvider(LocalCustomization provides CustomizationSettings(surfaceBlur = blurEnabled)) {
+                CompositionLocalProvider(Surface.local provides nxSurfaceAnswers(blurs = blurEnabled)) {
                 Box(Modifier.fillMaxSize().drawBehind { stripes() }) {
                     if (plate != null) {
                         Box(Modifier.fillMaxSize().drawBehind { drawRect(plate) })

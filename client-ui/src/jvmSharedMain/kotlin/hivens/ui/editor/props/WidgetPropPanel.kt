@@ -76,6 +76,7 @@ import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
 import hivens.ui.theme.plateOutline
+import hivens.ui.theme.plateSurface
 
 // Right-edge prop editor. Opened by a widget's "tune" chrome affordance,
 // which sets the host's prop target (path + instanceId). Resolves the
@@ -342,8 +343,9 @@ private fun PropPanelBody(
  */
 internal const val PANEL_SHADOW_DP = 18f
 
-/** The opacity the renderer draws a spec's plane at when the spec names none. */
-private fun defaultOpacityOf(spec: SurfaceSpec): Float = parseFill(spec.fill).kind().defaultOpacity()
+/** The opacity the renderer draws a spec's plane at when the spec names none: the plate's, or else its kind's. */
+@Composable
+private fun defaultOpacityOf(spec: SurfaceSpec): Float = plateSurface.opacity ?: parseFill(spec.fill).kind().defaultOpacity()
 
 /**
  * The seven values a plane has, one row each.
@@ -351,12 +353,17 @@ private fun defaultOpacityOf(spec: SurfaceSpec): Float = parseFill(spec.fill).ki
  * Only rendered for a widget that HAS a plane: a widget without one gets the
  * offer to add it instead, so no row here can bring a surface into being as a
  * side effect of moving something else.
+ *
+ * A row whose field the record leaves empty opens on what the theme draws there,
+ * and a row whose field is set can be put back to empty on its own, so it follows
+ * the theme again without the rest of the plane being reset with it.
  */
 @Composable
 private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
     val s = nexiraStrings()
     // What the plate draws where the record names nothing, so each row opens on it.
     val plate = plateOutline
+    val planeLook = plateSurface
     val corner = plate.corner.value
 
     // One field, a value or a name. Blank follows the theme, a surface word
@@ -379,17 +386,20 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
         range         = 0f..100f,
         format        = "%.0f%%",
         keyStep       = 1f,
+        isSet         = surface.opacity != null,
+        onReset       = { write(surface.copy(opacity = null)) },
         onValueChange = { write(surface.copy(opacity = it / 100f)) },
     )
     LabeledSlider(
         label         = s.text("editorSurfaceBlur"),
-        // Zero when unset, because that is what the renderer draws for a
-        // widget that names no radius. It opened on the style's value, which
-        // the widget path does not use.
-        value         = surface.blurDp ?: 0f,
+        // The plate's radius when unset, which is what the renderer draws for a
+        // widget that names none, not the radius of the plane's kind.
+        value         = surface.blurDp ?: planeLook.blurDp,
         range         = 0f..40f,
         format        = "%.0f",
         keyStep       = 1f,
+        isSet         = surface.blurDp != null,
+        onReset       = { write(surface.copy(blurDp = null)) },
         onValueChange = { write(surface.copy(blurDp = it)) },
     )
     // Opens on the plate's corner rather than on a sentinel, and writes
@@ -402,6 +412,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
         range         = 0f..40f,
         format        = "%.0f",
         keyStep       = 1f,
+        isSet         = surface.shape.corners.all != null,
+        onReset       = { write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(all = null)))) },
         onValueChange = {
             write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(all = it))))
         },
@@ -436,6 +448,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               range         = 0f..100f,
               format        = "%.0f%%",
               keyStep       = 1f,
+              isSet         = surface.shape.smoothing != null,
+              onReset       = { write(surface.copy(shape = surface.shape.copy(smoothing = null))) },
               onValueChange = { write(surface.copy(shape = surface.shape.copy(smoothing = it / 100f))) },
           )
           // A star's three values, and only where they mean something. Offering
@@ -449,6 +463,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
                   range         = 3f..16f,
                   format        = "%.0f",
                   keyStep       = 1f,
+                  isSet         = surface.shape.points != null,
+                  onReset       = { write(surface.copy(shape = surface.shape.copy(points = null))) },
                   onValueChange = { write(surface.copy(shape = surface.shape.copy(points = it.roundToInt()))) },
               )
               if (kind == "star") {
@@ -458,6 +474,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
                       range         = 5f..95f,
                       format        = "%.0f%%",
                       keyStep       = 1f,
+                      isSet         = surface.shape.innerRadius != null,
+                      onReset       = { write(surface.copy(shape = surface.shape.copy(innerRadius = null))) },
                       onValueChange = { write(surface.copy(shape = surface.shape.copy(innerRadius = it / 100f))) },
                   )
               }
@@ -467,30 +485,36 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
                   range         = 0f..100f,
                   format        = "%.0f%%",
                   keyStep       = 1f,
+                  isSet         = surface.shape.pointRounding != null,
+                  onReset       = { write(surface.copy(shape = surface.shape.copy(pointRounding = null))) },
                   onValueChange = { write(surface.copy(shape = surface.shape.copy(pointRounding = it / 100f))) },
               )
           }
           // Each corner opens at whatever the baseline resolves to and, once
           // moved, pins that corner independently -- which is what makes a plane
           // square on one side and round on the other.
-          CornerRow(s.text("editorSurfaceCornerTopStart"), surface.shape.corners.topStart(corner)) {
-              write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topStart = it))))
+          val corners = surface.shape.corners
+          fun withCorners(next: SurfaceCorners) = write(surface.copy(shape = surface.shape.copy(corners = next)))
+          CornerRow(s.text("editorSurfaceCornerTopStart"), corners.topStart(corner), corners.topStart != null, { withCorners(corners.copy(topStart = null)) }) {
+              withCorners(corners.copy(topStart = it))
           }
-          CornerRow(s.text("editorSurfaceCornerTopEnd"), surface.shape.corners.topEnd(corner)) {
-              write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(topEnd = it))))
+          CornerRow(s.text("editorSurfaceCornerTopEnd"), corners.topEnd(corner), corners.topEnd != null, { withCorners(corners.copy(topEnd = null)) }) {
+              withCorners(corners.copy(topEnd = it))
           }
-          CornerRow(s.text("editorSurfaceCornerBottomEnd"), surface.shape.corners.bottomEnd(corner)) {
-              write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomEnd = it))))
+          CornerRow(s.text("editorSurfaceCornerBottomEnd"), corners.bottomEnd(corner), corners.bottomEnd != null, { withCorners(corners.copy(bottomEnd = null)) }) {
+              withCorners(corners.copy(bottomEnd = it))
           }
-          CornerRow(s.text("editorSurfaceCornerBottomStart"), surface.shape.corners.bottomStart(corner)) {
-              write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(bottomStart = it))))
+          CornerRow(s.text("editorSurfaceCornerBottomStart"), corners.bottomStart(corner), corners.bottomStart != null, { withCorners(corners.copy(bottomStart = null)) }) {
+              withCorners(corners.copy(bottomStart = it))
           }
           LabeledSlider(
               label         = s.text("editorSurfaceBorder"),
-              value         = surface.border.widthDp ?: 0f,
+              value         = surface.border.widthDp ?: planeLook.edgeDp,
               range         = 0f..6f,
               format        = "%.1f",
               keyStep       = 0.5f,
+              isSet         = surface.border.widthDp != null,
+              onReset       = { write(surface.copy(border = surface.border.copy(widthDp = null))) },
               onValueChange = { write(surface.copy(border = surface.border.copy(widthDp = it))) },
           )
           StringRow(s.text("editorSurfaceBorderColor"), surface.border.color) {
@@ -502,6 +526,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               range         = 0f..100f,
               format        = "%.0f%%",
               keyStep       = 1f,
+              isSet         = surface.border.opacity != null,
+              onReset       = { write(surface.copy(border = surface.border.copy(opacity = null))) },
               onValueChange = { write(surface.copy(border = surface.border.copy(opacity = it / 100f))) },
           )
           LabeledSlider(
@@ -510,6 +536,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               range         = 0f..24f,
               format        = "%.0f",
               keyStep       = 1f,
+              isSet         = surface.shadowDp != null,
+              onReset       = { write(surface.copy(shadowDp = null)) },
               onValueChange = { write(surface.copy(shadowDp = it)) },
           )
       }

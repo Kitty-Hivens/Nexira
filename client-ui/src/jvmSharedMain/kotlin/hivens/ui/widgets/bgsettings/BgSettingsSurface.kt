@@ -33,7 +33,7 @@ private val THEME_PANEL_WIDTH = 320.dp
  * Appearance studio. AppLayout routes Screen.BackgroundSettings here. Two islands over
  * the live wallpaper: the wallpaper controls (the `controls` slot -- enable + image +
  * scale + position + effects + loop + tint + reset widgets) at the start, and the theme
- * island ([AppearanceThemeIsland]: blur, reduced motion and the colour provider's controls) at the end.
+ * island ([AppearanceThemeIsland]: the look providers' controls) at the end.
  *
  * No in-screen title or back button: the top-bar breadcrumb names the screen and drives
  * navigation, as on the other surfaces. There is also no preview -- the app's
@@ -47,8 +47,6 @@ fun BgSettingsSurface(
     currentSettings: BackgroundSettings,
     onSettingsChanged: (BackgroundSettings.() -> BackgroundSettings) -> Unit,
     onBack: () -> Unit,
-    surfaceBlur: Boolean,
-    onSurfaceBlurChanged: (Boolean) -> Unit,
 ) {
     // The shell's value, not a copy taken on the way in. The screen is not the
     // only writer: the player's volume and a transcode that finishes after the
@@ -62,7 +60,6 @@ fun BgSettingsSurface(
     PuppetClick("background.clearImage", enabled = settings.value.imagePath != null) {
         onSettingsChanged { copy(imagePath = null, enabled = false) }
     }
-    PuppetToggle("background.surfaceBlur", surfaceBlur, onValueChange = onSurfaceBlurChanged)
     PuppetClick("background.reset") { onSettingsChanged { BackgroundSettings() } }
 
     Row(Modifier.fillMaxSize().padding(16.dp)) {
@@ -81,10 +78,6 @@ fun BgSettingsSurface(
 
         Spacer(Modifier.weight(1f))
 
-        AppearanceThemeIsland(
-            surfaceBlur          = surfaceBlur,
-            onSurfaceBlurChanged = onSurfaceBlurChanged,
-            modifier             = Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight(),
-        )
+        AppearanceThemeIsland(Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight())
     }
 }
