@@ -97,11 +97,9 @@ import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.screens.MigrationScreen
 import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.system.SystemNotifier
-import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.ThemeRevealHost
-import hivens.ui.theme.nexiraCjkFamily
 import hivens.ui.theme.rememberThemeReveal
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
@@ -533,16 +531,13 @@ private fun FrameWindowScope.ShellContent(
     CompositionLocalProvider(LocalTranslator provides words) {
         val s = nexiraStrings()
 
-        // Which face draws the interface. Roboto Flex is subset to Latin,
-        // Cyrillic and Greek, so a locale outside those has to be drawn by the
-        // bundled CJK face or it leaves the bundle for whatever the host has --
-        // which on a machine without a CJK font is boxes. The question is asked
-        // of the locale's own strings rather than of a list of language tags, so
-        // the next locale that needs this is picked up without touching a list
-        // here. A handful of structural labels is enough: if the interface is in
-        // that language at all, they are in it too.
-        val uiNeedsCjk = needsCjkFace(s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle"))
-        val uiFamily = if (uiNeedsCjk) nexiraCjkFamily() else null
+        // A sample of the interface's own words, which the bridge asks the look about:
+        // a locale whose script the interface face cannot cover is drawn in the face the
+        // look has for that script. Asked of the locale's own strings rather than of a
+        // list of language tags, so the next locale that needs this is picked up without
+        // touching a list here. A handful of structural labels is enough: if the
+        // interface is in that language at all, they are in it too.
+        val interfaceText = s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle")
 
         // Came back from a crash restart: surface a one-shot notice so the reload
         // -- which resets the current screen -- is not silent. consumeRecovered()
@@ -792,7 +787,7 @@ private fun FrameWindowScope.ShellContent(
 
         // The console is a window of its own beside this one (see ShellHost) and
         // draws in what this shell decided, published for it here.
-        PublishShellLook(look, appLevel, uiFamily, customization)
+        PublishShellLook(look, appLevel, interfaceText, customization)
 
         // ── Main window ────────────────────────────────────────────────
         // af.requestCloseDialog dispatches: chaos active -> pop the torturous
@@ -943,7 +938,7 @@ private fun FrameWindowScope.ShellContent(
             LayerHost(windowLayers, Modifier.fillMaxSize()) {
             val themeReveal = rememberThemeReveal()
             // The bridge from the look the manager answers above to Compose and Material.
-            NxTheme(uiFamily = uiFamily) {
+            NxTheme(interfaceText = interfaceText) {
                 // What shows where Skia has not drawn yet while the window grows:
                 // the page colour, so a resize shows the theme and not light grey.
                 val page = NxColor.page
@@ -982,7 +977,7 @@ private fun FrameWindowScope.ShellContent(
             // Dev UI-debug overlay: top of the shell Box z-order (above AppRoot and
             // NotificationStack), its own NxTheme wrap so it draws in the active theme.
             // Inert unless a non-release build has the master toggle on.
-            NxTheme(uiFamily = uiFamily) {
+            NxTheme(interfaceText = interfaceText) {
                 DebugOverlay(debugOverlay)
                 // Inside the theme on purpose: the prompts are dialogs on the window's
                 // layers, which take their composition locals from where they are

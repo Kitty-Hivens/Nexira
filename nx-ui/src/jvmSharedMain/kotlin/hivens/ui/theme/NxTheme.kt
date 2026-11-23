@@ -14,10 +14,10 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ReadOnlyComposable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import hivens.look.colour.api.Colour
 import hivens.look.colour.api.ColourAnswers
@@ -26,6 +26,7 @@ import hivens.look.manager.api.Status as LookStatus
 import hivens.look.shape.api.Shape as ShapeAxis
 import hivens.look.feedback.api.Feedback
 import hivens.look.feedback.api.FeedbackTarget
+import hivens.look.type.api.Type
 
 /**
  * The bridge from the look to Compose and Material: everything inside drawn with what the colour axis
@@ -42,11 +43,12 @@ import hivens.look.feedback.api.FeedbackTarget
  */
 @Composable
 fun NxTheme(
-    // The face every text role is drawn with. Null keeps the bundled Latin face;
-    // a locale whose own strings that face cannot cover passes the bundled CJK
-    // one instead, which is the only way the interface stays inside the bundle
-    // rather than borrowing whatever the host happens to have.
-    uiFamily: FontFamily? = null,
+    // A sample of the interface's own words. Where the type axis has a face of its
+    // own for their script, every role is drawn in it, which is the only way a
+    // locale the interface face cannot cover stays inside the bundle rather than
+    // borrowing whatever the host happens to have. A bridge inside another, a
+    // preview of a theme, takes the sample of the one around it.
+    interfaceText: String = LocalInterfaceText.current,
     content: @Composable () -> Unit,
 ) {
     val answers = Colour.local.current
@@ -58,16 +60,17 @@ fun NxTheme(
 
     CompositionLocalProvider(
         LocalPlane provides Plane(step = 0, color = page, over = Backdrop.Page),
-        LocalMonoFamily provides nexiraMonoFamily(),
+        LocalMonoFamily provides Type.mono.family(),
         // Resolved once here rather than per call site: a font family is a cache
         // key in the resolver, and familyForText is asked inside Text parameters
         // that recompose with the playback position.
         LocalCjkFamily provides nexiraCjkFamily(),
+        LocalInterfaceText provides interfaceText,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,
             shapes      = shapes,
-            typography  = nexiraTypography(uiFamily ?: nexiraSansFamily()),
+            typography  = lookTypography(familyForText(interfaceText)),
         ) {
             // Inside MaterialTheme's lambda on purpose: MaterialTheme provides its
             // default ripple into LocalIndication and its own selection colours, so
@@ -83,6 +86,9 @@ fun NxTheme(
         }
     }
 }
+
+/** The sample of the interface's own words the bridge around was given, empty outside any. */
+internal val LocalInterfaceText = compositionLocalOf { "" }
 
 /** Read access to what the colour axis answers, for the few places that need more than a request. */
 object NxTheme {

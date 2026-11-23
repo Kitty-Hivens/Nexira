@@ -5,7 +5,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.font.FontFamily
 import hivens.i18n.api.strings
 import hivens.themes.api.ThemePreview
 import hivens.themes.api.ThemesApi
@@ -40,12 +39,12 @@ internal fun Theme.label(): String =
     if (id == ThemesApi.WALLPAPER_THEME_ID) strings(ColourNxControls.ID).text("themeFromWallpaper") else name
 
 /**
- * [content] drawn in [theme], in its dark or light scheme by [dark], with the interface face [face]:
- * the themes module's preview of the theme, and the design system's bridge from its answers.
+ * [content] drawn in [theme], in its dark or light scheme by [dark]: the themes module's preview of the
+ * theme, and the design system's bridge from its answers, in the faces of the interface around it.
  */
 @Composable
-internal fun InTheme(theme: Theme, dark: Boolean, face: FontFamily?, content: @Composable () -> Unit) {
+internal fun InTheme(theme: Theme, dark: Boolean, content: @Composable () -> Unit) {
     ThemePreview(theme, dark) {
-        NxTheme(uiFamily = face, content = content)
+        NxTheme(content = content)
     }
 }

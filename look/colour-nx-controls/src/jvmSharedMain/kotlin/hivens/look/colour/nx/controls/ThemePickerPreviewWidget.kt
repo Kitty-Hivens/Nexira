@@ -58,10 +58,9 @@ fun ThemePickerPreviewWidget() {
     val s = strings(ColourNxControls.ID)
     val theme = selection.or(active)
     val scheme = theme.scheme(dark)
-    val face = MaterialTheme.typography.bodyMedium.fontFamily
 
     Box(Modifier.fillMaxSize().clip(MaterialTheme.shapes.large)) {
-        InTheme(theme, dark, face) {
+        InTheme(theme, dark) {
             Column(
                 modifier            = Modifier.fillMaxSize().background(NxColor.page).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),

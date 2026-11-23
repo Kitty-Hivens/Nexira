@@ -147,7 +147,7 @@ private fun ConsoleWindowContent(look: ShellLook) {
                         // Around the theme, as in the main window: the layers belong to the
                         // window, and a layer takes its theme from where it is opened.
                         LayerHost(layers, Modifier.fillMaxSize()) {
-                            NxTheme(uiFamily = look.uiFamily) {
+                            NxTheme(interfaceText = look.interfaceText) {
                                 NxSurface(SurfaceKind.Page, Modifier.fillMaxSize(), shape = RectangleShape) {
                                     ConsoleContent(settings = settings, onSettingsChange = settingsStore::update)
                                 }

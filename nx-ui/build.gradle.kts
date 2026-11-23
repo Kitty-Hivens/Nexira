@@ -66,6 +66,8 @@ kotlin {
                 api(project(":look:timing-api"))
                 // How everything here answers a pointer, the keyboard and a press: the feedback axis's answers.
                 api(project(":look:feedback-api"))
+                // The faces every text here is drawn in: the type axis's answers, the same way.
+                api(project(":look:type-api"))
             }
         }
 

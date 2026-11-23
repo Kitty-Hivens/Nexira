@@ -120,6 +120,7 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 | `nexira.look.surface`  | `:look:surface-api`   | `hivens.look.surface.api`  | Asking planes by kind, and answering the surface axis                                     |
 | `nexira.look.timing`   | `:look:timing-api`    | `hivens.look.timing.api`   | Asking the delay before a tooltip appears, and answering the timing axis                  |
 | `nexira.look.feedback` | `:look:feedback-api`  | `hivens.look.feedback.api` | Asking how a widget answers hover, focus, press and drag, and answering the feedback axis |
+| `nexira.look.type`     | `:look:type-api`      | `hivens.look.type.api`     | Asking the face text is drawn in, and answering the type axis                             |
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
 
@@ -354,6 +355,12 @@ The timing axis, `timing`, comes with the launcher in `:look:timing-api` (`nexir
 The feedback axis, `feedback`, comes with the launcher in `:look:feedback-api` (`nexira.look.feedback`). A widget asks it how it answers what Compose calls an interaction, a pointer over it, the keyboard's focus, a press, a drag: `Feedback.indication(target, shape, tint)` with a `FeedbackTarget`, `Control` for something pressed, typed into or picked and `Plane` for a plane pressed as a whole. The answer is a Compose `Indication`, which the widget hands to its clickable or draws with `Modifier.indication`. `shape` is the widget's outline, null where its own clip shapes it, and `tint` the colour the colour axis gives its content, null for the content colour around it. `Feedback.disabledAlpha` is how opaque disabled content is. That something is chosen, wrong or a target for a drop is the colour and stroke axes' to show, and busy or open is the widget's own.
 
 A provider of feedback answers with `FeedbackAnswers.build { indication = { target, shape, tint -> ... }; disabledAlpha = ... }`. Nothing it answers moves a layout. When no provider is chosen for the axis, every widget takes Compose's default indication, black at 0.1 under hover and focus and 0.3 under a press, and disabled content stands at Material's 0.38. The default pack names the `nx` family for feedback.
+
+### Type
+
+The type axis, `type`, comes with the launcher in `:look:type-api` (`nexira.look.type`). A widget asks it the face its text is drawn in, by what the text is: `Type.face(TextRole.Heading)`, and `Display`, `Title`, `Body` or `Label`. `Type.mono` is the face for code and values, and `Type.forText(text)` the face for a string in a script the other faces cannot draw, null where they can. The answer is a `TypeFace`: its `family()`, read in composition, and the weight and style the look gives it, null where the widget's own hold. The axis never answers a size, a line height or a tracking: those are the widget's, so a look that changes faces moves no layout by more than its letters. Material's type scale follows the axis through the bridge, each group in its role's face.
+
+A provider of type answers with `TypeAnswers.build { face = { role -> ... }; mono = ...; forText = { text -> ... } }`, a face being `TypeFace.of(family)` or a class of its own extending `TypeFace`. When no provider is chosen for the axis, every role is Compose's default family, code its monospace, and no script gets a face of its own. The default pack names the `nx` family for type.
 
 ## Catalogue sources
 

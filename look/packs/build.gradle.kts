@@ -21,6 +21,7 @@ kotlin.sourceSets.named("jvmTest") {
         implementation(project(":look:surface-api"))
         implementation(project(":look:timing-api"))
         implementation(project(":look:feedback-api"))
+        implementation(project(":look:type-api"))
         implementation(libs.compose.runtime)
     }
 }

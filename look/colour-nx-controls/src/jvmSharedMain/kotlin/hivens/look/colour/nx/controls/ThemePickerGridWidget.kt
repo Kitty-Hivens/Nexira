@@ -115,7 +115,6 @@ private fun ThemeCard(
     // The frame is the launcher's own, outside the theme being shown: it marks the
     // choice in the colours the person is looking at the picker in.
     val frame = if (isSelected) NxColor.lead() else NxInk.line
-    val face = MaterialTheme.typography.bodyMedium.fontFamily
     val darkOnly = !dark && !theme.hasLight
 
     Box(
@@ -125,7 +124,7 @@ private fun ThemeCard(
             .clip(shape)
             .border(if (isSelected) 2.dp else 1.dp, frame, shape),
     ) {
-        InTheme(theme, dark, face) {
+        InTheme(theme, dark) {
             Column(
                 modifier            = Modifier.fillMaxSize().background(NxColor.page).padding(12.dp),
                 verticalArrangement = Arrangement.SpaceBetween,

@@ -26,9 +26,7 @@ import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.surface.NxSurface
-import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.NxThemed
-import hivens.ui.theme.nexiraCjkFamily
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.test.Test
@@ -79,12 +77,8 @@ class JapaneseUiRenderProbe {
             ShippedLanguageProvider(language) {
                 val s = nexiraStrings()
                 // The same decision AppShell makes, not a copy of its outcome.
-                val family = if (!needsCjkFace(s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle"))) {
-                    null
-                } else {
-                    nexiraCjkFamily()
-                }
-                NxThemed(Themes.default, dark = true, uiFamily = family) {
+                val sample = s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle")
+                NxThemed(Themes.default, dark = true, interfaceText = sample) {
                     Box(
                         Modifier.fillMaxSize().background(NxColor.page).padding(16.dp),
                         contentAlignment = Alignment.Center,

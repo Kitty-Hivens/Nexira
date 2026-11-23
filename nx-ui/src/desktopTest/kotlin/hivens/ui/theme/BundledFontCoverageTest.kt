@@ -127,10 +127,13 @@ class BundledFontCoverageTest {
         val answers = mutableMapOf<String, Boolean>()
         @OptIn(ExperimentalComposeUiApi::class)
         val scene = ImageComposeScene(width = 8, height = 8, density = Density(1f)) {
-            listOf(
-                "Sacrifice", "Привет", "Grüße", "Xin chào", "€1",
-                "追憶のサクラメント", "Taka feat. めらみぽっぷ", "한국어", "Sacrifice ☆",
-            ).forEach { answers[it] = familyForText(it) != null }
+            // Inside nx's look, where the type axis answers which face a script needs.
+            NxThemed(NeutralTheme) {
+                listOf(
+                    "Sacrifice", "Привет", "Grüße", "Xin chào", "€1",
+                    "追憶のサクラメント", "Taka feat. めらみぽっぷ", "한국어", "Sacrifice ☆",
+                ).forEach { answers[it] = familyForText(it) != null }
+            }
         }
         scene.render()
         scene.close()

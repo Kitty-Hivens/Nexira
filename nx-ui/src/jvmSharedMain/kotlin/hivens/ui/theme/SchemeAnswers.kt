@@ -3,7 +3,6 @@ package hivens.ui.theme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
-import androidx.compose.ui.text.font.FontFamily
 import hivens.look.colour.api.Colour
 import hivens.look.colour.api.ColourAnswers
 import hivens.look.manager.api.Status as LookStatus
@@ -12,6 +11,7 @@ import hivens.look.stroke.api.Stroke
 import hivens.look.surface.api.Surface
 import hivens.look.timing.api.Timing
 import hivens.look.feedback.api.Feedback
+import hivens.look.type.api.Type
 import hivens.look.motion.api.Motion as MotionAxis
 
 /**
@@ -48,17 +48,19 @@ fun Scheme.colourAnswers(): ColourAnswers {
 
 /**
  * [content] drawn in [theme], in its dark scheme or its light one by [dark], moving as nx moves, with
- * its decorative movement held still by [reduceMotion], and in nx's corners, strokes, planes, waits
- * and feedback, whatever the look around answers: the theme's answers provided for the colour axis,
- * nx's for the motion axis ([nxMotionAnswers]), the shape axis ([nxShapeAnswers]), the stroke axis
- * ([nxStrokeAnswers]), the surface axis ([nxSurfaceAnswers]), the timing axis ([nxTimingAnswers]) and
- * the feedback axis ([nxFeedbackAnswers]), and the bridge ([NxTheme]) set from them. For what draws one theme on purpose, a preview of it or a render of a component in it.
+ * its decorative movement held still by [reduceMotion], and in nx's corners, strokes, planes, waits,
+ * feedback and faces, whatever the look around answers: the theme's answers provided for the colour
+ * axis, nx's for the motion axis ([nxMotionAnswers]), the shape axis ([nxShapeAnswers]), the stroke
+ * axis ([nxStrokeAnswers]), the surface axis ([nxSurfaceAnswers]), the timing axis ([nxTimingAnswers]),
+ * the feedback axis ([nxFeedbackAnswers]) and the type axis ([nxTypeAnswers]), and the bridge
+ * ([NxTheme]) set from them. For what draws one theme on purpose, a preview of it or a render of a
+ * component in it. [interfaceText] decides the interface face as it does for [NxTheme].
  */
 @Composable
 fun NxThemed(
     theme: Theme,
     dark: Boolean = true,
-    uiFamily: FontFamily? = null,
+    interfaceText: String = LocalInterfaceText.current,
     reduceMotion: Boolean = false,
     content: @Composable () -> Unit,
 ) {
@@ -72,8 +74,9 @@ fun NxThemed(
         Surface.local provides nxSurfaceAnswers(blurs = true),
         Timing.local provides nxTimingAnswers(),
         Feedback.local provides nxFeedbackAnswers(),
+        Type.local provides nxTypeAnswers(),
     ) {
-        NxTheme(uiFamily = uiFamily, content = content)
+        NxTheme(interfaceText = interfaceText, content = content)
     }
 }
 

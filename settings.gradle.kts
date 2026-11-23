@@ -231,5 +231,8 @@ include(":look:timing-nx")
 include(":look:feedback-api")
 // The nx feedback provider: nx's state layers, with no settings of its own.
 include(":look:feedback-nx")
+include(":look:type-api")
+// The nx type provider: nx's bundled faces, with no settings of its own.
+include(":look:type-nx")
 include(":profiler-agent")
 include(":authlib-agent")

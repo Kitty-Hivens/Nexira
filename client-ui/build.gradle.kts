@@ -188,15 +188,17 @@ kotlin {
                 implementation(project(":look:surface-api"))
                 implementation(project(":look:timing-api"))
                 implementation(project(":look:feedback-api"))
+                implementation(project(":look:type-api"))
                 implementation(project(":look:packs"))
-                // The nx motion, shape, stroke, surface, timing and feedback providers, compiled in like the colour
-                // one.
+                // The nx motion, shape, stroke, surface, timing, feedback and type providers, compiled in like the
+                // colour one.
                 implementation(project(":look:motion-nx"))
                 implementation(project(":look:shape-nx"))
                 implementation(project(":look:stroke-nx"))
                 implementation(project(":look:surface-nx"))
                 implementation(project(":look:timing-nx"))
                 implementation(project(":look:feedback-nx"))
+                implementation(project(":look:type-nx"))
                 // The nx providers' controls, compiled in like the providers: the shell names
                 // nothing of them beyond their CompiledModule, and draws their widgets by kind.
                 implementation(project(":look:colour-nx-controls"))

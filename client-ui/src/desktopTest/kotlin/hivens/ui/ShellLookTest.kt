@@ -98,7 +98,7 @@ class ShellLookTest {
             onEventThread {
                 val scene = ImageComposeScene(100, 100, Density(1f)) {
                     ShippedLanguageProvider("en") {
-                        PublishShellLook(look, shell.app, null, CustomizationSettings())
+                        PublishShellLook(look, shell.app, "", CustomizationSettings())
                     }
                 }
                 try {

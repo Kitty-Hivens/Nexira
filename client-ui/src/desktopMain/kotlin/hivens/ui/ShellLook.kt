@@ -6,7 +6,6 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.text.font.FontFamily
 import hivens.i18n.api.Translator
 import hivens.ui.customization.CustomizationSettings
 import hivens.widget.api.WidgetScope
@@ -14,7 +13,7 @@ import hivens.widget.api.WidgetScope
 /**
  * What the main window decided about how the launcher reads, for the windows beside it.
  *
- * The language, the interface face and the customization are decided by the main
+ * The language, a sample of the interface's words and the customization are decided by the main
  * window's shell, where the settings that change them live. A window of the
  * application next to it, the console, is not inside that composition and inherits
  * none of it, so the shell writes what it decided here and the other window reads
@@ -26,21 +25,21 @@ import hivens.widget.api.WidgetScope
 class ShellLook(words: Translator) {
     var words: Translator by mutableStateOf(words)
         private set
-    var uiFamily: FontFamily? by mutableStateOf(null)
+    var interfaceText: String by mutableStateOf("")
         private set
     var customization: CustomizationSettings by mutableStateOf(CustomizationSettings())
         private set
 
-    fun update(words: Translator, uiFamily: FontFamily?, customization: CustomizationSettings) {
+    fun update(words: Translator, interfaceText: String, customization: CustomizationSettings) {
         this.words = words
-        this.uiFamily = uiFamily
+        this.interfaceText = interfaceText
         this.customization = customization
     }
 }
 
 /**
  * Keeps [look] on what the main window draws with: the words as [app] answers them
- * (see [ShellLookValues]), and what only the shell knows, [uiFamily] and
+ * (see [ShellLookValues]), and what only the shell knows, [interfaceText] and
  * [customization].
  *
  * The words are read here, in a restart scope of its own, so a language switched
@@ -52,9 +51,9 @@ class ShellLook(words: Translator) {
 internal fun PublishShellLook(
     look: ShellLook,
     app: WidgetScope,
-    uiFamily: FontFamily?,
+    interfaceText: String,
     customization: CustomizationSettings,
 ) {
     val words = app.read(ShellLookValues.Words)
-    SideEffect { look.update(words, uiFamily, customization) }
+    SideEffect { look.update(words, interfaceText, customization) }
 }

@@ -1,0 +1,79 @@
+public final class hivens/look/type/api/TextRole : java/lang/Enum {
+	public static final field Body Lhivens/look/type/api/TextRole;
+	public static final field Display Lhivens/look/type/api/TextRole;
+	public static final field Heading Lhivens/look/type/api/TextRole;
+	public static final field Label Lhivens/look/type/api/TextRole;
+	public static final field Title Lhivens/look/type/api/TextRole;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lhivens/look/type/api/TextRole;
+	public static fun values ()[Lhivens/look/type/api/TextRole;
+}
+
+public final class hivens/look/type/api/Type : hivens/look/manager/api/LookAxis {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/type/api/Type;
+	public final fun face (Lhivens/look/type/api/TextRole;Landroidx/compose/runtime/Composer;I)Lhivens/look/type/api/TypeFace;
+	public final fun forText (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)Lhivens/look/type/api/TypeFace;
+	public fun getLabel ()Ljava/lang/String;
+	public final fun getMono (Landroidx/compose/runtime/Composer;I)Lhivens/look/type/api/TypeFace;
+}
+
+public final class hivens/look/type/api/TypeAnswers {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/type/api/TypeAnswers$Companion;
+	public final fun face (Lhivens/look/type/api/TextRole;)Lhivens/look/type/api/TypeFace;
+	public final fun forText (Ljava/lang/String;)Lhivens/look/type/api/TypeFace;
+	public final fun getMono ()Lhivens/look/type/api/TypeFace;
+}
+
+public final class hivens/look/type/api/TypeAnswers$Builder {
+	public static final field $stable I
+	public final fun getFace ()Lkotlin/jvm/functions/Function1;
+	public final fun getForText ()Lkotlin/jvm/functions/Function1;
+	public final fun getMono ()Lhivens/look/type/api/TypeFace;
+	public final fun setFace (Lkotlin/jvm/functions/Function1;)V
+	public final fun setForText (Lkotlin/jvm/functions/Function1;)V
+	public final fun setMono (Lhivens/look/type/api/TypeFace;)V
+}
+
+public final class hivens/look/type/api/TypeAnswers$Companion {
+	public final fun build (Lkotlin/jvm/functions/Function1;)Lhivens/look/type/api/TypeAnswers;
+	public final fun getBASE ()Lhivens/look/type/api/TypeAnswers;
+}
+
+public final class hivens/look/type/api/TypeApi {
+	public static final field $stable I
+	public static final field AXIS Ljava/lang/String;
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/look/type/api/TypeApi;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public abstract class hivens/look/type/api/TypeFace {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/type/api/TypeFace$Companion;
+	public fun <init> ()V
+	public abstract fun family (Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/text/font/FontFamily;
+	public fun getStyle-4Lr2A7w ()Landroidx/compose/ui/text/font/FontStyle;
+	public fun getWeight ()Landroidx/compose/ui/text/font/FontWeight;
+}
+
+public final class hivens/look/type/api/TypeFace$Companion {
+	public final fun of-9y9KoKQ (Landroidx/compose/ui/text/font/FontFamily;Landroidx/compose/ui/text/font/FontWeight;Landroidx/compose/ui/text/font/FontStyle;)Lhivens/look/type/api/TypeFace;
+	public static synthetic fun of-9y9KoKQ$default (Lhivens/look/type/api/TypeFace$Companion;Landroidx/compose/ui/text/font/FontFamily;Landroidx/compose/ui/text/font/FontWeight;Landroidx/compose/ui/text/font/FontStyle;ILjava/lang/Object;)Lhivens/look/type/api/TypeFace;
+}
+
+public final class hivens/look/type/api/TypeModule : hivens/widget/api/CompiledModule {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/type/api/TypeModule;
+	public fun getApiPackages ()Ljava/util/Map;
+	public fun getBoot ()Lhivens/widget/api/BootAnswers;
+	public fun getContributionKinds ()Ljava/util/List;
+	public fun getContributions ()Ljava/util/List;
+	public fun getId ()Ljava/lang/String;
+	public fun getName ()Ljava/lang/String;
+	public fun getProvides ()Ljava/util/Map;
+	public fun getStrings ()Lhivens/widget/api/ModuleStrings;
+	public fun getWidgets ()Lhivens/widget/api/WidgetRegistry;
+}
+

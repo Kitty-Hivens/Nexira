@@ -73,11 +73,9 @@ import hivens.ui.logic.LaunchLogCollector
 import hivens.ui.screens.ConsoleContent
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.text.needsCjkFace
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.ThemeRevealHost
-import hivens.ui.theme.nexiraCjkFamily
 import hivens.ui.theme.rememberThemeReveal
 import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
@@ -241,7 +239,7 @@ private fun AndroidShellContent() {
     CompositionLocalProvider(LocalAprilFools provides AprilFoolsLoader.instance) {
         CompositionLocalProvider(LocalTranslator provides words) {
             val s = nexiraStrings()
-            val uiFamily = if (needsCjkFace(s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle"))) nexiraCjkFamily() else null
+            val interfaceText = s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle")
 
             val customizationJson = remember { Json { ignoreUnknownKeys = true; encodeDefaults = true; coerceInputValues = true } }
             val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
@@ -322,7 +320,7 @@ private fun AndroidShellContent() {
                 ) {
                 LayerHost(layers, Modifier.fillMaxSize()) {
                 val themeReveal = rememberThemeReveal()
-                NxTheme(uiFamily = uiFamily) {
+                NxTheme(interfaceText = interfaceText) {
                     ThemeRevealHost(themeReveal) {
                         // The system bars and the caption of a freeform window are the system's, so the
                         // layout yields room to them instead of drawing under.

@@ -10,11 +10,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.Typography
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import hivens.look.type.api.TextRole
+import hivens.look.type.api.Type
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.nx.ui.generated.resources.Res
@@ -28,7 +30,6 @@ import hivens.nx.ui.generated.resources.roboto_flex_bold
 import hivens.nx.ui.generated.resources.roboto_flex_medium
 import hivens.nx.ui.generated.resources.roboto_flex_regular
 import hivens.nx.ui.generated.resources.roboto_flex_semibold
-import hivens.ui.text.needsCjkFace
 import org.jetbrains.compose.resources.Font
 
 /**
@@ -102,26 +103,20 @@ val LocalCjkFamily = staticCompositionLocalOf<FontFamily?> { null }
 
 /**
  * Which face to draw [text] with, for text the app did not write: a track title
- * off a file's tags, a pack name, a filename, something typed into a widget.
+ * off a file's tags, a pack name, a filename, something typed into a widget. The
+ * type axis answers it ([Type.forText]).
  *
- * Null means "whatever the style already says", which is the bundled Latin face
- * for all but a fraction of strings, so the common case costs a range lookup and
- * changes nothing. A string that face cannot cover is handed the bundled CJK one
- * instead of leaving the bundle for the host's fonts, which on a machine without
- * a CJK font renders boxes.
+ * Null means "whatever the style already says", which is the interface face for
+ * all but a fraction of strings, so the common case changes nothing. A string that
+ * face cannot cover is handed the face the look has for its script, which under nx
+ * is the bundled CJK one, rather than leaving the bundle for the host's fonts, which
+ * on a machine without a CJK font renders boxes.
  *
  * Asked per string rather than per locale on purpose: a Japanese track title
  * turns up in a Russian interface constantly, and it is the string that decides.
  */
 @Composable
-fun familyForText(text: String): FontFamily? = when {
-    !needsCjkFace(text) -> null
-    // The theme's single instance where there is one. The fallback is for a
-    // surface composed outside NxTheme: reading the local alone would hand such a
-    // caller null, which is not "use the style's face", it is a CJK string drawn
-    // by a face that has no CJK in it, silently and only on some screens.
-    else -> LocalCjkFamily.current ?: nexiraCjkFamily()
-}
+fun familyForText(text: String): FontFamily? = Type.forText(text)?.family()
 
 /**
  * DejaVu Sans, bundled solely because it carries the full Braille block (U+2800)
@@ -141,33 +136,45 @@ fun nexiraBrailleFamily(): FontFamily = FontFamily(Font(Res.font.dejavu_sans))
 val LocalMonoFamily = staticCompositionLocalOf<FontFamily> { FontFamily.Monospace }
 
 /**
- * Material 3 type scale with every role re-pointed at [sans].
+ * Material 3's type scale, its sizes, line heights and tracking kept, with each
+ * group drawn in the face the type axis answers for its role: display, headline
+ * as heading, title, body and label. A face's weight and style replace the slot's
+ * where the face gives one.
  *
- * [sans] is a parameter because a locale whose own interface text leaves the
- * Latin face has to be drawn by a face that covers it, and the type scale is the
- * one place that decision reaches every role at once. Defaulted, so a caller
- * that has no such concern reads as it did before.
+ * [uiFamily] replaces every role's family, because a locale whose own interface
+ * text leaves the interface face has to be drawn by a face that covers it, and
+ * the type scale is the one place that decision reaches every role at once.
  */
 @Composable
-fun nexiraTypography(sans: FontFamily = nexiraSansFamily()): Typography {
-    return remember(sans) {
+fun lookTypography(uiFamily: FontFamily? = null): Typography {
+    val faces = TextRole.entries.associateWith { Type.face(it) }
+    val families = TextRole.entries.associateWith { uiFamily ?: faces.getValue(it).family() }
+    return remember(faces, families) {
+        fun TextStyle.of(role: TextRole): TextStyle {
+            val face = faces.getValue(role)
+            return copy(
+                fontFamily = families.getValue(role),
+                fontWeight = face.weight ?: fontWeight,
+                fontStyle = face.style ?: fontStyle,
+            )
+        }
         with(Typography()) {
             copy(
-                displayLarge   = displayLarge.copy(fontFamily = sans),
-                displayMedium  = displayMedium.copy(fontFamily = sans),
-                displaySmall   = displaySmall.copy(fontFamily = sans),
-                headlineLarge  = headlineLarge.copy(fontFamily = sans),
-                headlineMedium = headlineMedium.copy(fontFamily = sans),
-                headlineSmall  = headlineSmall.copy(fontFamily = sans),
-                titleLarge     = titleLarge.copy(fontFamily = sans),
-                titleMedium    = titleMedium.copy(fontFamily = sans),
-                titleSmall     = titleSmall.copy(fontFamily = sans),
-                bodyLarge      = bodyLarge.copy(fontFamily = sans),
-                bodyMedium     = bodyMedium.copy(fontFamily = sans),
-                bodySmall      = bodySmall.copy(fontFamily = sans),
-                labelLarge     = labelLarge.copy(fontFamily = sans),
-                labelMedium    = labelMedium.copy(fontFamily = sans),
-                labelSmall     = labelSmall.copy(fontFamily = sans),
+                displayLarge   = displayLarge.of(TextRole.Display),
+                displayMedium  = displayMedium.of(TextRole.Display),
+                displaySmall   = displaySmall.of(TextRole.Display),
+                headlineLarge  = headlineLarge.of(TextRole.Heading),
+                headlineMedium = headlineMedium.of(TextRole.Heading),
+                headlineSmall  = headlineSmall.of(TextRole.Heading),
+                titleLarge     = titleLarge.of(TextRole.Title),
+                titleMedium    = titleMedium.of(TextRole.Title),
+                titleSmall     = titleSmall.of(TextRole.Title),
+                bodyLarge      = bodyLarge.of(TextRole.Body),
+                bodyMedium     = bodyMedium.of(TextRole.Body),
+                bodySmall      = bodySmall.of(TextRole.Body),
+                labelLarge     = labelLarge.of(TextRole.Label),
+                labelMedium    = labelMedium.of(TextRole.Label),
+                labelSmall     = labelSmall.of(TextRole.Label),
             )
         }
     }
