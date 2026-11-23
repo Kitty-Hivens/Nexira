@@ -105,20 +105,21 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 "Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.themes=1.0, nexira.packs=2.0, nexira.accounts=1.0, nexira.catalogue=1.0",
 ```
 
-| API id                | Artifact              | Package                   | What it is for                                                           |
-|-----------------------|-----------------------|---------------------------|--------------------------------------------------------------------------|
-| `nexira.i18n`         | `:i18n-api`           | `hivens.i18n.api`         | Looking words up, the language in use, the language setting              |
-| `nexira.themes`       | `:look:colour-nx-api` | `hivens.themes.api`       | The theme in use, the choice, and bringing a theme                       |
-| `nexira.packs`        | `:packs-api`          | `hivens.packs.api`        | Listing, launching, installing and updating packs                        |
-| `nexira.accounts`     | `:accounts-api`       | `hivens.accounts.api`     | Who is signed in, the stored accounts, signing in and out                |
-| `nexira.catalogue`    | `:catalogue-api`      | `hivens.catalogue.api`    | Searching, installing a project, and bringing a source                   |
-| `nexira.look.manager` | `:look:manager-api`   | `hivens.look.manager.api` | Bringing an axis of the look, a provider or a pack, and the choice       |
-| `nexira.look.colour`  | `:look:colour-api`    | `hivens.look.colour.api`  | Asking colour by role, and answering the colour axis                     |
-| `nexira.look.motion`  | `:look:motion-api`    | `hivens.look.motion.api`  | Asking movement by role, and answering the motion axis                   |
-| `nexira.look.shape`   | `:look:shape-api`     | `hivens.look.shape.api`   | Asking corners and outlines by role, and answering the shape axis        |
-| `nexira.look.stroke`  | `:look:stroke-api`    | `hivens.look.stroke.api`  | Asking strokes by role, and answering the stroke axis                    |
-| `nexira.look.surface` | `:look:surface-api`   | `hivens.look.surface.api` | Asking planes by kind, and answering the surface axis                    |
-| `nexira.look.timing`  | `:look:timing-api`    | `hivens.look.timing.api`  | Asking the delay before a tooltip appears, and answering the timing axis |
+| API id                 | Artifact              | Package                    | What it is for                                                                            |
+|------------------------|-----------------------|----------------------------|-------------------------------------------------------------------------------------------|
+| `nexira.i18n`          | `:i18n-api`           | `hivens.i18n.api`          | Looking words up, the language in use, the language setting                               |
+| `nexira.themes`        | `:look:colour-nx-api` | `hivens.themes.api`        | The theme in use, the choice, and bringing a theme                                        |
+| `nexira.packs`         | `:packs-api`          | `hivens.packs.api`         | Listing, launching, installing and updating packs                                         |
+| `nexira.accounts`      | `:accounts-api`       | `hivens.accounts.api`      | Who is signed in, the stored accounts, signing in and out                                 |
+| `nexira.catalogue`     | `:catalogue-api`      | `hivens.catalogue.api`     | Searching, installing a project, and bringing a source                                    |
+| `nexira.look.manager`  | `:look:manager-api`   | `hivens.look.manager.api`  | Bringing an axis of the look, a provider or a pack, and the choice                        |
+| `nexira.look.colour`   | `:look:colour-api`    | `hivens.look.colour.api`   | Asking colour by role, and answering the colour axis                                      |
+| `nexira.look.motion`   | `:look:motion-api`    | `hivens.look.motion.api`   | Asking movement by role, and answering the motion axis                                    |
+| `nexira.look.shape`    | `:look:shape-api`     | `hivens.look.shape.api`    | Asking corners and outlines by role, and answering the shape axis                         |
+| `nexira.look.stroke`   | `:look:stroke-api`    | `hivens.look.stroke.api`   | Asking strokes by role, and answering the stroke axis                                     |
+| `nexira.look.surface`  | `:look:surface-api`   | `hivens.look.surface.api`  | Asking planes by kind, and answering the surface axis                                     |
+| `nexira.look.timing`   | `:look:timing-api`    | `hivens.look.timing.api`   | Asking the delay before a tooltip appears, and answering the timing axis                  |
+| `nexira.look.feedback` | `:look:feedback-api`  | `hivens.look.feedback.api` | Asking how a widget answers hover, focus, press and drag, and answering the feedback axis |
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
 
@@ -347,6 +348,12 @@ A provider of surface answers with `SurfaceAnswers.build { ... }`, one rule for 
 ### Timing
 
 The timing axis, `timing`, comes with the launcher in `:look:timing-api` (`nexira.look.timing`). A widget asks it the delay before a tooltip appears under the pointer, by what the tooltip is for: `Timing.tooltipDelay(TooltipKind.Label)` for one that names the thing, `Explain` for one that is read, `Preview` for a picture. How a tooltip behaves once shown, whether it can be entered and when it leaves, is the widget's own, and nothing the axis answers moves a layout. A provider answers with `TimingAnswers.build { tooltipDelay = { kind -> ... } }`. Where it answers nothing, the delay is half a second, Compose's own default. The default pack names the `nx` family for timing.
+
+### Feedback
+
+The feedback axis, `feedback`, comes with the launcher in `:look:feedback-api` (`nexira.look.feedback`). A widget asks it how it answers what Compose calls an interaction, a pointer over it, the keyboard's focus, a press, a drag: `Feedback.indication(target, shape, tint)` with a `FeedbackTarget`, `Control` for something pressed, typed into or picked and `Plane` for a plane pressed as a whole. The answer is a Compose `Indication`, which the widget hands to its clickable or draws with `Modifier.indication`. `shape` is the widget's outline, null where its own clip shapes it, and `tint` the colour the colour axis gives its content, null for the content colour around it. `Feedback.disabledAlpha` is how opaque disabled content is. That something is chosen, wrong or a target for a drop is the colour and stroke axes' to show, and busy or open is the widget's own.
+
+A provider of feedback answers with `FeedbackAnswers.build { indication = { target, shape, tint -> ... }; disabledAlpha = ... }`. Nothing it answers moves a layout. When no provider is chosen for the axis, every widget takes Compose's default indication, black at 0.1 under hover and focus and 0.3 under a press, and disabled content stands at Material's 0.38. The default pack names the `nx` family for feedback.
 
 ## Catalogue sources
 

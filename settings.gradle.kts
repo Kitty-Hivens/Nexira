@@ -228,5 +228,8 @@ include(":look:surface-nx-controls")
 include(":look:timing-api")
 // The nx timing provider: how long nx's tooltips wait, with no settings of its own.
 include(":look:timing-nx")
+include(":look:feedback-api")
+// The nx feedback provider: nx's state layers, with no settings of its own.
+include(":look:feedback-nx")
 include(":profiler-agent")
 include(":authlib-agent")

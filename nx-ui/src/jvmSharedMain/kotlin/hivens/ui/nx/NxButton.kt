@@ -25,6 +25,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.look.feedback.api.Feedback
+import hivens.look.feedback.api.FeedbackTarget
 import hivens.look.shape.api.Shape
 import hivens.look.stroke.api.Stroke
 import hivens.look.stroke.api.collectStrokeState
@@ -92,14 +94,14 @@ fun NxButton(
     }
     val outline = NxInk.line
     val bordered = style == NxButtonStyle.Secondary
-    val dim = if (enabled) 1f else 0.45f
+    val dim = if (enabled) 1f else Feedback.disabledAlpha
     val pad = if (compact) PaddingValues(horizontal = 12.dp, vertical = 6.dp)
               else PaddingValues(horizontal = 18.dp, vertical = 10.dp)
 
-    // Hover/press feedback through the shared ShapedStateLayer at the button's own
+    // Hover and press as the feedback axis answers a control at the button's own
     // outline, provided as LocalIndication so the clickable picks it up.
     CompositionLocalProvider(
-        LocalIndication provides ShapedStateLayer(shape, content),
+        LocalIndication provides Feedback.indication(FeedbackTarget.Control, shape, content),
     ) {
         Row(
             modifier              = modifier

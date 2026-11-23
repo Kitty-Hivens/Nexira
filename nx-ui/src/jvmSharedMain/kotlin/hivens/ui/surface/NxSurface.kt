@@ -2,8 +2,7 @@ package hivens.ui.surface
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.InteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
-import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.indication
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -40,6 +39,8 @@ import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Plane
 import hivens.look.colour.api.Colour
 import hivens.look.colour.api.LocalGround
+import hivens.look.feedback.api.Feedback
+import hivens.look.feedback.api.FeedbackTarget
 import hivens.look.surface.api.Surface
 import hivens.look.surface.api.drawPlaneBody
 import hivens.look.shape.api.Shape as ShapeAxis
@@ -109,11 +110,9 @@ fun NxSurface(
     val over = if (kind == SurfaceKind.Chrome) parent.over else Backdrop.Plane
     val plane = Plane(look.contentDepth, under, over)
 
-    // Held as state and read in the draw lambda, not here: hovering a card would
-    // otherwise recompose it and everything it contains, to change one rectangle.
-    val hovered = interactionSource?.collectIsHoveredAsState()
-    val pressed = interactionSource?.collectIsPressedAsState()
-    val stateTint = answers.paintLead
+    // An indication draws from the interactions themselves, so hovering a card does
+    // not recompose it and everything it contains to change one rectangle.
+    val feedback = interactionSource?.let { Feedback.indication(FeedbackTarget.Plane, tint = answers.paintLead) }
 
     Box(
         modifier
@@ -135,13 +134,8 @@ fun NxSurface(
             .clip(shape)
             .drawBehind {
                 drawPlaneBody(look.material, body, backdrop?.let { blurred -> { blurred.draw(this) } })
-                val stateAlpha = when {
-                    pressed?.value == true -> PRESS_ALPHA
-                    hovered?.value == true -> HOVER_ALPHA
-                    else -> 0f
-                }
-                if (stateAlpha > 0f) drawRect(stateTint.copy(alpha = stateAlpha))
-            },
+            }
+            .then(if (interactionSource != null && feedback != null) Modifier.indication(interactionSource, feedback) else Modifier),
     ) {
         CompositionLocalProvider(
             LocalPlane provides plane,
@@ -159,8 +153,6 @@ private val SurfaceKind.defaultShadowDp: Float
         else -> 0f
     }
 
-private const val HOVER_ALPHA = 0.06f
-private const val PRESS_ALPHA = 0.12f
 
 /**
  * The opacity a surface of this kind draws at when it names none, as the look answers it

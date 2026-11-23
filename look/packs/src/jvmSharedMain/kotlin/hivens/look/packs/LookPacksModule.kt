@@ -33,5 +33,5 @@ object NexiraPack : LookPack {
 
     // By id, as a pack knows no axis and no provider: every axis that exists, each answered by the nx family.
     override val providers: Map<String, String> =
-        listOf("colour", "motion", "shape", "stroke", "surface", "timing").associateWith { "nx" }
+        listOf("colour", "motion", "shape", "stroke", "surface", "timing", "feedback").associateWith { "nx" }
 }

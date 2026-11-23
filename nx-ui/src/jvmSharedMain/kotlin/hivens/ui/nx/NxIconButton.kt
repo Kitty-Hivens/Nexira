@@ -23,6 +23,8 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
 import hivens.ui.theme.NeutralTheme
+import hivens.look.feedback.api.Feedback
+import hivens.look.feedback.api.FeedbackTarget
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxThemed
@@ -31,8 +33,8 @@ import hivens.ui.theme.Status
 /**
  * Icon-only clickable with a shape-correct state layer: the hover/press tint takes
  * the round hit target's own outline, the look's capsule, not a mismatched rectangle
- * ripple (Rule 5/D28). The first consumer of [ShapedStateLayer]'s Shape overload,
- * it hands the layer the host's actual shape.
+ * ripple (Rule 5/D28). It hands the feedback axis the host's actual shape, and the
+ * look answers how a control there is hovered and pressed.
  *
  * A glyph is not a name, so [contentDescription] is also raised as a tooltip on
  * hover. It is the same string either way -- every call site already passes the
@@ -80,7 +82,7 @@ fun NxIconButton(
                 .layerTrigger()
                 .clickable(
                     interactionSource = interaction,
-                    indication        = ShapedStateLayer(shape, shownTint),
+                    indication        = Feedback.indication(FeedbackTarget.Control, shape, shownTint),
                     enabled           = enabled,
                     onClick           = onClick,
                 )

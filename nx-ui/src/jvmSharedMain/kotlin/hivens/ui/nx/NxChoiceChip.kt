@@ -1,5 +1,7 @@
 package hivens.ui.nx
 
+import hivens.look.feedback.api.Feedback
+import hivens.look.feedback.api.FeedbackTarget
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -59,7 +61,7 @@ fun NxChoiceChip(
                 .background(bg)
                 .clickable(
                     interactionSource = interaction,
-                    indication        = ShapedStateLayer(shape, fg),
+                    indication        = Feedback.indication(FeedbackTarget.Control, shape, fg),
                     enabled           = enabled,
                     onClick           = onToggle,
                 )

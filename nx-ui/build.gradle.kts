@@ -64,6 +64,8 @@ kotlin {
                 api(project(":look:surface-api"))
                 // How long what is transient waits here: the timing axis's answers, the same way.
                 api(project(":look:timing-api"))
+                // How everything here answers a pointer, the keyboard and a press: the feedback axis's answers.
+                api(project(":look:feedback-api"))
             }
         }
 

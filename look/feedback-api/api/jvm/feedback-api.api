@@ -1,0 +1,58 @@
+public final class hivens/look/feedback/api/Feedback : hivens/look/manager/api/LookAxis {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/feedback/api/Feedback;
+	public final fun getDisabledAlpha (Landroidx/compose/runtime/Composer;I)F
+	public fun getLabel ()Ljava/lang/String;
+	public final fun indication-gKt5lHk (Lhivens/look/feedback/api/FeedbackTarget;Landroidx/compose/ui/graphics/Shape;Landroidx/compose/ui/graphics/Color;Landroidx/compose/runtime/Composer;II)Landroidx/compose/foundation/Indication;
+}
+
+public final class hivens/look/feedback/api/FeedbackAnswers {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/feedback/api/FeedbackAnswers$Companion;
+	public final fun getDisabledAlpha ()F
+	public final fun indication-t9lfQc4 (Lhivens/look/feedback/api/FeedbackTarget;Landroidx/compose/ui/graphics/Shape;Landroidx/compose/ui/graphics/Color;)Landroidx/compose/foundation/Indication;
+}
+
+public final class hivens/look/feedback/api/FeedbackAnswers$Builder {
+	public static final field $stable I
+	public final fun getDisabledAlpha ()Ljava/lang/Float;
+	public final fun getIndication ()Lkotlin/jvm/functions/Function3;
+	public final fun setDisabledAlpha (Ljava/lang/Float;)V
+	public final fun setIndication (Lkotlin/jvm/functions/Function3;)V
+}
+
+public final class hivens/look/feedback/api/FeedbackAnswers$Companion {
+	public final fun build (Lkotlin/jvm/functions/Function1;)Lhivens/look/feedback/api/FeedbackAnswers;
+	public final fun getBASE ()Lhivens/look/feedback/api/FeedbackAnswers;
+}
+
+public final class hivens/look/feedback/api/FeedbackApi {
+	public static final field $stable I
+	public static final field AXIS Ljava/lang/String;
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/look/feedback/api/FeedbackApi;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public final class hivens/look/feedback/api/FeedbackModule : hivens/widget/api/CompiledModule {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/feedback/api/FeedbackModule;
+	public fun getApiPackages ()Ljava/util/Map;
+	public fun getBoot ()Lhivens/widget/api/BootAnswers;
+	public fun getContributionKinds ()Ljava/util/List;
+	public fun getContributions ()Ljava/util/List;
+	public fun getId ()Ljava/lang/String;
+	public fun getName ()Ljava/lang/String;
+	public fun getProvides ()Ljava/util/Map;
+	public fun getStrings ()Lhivens/widget/api/ModuleStrings;
+	public fun getWidgets ()Lhivens/widget/api/WidgetRegistry;
+}
+
+public final class hivens/look/feedback/api/FeedbackTarget : java/lang/Enum {
+	public static final field Control Lhivens/look/feedback/api/FeedbackTarget;
+	public static final field Plane Lhivens/look/feedback/api/FeedbackTarget;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lhivens/look/feedback/api/FeedbackTarget;
+	public static fun values ()[Lhivens/look/feedback/api/FeedbackTarget;
+}
+

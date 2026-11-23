@@ -24,7 +24,8 @@ import hivens.look.colour.api.ColourAnswers
 import hivens.look.shape.api.ShapeAnswers
 import hivens.look.manager.api.Status as LookStatus
 import hivens.look.shape.api.Shape as ShapeAxis
-import hivens.ui.nx.ThemeStateLayer
+import hivens.look.feedback.api.Feedback
+import hivens.look.feedback.api.FeedbackTarget
 
 /**
  * The bridge from the look to Compose and Material: everything inside drawn with what the colour axis
@@ -73,7 +74,7 @@ fun NxTheme(
             // the ones here must be provided beneath it to win. Placed outside, this
             // is a silent no-op.
             CompositionLocalProvider(
-                LocalIndication provides ThemeStateLayer,
+                LocalIndication provides Feedback.indication(FeedbackTarget.Control),
                 LocalContentColor provides answers.inkMain,
                 LocalTextSelectionColors provides selection,
             ) {
