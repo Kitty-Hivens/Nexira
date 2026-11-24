@@ -76,6 +76,8 @@ class TransferEngine(
      * the small files behind it wait.
      */
     private val blocksInFlight: Int = DEFAULT_BLOCKS_IN_FLIGHT,
+    /** Silence past which a request is given up and retried, see [TRANSFER_STALL_MS]. */
+    private val stallMs: Long = TRANSFER_STALL_MS,
 ) {
     private val log = LoggerFactory.getLogger(TransferEngine::class.java)
 
@@ -729,6 +731,7 @@ class TransferEngine(
         range: String?,
         handle: suspend (HttpResponse) -> R,
     ): R = http.current.prepareGet(url) {
+        transferTimeout(stallMs)
         t.userAgent?.let { header(HttpHeaders.UserAgent, it) }
         t.headers.forEach { (name, value) -> header(name, value) }
         range?.let { header(HttpHeaders.Range, it) }
