@@ -5,6 +5,7 @@ import hivens.core.io.deleteTree
 import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.data.PackInstance
 import hivens.core.data.PackOrigin
+import hivens.core.net.KeptDownloads
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -65,12 +66,14 @@ typealias PackInstallRunner = suspend (
  * Cancellation is deliberate only: [cancel] (a user pressing Cancel) or process
  * shutdown when [scope] is torn down. On cancel and on failure the partial
  * instance directory -- captured via the installer's reserve hook -- is deleted,
- * so neither leaves an orphan under `instances/`. A successful install registers
- * its instance in the repository the way it always did; a failed one does not.
+ * so neither leaves an orphan under `instances/`. What it had downloaded is moved to
+ * [kept] first, for the next attempt. A successful install registers its instance in
+ * the repository the way it always did; a failed one does not.
  */
 class PackInstallService(
     private val runInstall: PackInstallRunner,
     private val scope: CoroutineScope,
+    private val kept: KeptDownloads? = null,
 ) {
     private val log = LoggerFactory.getLogger(PackInstallService::class.java)
 
@@ -128,7 +131,10 @@ class PackInstallService(
         val reservedDirs = ConcurrentHashMap.newKeySet<Path>()
         val reserve: (Path) -> Unit = { dir ->
             if (Files.exists(dir)) log.warn("pack job {} reserved {}, which already exists; it will not be cleaned up", key, dir)
-            else reservedDirs.add(dir)
+            else {
+                reservedDirs.add(dir)
+                kept?.watch(dir)
+            }
         }
 
         _installs.update {
@@ -141,8 +147,10 @@ class PackInstallService(
                     reserve,
                     { current, total, filename -> updatePhase(key, InstallPhase.Running(current, total, filename)) },
                 )
+                reservedDirs.forEach { kept?.settle(it, keep = false) }
                 updatePhase(key, InstallPhase.Succeeded(instance.id))
             } catch (e: CancellationException) {
+                log.info("pack job cancelled for {}", key)
                 updatePhase(key, InstallPhase.Cancelled)
                 cleanupReserved(reservedDirs)
                 throw e
@@ -180,6 +188,8 @@ class PackInstallService(
 
     private fun cleanupReserved(dirs: Set<Path>) {
         for (dir in dirs) {
+            val files = kept?.settle(dir, keep = true) ?: 0
+            if (files > 0) log.info("kept {} finished download(s) of {} for the next attempt", files, dir.fileName)
             runCatching {
                 if (Files.isDirectory(dir)) deleteTree(dir)
             }.onFailure { log.warn("failed to remove partial install dir {}", dir, it) }

@@ -5,10 +5,15 @@ import hivens.core.api.catalogue.CataloguePackVersion
 import hivens.core.data.InstanceRuntime
 import hivens.core.data.PackInstance
 import hivens.core.data.PackReference
+import hivens.core.net.Digest
+import hivens.core.net.DigestAlgorithm
+import hivens.core.net.KeptDownloads
+import hivens.core.net.of
 import hivens.launcher.sources.EngineSources
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runTest
 import java.io.IOException
@@ -169,6 +174,50 @@ class PackInstallServiceTest {
 
         assertIs<InstallPhase.Failed>(service.installs.value[key]?.phase)
         assertFalse(Files.exists(partial), "the half-made instance is gone")
+    }
+
+    /** Runs one install that downloads into its directory and ends as [ending] says, and answers what was kept. */
+    private suspend fun TestScope.keptAfter(ending: suspend () -> Unit): List<String> {
+        sandbox = Files.createTempDirectory("pack-install-test")
+        val store = sandbox.resolve("kept")
+        val kept = KeptDownloads(store)
+        val dir = sandbox.resolve("instances").resolve("Industrial-partial")
+        val bytes = "mod".toByteArray()
+        val service = PackInstallService(
+            runInstall = { _, _, onReserveDir, _ ->
+                onReserveDir(dir)
+                val mod = dir.resolve("mods").resolve("mod.jar")
+                kept.claim(mod, Digest(DigestAlgorithm.SHA1, DigestAlgorithm.SHA1.of(bytes)))
+                Files.createDirectories(mod.parent)
+                Files.write(mod, bytes)
+                ending()
+                instance("inst-1")
+            },
+            scope = this,
+            kept = kept,
+        )
+        val key = service.start(pack, version)
+        advanceUntilIdle()
+        service.cancel(key)
+        advanceUntilIdle()
+        assertEquals(service.installs.value[key]?.phase is InstallPhase.Succeeded, Files.exists(dir), "only a finished install leaves its directory")
+        return if (Files.isDirectory(store)) Files.list(store).use { all -> all.map { it.fileName.toString() }.toList() } else emptyList()
+    }
+
+    @Test
+    fun `what a failed install downloaded is kept as its directory goes`() = runTest {
+        assertEquals(1, keptAfter { throw IOException("a file would not come") }.size)
+    }
+
+    @Test
+    fun `what a cancelled install downloaded is kept as its directory goes`() = runTest {
+        assertEquals(1, keptAfter { awaitCancellation() }.size)
+    }
+
+    @Test
+    fun `an install that finished keeps what it downloaded to itself`() = runTest {
+        assertEquals(emptyList(), keptAfter { })
+        assertTrue(Files.exists(sandbox.resolve("instances/Industrial-partial/mods/mod.jar")))
     }
 
     /**

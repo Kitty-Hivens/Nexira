@@ -78,6 +78,8 @@ class TransferEngine(
     private val blocksInFlight: Int = DEFAULT_BLOCKS_IN_FLIGHT,
     /** Silence past which a request is given up and retried, see [TRANSFER_STALL_MS]. */
     private val stallMs: Long = TRANSFER_STALL_MS,
+    /** What installs that did not finish left behind, taken before anything is fetched. */
+    private val kept: KeptDownloads? = null,
 ) {
     private val log = LoggerFactory.getLogger(TransferEngine::class.java)
 
@@ -122,6 +124,7 @@ class TransferEngine(
     suspend fun fetch(t: Transfer, onProgress: (done: Long, total: Long) -> Unit = { _, _ -> }): Long =
         withContext(Dispatchers.IO) {
             withDestLock(t.dest) {
+                if (t.skip == SkipIfPresent.ByDigest) t.expect?.let { kept?.claim(t.dest, it) }
                 if (alreadySatisfied(t)) {
                     val size = t.size.coerceAtLeast(0L)
                     onProgress(size, size)
@@ -131,6 +134,15 @@ class TransferEngine(
                 fetchFromAnySource(t, onProgress)
             }
         }
+
+    /**
+     * Puts at [dest] what an install that did not finish left of the bytes of [expect], see
+     * [KeptDownloads]. [fetch] does it itself. This is for a caller that checks what it has
+     * before it makes a transfer, where making one costs a request.
+     */
+    fun claimKept(dest: Path, expect: Digest) {
+        kept?.claim(dest, expect)
+    }
 
     /**
      * Fetch every transfer, letting the gate decide how many requests run at once.

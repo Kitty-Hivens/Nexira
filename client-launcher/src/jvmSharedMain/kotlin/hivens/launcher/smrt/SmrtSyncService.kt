@@ -1241,6 +1241,7 @@ class SmrtSyncService(
         // disk: the log for one tells the player to install it by hand, and having
         // done so they are owed silence rather than a warning and a repair that
         // reports their pack broken.
+        transfers.claimKept(dest, Digest(DigestAlgorithm.SHA1, expectedSha1))
         if (isUpToDate(dest, expectedSha1, expectedSize)) {
             return Planned.UpToDate
         }

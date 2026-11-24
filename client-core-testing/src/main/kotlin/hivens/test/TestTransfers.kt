@@ -2,6 +2,7 @@ package hivens.test
 
 import hivens.core.api.HttpClientProvider
 import hivens.core.net.AdaptiveGate
+import hivens.core.net.KeptDownloads
 import hivens.core.net.TransferEngine
 
 /**
@@ -13,8 +14,9 @@ import hivens.core.net.TransferEngine
  * The engine's own behaviour is covered in `client-core`; here it is a dependency
  * the services under test need, not the subject.
  */
-fun testTransferEngine(provider: HttpClientProvider): TransferEngine = TransferEngine(
+fun testTransferEngine(provider: HttpClientProvider, kept: KeptDownloads? = null): TransferEngine = TransferEngine(
     http = provider,
     gate = AdaptiveGate(initial = 4, min = 1, max = 4),
     backoffMs = listOf(0L, 0L, 0L),
+    kept = kept,
 )

@@ -22,6 +22,7 @@ import hivens.launcher.network.ServerProtocolConfigLoader
 import hivens.launcher.protocol.LauncherHashCache
 import hivens.launcher.protocol.SmartycraftV1Protocol
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.KeptDownloads
 import hivens.core.net.TransferEngine
 import hivens.core.api.SkinRepository
 import hivens.core.api.interfaces.ISettingsService
@@ -310,7 +311,13 @@ val networkModule = module {
      * GitHub all keep strict TLS, and none of them has any business inheriting an
      * SSL bypass the user granted for the smartycraft host.
      */
-    single { TransferEngine(get<HttpClientProvider>(named("direct"))) }
+    single { TransferEngine(get<HttpClientProvider>(named("direct")), kept = get()) }
+
+    /** What installs that did not finish had downloaded. Tidied once a run, off the thread that asks for it. */
+    single {
+        KeptDownloads(get<Path>().resolve("downloads").resolve("kept"))
+            .also { get<CoroutineScope>().launch(Dispatchers.IO) { it.prune() } }
+    }
 
     /**
      * The same downloader on the smartycraft channel, for the bytes that come from
@@ -513,7 +520,7 @@ val mirrorModule = module {
     // App-scoped owner of catalogue installs: runs the install on the shared
     // process scope (get<CoroutineScope>()) so navigating away from Browse does
     // not cancel a download mid-flight.
-    single { PackInstallService(runInstall = get<PackInstallCoordinator>()::install, scope = get()) }
+    single { PackInstallService(runInstall = get<PackInstallCoordinator>()::install, scope = get(), kept = get()) }
     single {
         CurseForgeZipInstaller(
             json = get(),

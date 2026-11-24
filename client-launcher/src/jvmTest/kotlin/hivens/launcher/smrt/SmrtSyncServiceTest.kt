@@ -3,6 +3,7 @@ package hivens.launcher.smrt
 import hivens.test.testTransferEngine
 import hivens.core.api.dto.smrt.SmrtPackManifest
 import hivens.core.api.HttpClientProvider
+import hivens.core.net.KeptDownloads
 import hivens.core.update.UpdatePlan
 import hivens.launcher.modrinth.ModrinthClient
 import io.ktor.client.HttpClient
@@ -135,11 +136,46 @@ class SmrtSyncServiceTest {
 
     private fun serviceWith(
         engine: MockEngine,
+        kept: KeptDownloads? = null,
         openForDigest: (Path) -> InputStream = { Files.newInputStream(it) },
     ): SmrtSyncService {
         val provider = HttpClientProvider { HttpClient(engine) }
         val modrinth = ModrinthClient(provider, testTransferEngine(provider), json)
-        return SmrtSyncService(modrinth, testTransferEngine(provider), openForDigest)
+        return SmrtSyncService(modrinth, testTransferEngine(provider, kept), openForDigest)
+    }
+
+    /** Asked after the address, each mod an earlier attempt had would cost the request that finds its address. */
+    @Test
+    fun `a mod an unfinished install left is taken before anybody is asked where it is`() = runTest {
+        val root = tempDir("kept")
+        val kept = KeptDownloads(root.resolve("kept"))
+        Files.createDirectories(root.resolve("kept"))
+        Files.write(root.resolve("kept").resolve("sha1-${sha1(reqBytes)}"), reqBytes)
+        val asked = mutableListOf<String>()
+        val service = serviceWith(
+            MockEngine { req ->
+                asked += req.url.toString()
+                respond("down", HttpStatusCode.NotFound)
+            },
+            kept = kept,
+        )
+        val dir = root.resolve("instance").also { kept.watch(it) }
+
+        service.sync(
+            parsed(
+                """
+                {"schema_version":2,"pack_id":"test","pack_version":"1","generated_at":"now",
+                 "minecraft":{"version":"1.20.1"},"loader":{"name":"fabric","version":"0.19.2"},"java":{"major":17},
+                 "mods":[{"filename":"req.jar","sha1":"${sha1(reqBytes)}","size_bytes":${reqBytes.size},"required":true,
+                          "source":{"type":"modrinth","project_id":"P","version_id":"V"}}],
+                 "assets":[]}
+                """.trimIndent(),
+            ),
+            dir,
+        )
+
+        assertContentEquals(reqBytes, Files.readAllBytes(dir.resolve("mods/req.jar")))
+        assertEquals(emptyList(), asked)
     }
 
 
