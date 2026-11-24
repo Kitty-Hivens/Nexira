@@ -69,6 +69,25 @@ class DiagnosticBundleTest {
     }
 
     @Test
+    fun `a log and a crash report do not name the account in the paths they quote`() {
+        val account = Path.of(System.getProperty("user.home"))
+        val line = "Exodus environment created: ${account.resolve("nexira").resolve("db")}"
+        Files.createDirectories(paths.logsDir)
+        Files.writeString(paths.logsDir.resolve("launcher.log"), line)
+        Files.createDirectories(paths.crashDir)
+        Files.writeString(paths.crashDir.resolve("crash-1.txt"), line)
+        ActionRing.record("Opened ${account.resolve("pack")}")
+
+        val bundle = entries(DiagnosticBundle.create(paths))
+
+        listOf("logs/launcher.log", "crash-reports/crash-1.txt", "action-ring.txt").forEach { name ->
+            val text = bundle.getValue(name)
+            assertFalse(text.contains(account.toString()), "$name names the home directory")
+            assertTrue(text.contains("~"), "$name keeps the rest of the path")
+        }
+    }
+
+    @Test
     fun `system info names the modules recovery switched off`() {
         val off = entries(DiagnosticBundle.create(paths, setOf("skinema", "tray")))["system-info.txt"].orEmpty()
         assertTrue(off.contains("Modules off: skinema, tray"), "a disabled module must be visible to a support reader")
@@ -111,5 +130,11 @@ class DiagnosticBundleTest {
         )
         assertEquals("~\\AppData\\nexira", DiagnosticBundle.foldHome("C:\\Users\\alice\\AppData\\nexira", "C:\\Users\\alice"))
         assertEquals("/home/alice/x", DiagnosticBundle.foldHome("/home/alice/x", ""))
+        val windows = "C:\\Users\\alice"
+        assertEquals("file:///~/AppData", DiagnosticBundle.foldHome("file:///C:/Users/alice/AppData", windows))
+        assertEquals("{\"dir\":\"~\\\\AppData\"}", DiagnosticBundle.foldHome("{\"dir\":\"C:\\\\Users\\\\alice\\\\AppData\"}", windows))
+        assertEquals("~\\x", DiagnosticBundle.foldHome("c:\\users\\Alice\\x", windows))
+        assertEquals("C:\\Users\\alice2\\x", DiagnosticBundle.foldHome("C:\\Users\\alice2\\x", windows))
+        assertEquals("/home/Alice/x", DiagnosticBundle.foldHome("/home/Alice/x", "/home/alice"), "elsewhere case tells two accounts apart")
     }
 }

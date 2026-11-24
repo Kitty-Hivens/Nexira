@@ -39,6 +39,9 @@ import java.util.zip.ZipOutputStream
  * a defense-in-depth pass: if a future code path ever logs raw without
  * going through `%rmsg`, the bundle still ships a redacted copy. Cheap;
  * Redactor is a few regex replaces over text we're streaming anyway.
+ *
+ * The home directory in them is folded to `~`, which the pipeline does not do:
+ * a log line that names a file names the account with it.
  */
 object DiagnosticBundle {
 
@@ -72,7 +75,7 @@ object DiagnosticBundle {
             // recorded, and a path line carries the account name the OS put in
             // it.
             writeText(zip, "system-info.txt", Redactor.redact(buildSystemInfo(paths, disabledModules, renderBackend)))
-            writeText(zip, "action-ring.txt", Redactor.redact(buildActionRing()))
+            writeText(zip, "action-ring.txt", foldHome(Redactor.redact(buildActionRing())))
 
             // Live log files. Each file is isolated: a single broken file
             // (locked, malformed UTF-8, permission denied) MUST NOT abort the
@@ -185,11 +188,17 @@ object DiagnosticBundle {
      * [abbreviateHome] for every occurrence inside free text, such as a stack
      * trace whose exception message names a file under the home directory. Only
      * a whole path segment is folded: `/home/al` does not swallow `/home/alice`.
+     *
+     * A Windows home is found in any case and however its separators are written:
+     * as they are, turned the way a URL has them, or doubled the way JSON does.
      */
     internal fun foldHome(text: String, home: String = System.getProperty("user.home") ?: ""): String {
         val normalisedHome = home.trimEnd('/', '\\')
         if (normalisedHome.isBlank()) return text
-        return Regex(Regex.escape(normalisedHome) + "(?![\\w.-])").replace(text, "~")
+        val windows = '\\' in normalisedHome
+        val spelled = normalisedHome.split('\\').joinToString(if (windows) """(?:\\{1,2}|/)""" else "") { Regex.escape(it) }
+        val options = if (windows) setOf(RegexOption.IGNORE_CASE) else emptySet()
+        return Regex(spelled + "(?![\\w.-])", options).replace(text, "~")
     }
 
     private fun buildActionRing(): String = buildString {
@@ -219,11 +228,11 @@ object DiagnosticBundle {
      * better than nothing.
      */
     private fun copyTextRedacted(zip: ZipOutputStream, entryName: String, src: Path) {
-        val payload = runCatching { Redactor.redact(readUtf8(src)) }
+        val payload = runCatching { foldHome(Redactor.redact(readUtf8(src))) }
             .getOrElse { e ->
                 log.warn("Diagnostic bundle: skipping unreadable {} ({}): {}",
                     src, e.javaClass.simpleName, e.message)
-                "<unreadable: ${e.javaClass.simpleName}: ${e.message}>"
+                foldHome("<unreadable: ${e.javaClass.simpleName}: ${e.message}>")
             }
         writeText(zip, entryName, payload)
     }
