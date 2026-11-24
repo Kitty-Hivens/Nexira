@@ -24,6 +24,7 @@ import java.nio.file.Path
 import java.nio.file.attribute.PosixFilePermission
 import java.security.MessageDigest
 import java.util.jar.Attributes
+import java.util.jar.JarEntry
 import java.util.jar.JarOutputStream
 import java.util.jar.Manifest
 import kotlin.test.AfterTest
@@ -615,29 +616,119 @@ class SmrtSyncServiceTest {
         JarOutputStream(out, manifest).use { }
         return out.toByteArray()
     }
+    private fun jarCarrying(vararg deps: Pair<String, ByteArray>): ByteArray {
+        val manifest = Manifest().apply {
+            mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
+            mainAttributes.putValue(
+                "ContainedDeps",
+                deps.joinToString(" ") { it.first },
+            )
+        }
+
+        val out = ByteArrayOutputStream()
+        JarOutputStream(out, manifest).use { jar ->
+            for ((name, bytes) in deps) {
+                jar.putNextEntry(JarEntry(name))
+                jar.write(bytes)
+                jar.closeEntry()
+            }
+        }
+        return out.toByteArray()
+    }
 
     /**
-     * Scalar is the case: a coremod that carries a Scala runtime and has FML lay it
-     * out under `mods/<mcversion>/` once the game is up. Those files appear after
-     * the launch, in the window the session guard watches, and used to read as an
-     * instance modifying itself.
+     * FML unpacks declared dependencies under `mods/<mcversion>/`.
+     * The roster check trusts the name, even when the existing file has
+     * different bytes from the dependency inside the carrier jar.
      */
     @Test
     fun `what a rostered jar declares it unpacks is not foreign`() = runTest {
         val dir = tempDir("contained-deps")
         Files.createDirectories(dir.resolve("mods/1.12.2"))
-        val scalar = jarDeclaring("scala-library-2.11.1.jar", "scala-reflect-2.11.1.jar")
-        Files.write(dir.resolve("mods/scalar.jar"), scalar)
-        Files.write(dir.resolve("mods/1.12.2/scala-library-2.11.1.jar"), "RUNTIME".toByteArray())
-        Files.write(dir.resolve("mods/1.12.2/scala-reflect-2.11.1.jar"), "RUNTIME".toByteArray())
-        val baseline = mapOf("scalar.jar" to sha1Hex(scalar))
 
-        val verdict = syncService().enforceRoster(dir, baseline)
+        val packedLibrary = "bytes inside the carrier jar".toByteArray()
+        val packedReflect = "reflect bytes inside the carrier jar".toByteArray()
+        val scalar = jarCarrying(
+            "scala-library-2.11.1.jar" to packedLibrary,
+            "scala-reflect-2.11.1.jar" to packedReflect,
+        )
+
+        val library = dir.resolve("mods/1.12.2/scala-library-2.11.1.jar")
+        val reflect = dir.resolve("mods/1.12.2/scala-reflect-2.11.1.jar")
+        val existingLibrary = "different library bytes".toByteArray()
+        val existingReflect = "different reflect bytes".toByteArray()
+
+        Files.write(dir.resolve("mods/scalar.jar"), scalar)
+        Files.write(library, existingLibrary)
+        Files.write(reflect, existingReflect)
+
+        val baseline = mapOf("scalar.jar" to sha1Hex(scalar))
+        val service = syncService()
+
+        val verdict = service.enforceRoster(dir, baseline)
 
         assertTrue(verdict.verified)
-        assertTrue(verdict.removed.isEmpty(), "the loader unpacked these out of a jar the pack vouches for")
-        assertTrue(Files.exists(dir.resolve("mods/1.12.2/scala-library-2.11.1.jar")))
-        assertTrue(Files.exists(dir.resolve("mods/1.12.2/scala-reflect-2.11.1.jar")))
+        assertTrue(verdict.removed.isEmpty())
+        assertContentEquals(existingLibrary, Files.readAllBytes(library))
+        assertContentEquals(existingReflect, Files.readAllBytes(reflect))
+
+        val inspection = service.inspectRoster(dir, baseline)
+
+        assertTrue(inspection.isClean)
+        assertTrue(inspection.foreign.isEmpty())
+        assertContentEquals(existingLibrary, Files.readAllBytes(library))
+        assertContentEquals(existingReflect, Files.readAllBytes(reflect))
+    }
+
+    @Test
+    fun `plain sync keeps bytes under a contained dependency name`() = runTest {
+        val dir = tempDir("contained-deps-sync")
+        val packedBytes = "bytes inside the carrier jar".toByteArray()
+        val carrier = jarCarrying("scala-library-2.11.1.jar" to packedBytes)
+        val carrierUrl = "https://mirror.test/scalar.jar"
+
+        val packManifest = parsed(
+            """
+        {
+          "schema_version": 2,
+          "pack_id": "test",
+          "pack_version": "1",
+          "generated_at": "now",
+          "minecraft": {"version": "1.12.2"},
+          "loader": {"name": "forge", "version": "14.23.5.2860"},
+          "java": {"major": 8},
+          "mods": [{
+            "filename": "scalar.jar",
+            "sha1": "${sha1(carrier)}",
+            "size_bytes": ${carrier.size},
+            "required": true,
+            "source": {"type": "smrt_static", "url": "$carrierUrl"}
+          }],
+          "assets": []
+        }
+        """.trimIndent()
+        )
+
+        val service = serviceWith(
+            MockEngine { request ->
+                if (request.url.toString() == carrierUrl) {
+                    respond(ByteReadChannel(carrier), HttpStatusCode.OK)
+                } else {
+                    respond("missing ${request.url}", HttpStatusCode.NotFound)
+                }
+            }
+        )
+
+        service.sync(packManifest, dir)
+
+        val dependency = dir.resolve("mods/1.12.2/scala-library-2.11.1.jar")
+        val existingBytes = "different bytes already on disk".toByteArray()
+        Files.createDirectories(dependency.parent)
+        Files.write(dependency, existingBytes)
+
+        service.sync(packManifest, dir)
+
+        assertContentEquals(existingBytes, Files.readAllBytes(dependency))
     }
 
     /**
