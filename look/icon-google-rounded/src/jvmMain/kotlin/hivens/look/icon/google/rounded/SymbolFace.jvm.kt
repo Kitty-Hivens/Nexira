@@ -14,6 +14,7 @@ import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.toOffset
 import org.jetbrains.skia.Data
 import org.jetbrains.skia.FontMgr
@@ -25,8 +26,9 @@ internal actual fun symbolFace(bytes: ByteArray): SymbolFace = SkiaSymbolFace(by
 private class SkiaSymbolFace(bytes: ByteArray) : SymbolFace {
     private val base = requireNotNull(FontMgr.default.makeFromData(Data.makeFromBytes(bytes))) { "the icon font does not load" }
 
-    // Laid out as Compose lays its own text out, so an icon has the edges text beside it has. One for
-    // every face, kept under a lock: a window and an off-screen picture may draw at the same time.
+    // Laid out as Compose lays its own text out, so an icon has the edges text beside it has. At a density
+    // of one, since the size of a room is in its own pixels already. One for every face, kept under a lock:
+    // a window and an off-screen picture may draw at the same time.
     private val measurer = TextMeasurer(createFontFamilyResolver(), LocaleList.Empty, Density(1f), LayoutDirection.Ltr, LAYOUTS)
 
     // Named, since Compose keeps faces by name and every copy carries the family name of the first.
@@ -48,13 +50,11 @@ private class SkiaSymbolFace(bytes: ByteArray) : SymbolFace {
     private inner class Ink(private val family: FontFamily) : SymbolInk {
         override fun DrawScope.draw(glyph: String, tint: Color) {
             val style = TextStyle(
-                fontSize = size.minDimension.toSp(),
+                fontSize = size.minDimension.sp,
                 fontFamily = family,
                 lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
             )
-            // A density of its own value: the scope is one too, and a kept layout would hold on to it.
-            val drawnAt = Density(density, fontScale)
-            val layout = synchronized(measurer) { measurer.measure(glyph, style, layoutDirection = layoutDirection, density = drawnAt) }
+            val layout = synchronized(measurer) { measurer.measure(glyph, style, layoutDirection = layoutDirection) }
             val room = IntSize(size.width.roundToInt(), size.height.roundToInt())
             drawText(layout, tint, Alignment.Center.align(layout.size, room, layoutDirection).toOffset())
         }
