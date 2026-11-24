@@ -26,6 +26,14 @@ kotlin {
             enable = true
         }
     }
+    sourceSets {
+        getByName("jvmTest") {
+            dependencies {
+                // The faces are read by Skia, which takes the runtime of the machine running the tests.
+                implementation(compose.desktop.currentOs)
+            }
+        }
+    }
 }
 
 compose.resources {

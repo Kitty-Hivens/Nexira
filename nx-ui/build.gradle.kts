@@ -102,6 +102,14 @@ kotlin {
                 // (ImageComposeScene) can create a Skia surface. Test-only -- the
                 // published leaf module stays free of any compose.desktop dep.
                 implementation(compose.desktop.currentOs)
+                // nx's answers, which the tests hold the components to.
+                implementation(project(":look:motion-nx"))
+                implementation(project(":look:shape-nx"))
+                implementation(project(":look:stroke-nx"))
+                implementation(project(":look:surface-nx"))
+                implementation(project(":look:timing-nx"))
+                implementation(project(":look:feedback-nx"))
+                implementation(project(":look:type-nx"))
                 // What the previews drawn by the tests take from providers this module does not know.
                 runtimeOnly(project(":look:preview"))
             }
