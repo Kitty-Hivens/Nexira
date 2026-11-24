@@ -7,8 +7,8 @@ import hivens.look.type.api.TypeFace
 import hivens.ui.text.needsCjkFace
 
 /**
- * nx's faces as the type axis's answers: what the nx type provider answers, and what [NxThemed] draws
- * previews and tests in. Made once, so a role is the same value wherever it is read.
+ * nx's faces as the type axis's answers: what the nx type provider answers, and what previews and
+ * tests draw in. Made once, so a role is the same value wherever it is read.
  */
 fun nxTypeAnswers(): TypeAnswers = NxType.ANSWERS
 
@@ -39,13 +39,9 @@ private object Mono : TypeFace() {
     override fun toString(): String = "JetBrains Mono"
 }
 
-/**
- * Noto Sans CJK, see [nexiraCjkFamily]: the one instance [NxTheme] provides where there is one, since
- * a family is a cache key in the font resolver and this face is asked inside `Text` parameters that
- * recompose with a playback position.
- */
+/** Noto Sans CJK, see [nexiraCjkFamily]. */
 private object Cjk : TypeFace() {
     @Composable
-    override fun family(): FontFamily = LocalCjkFamily.current ?: nexiraCjkFamily()
+    override fun family(): FontFamily = nexiraCjkFamily()
     override fun toString(): String = "Noto Sans CJK"
 }

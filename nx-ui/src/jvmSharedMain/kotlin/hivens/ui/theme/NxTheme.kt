@@ -34,7 +34,7 @@ import hivens.look.type.api.Type
  * set from the same answers.
  *
  * Which colours those are is not decided here: a window is placed inside the look the host wraps it in,
- * and a preview or a render inside [NxThemed]. Material components still in use get a colour scheme
+ * and a preview or a render inside a look of its own. Material components still in use get a colour scheme
  * cut from the same ladder and colours, so they agree with the library around them instead of falling
  * back to Material's own purple, and Material's corners cut from the shape axis's roles
  * ([materialShapes]). Text selection and the right-click menu a text field opens are set from the
@@ -61,10 +61,6 @@ fun NxTheme(
     CompositionLocalProvider(
         LocalPlane provides Plane(step = 0, color = page, over = Backdrop.Page),
         LocalMonoFamily provides Type.mono.family(),
-        // Resolved once here rather than per call site: a font family is a cache
-        // key in the resolver, and familyForText is asked inside Text parameters
-        // that recompose with the playback position.
-        LocalCjkFamily provides nexiraCjkFamily(),
         LocalInterfaceText provides interfaceText,
     ) {
         MaterialTheme(
