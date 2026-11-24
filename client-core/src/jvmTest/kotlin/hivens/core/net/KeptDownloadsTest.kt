@@ -190,6 +190,7 @@ class KeptDownloadsTest {
     @Test
     fun `a download with no digest is not kept, and neither is one whose digest is no digest`() = runTest {
         val dir = instance("first")
+        Files.createDirectories(store)
         val _ = engine.fetch(mod(dir, A, a).copy(expect = null))
         kept.claim(dir.resolve("x"), Digest(DigestAlgorithm.SHA1, "../escaped"))
         Files.write(dir.resolve("x"), a)
