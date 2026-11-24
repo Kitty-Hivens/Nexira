@@ -32,6 +32,9 @@ import hivens.ui.nx.CalloutBanner
 import hivens.ui.nx.CalloutTone
 import hivens.ui.nx.rememberFieldState
 import hivens.ui.platform.SystemActions
+import hivens.ui.press.Button
+import hivens.ui.press.OutlinedButton
+import hivens.ui.press.pressCursor
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -225,6 +228,7 @@ fun LoginPanel(
             Checkbox(
                 checked         = rememberMe,
                 onCheckedChange = setRemember,
+                modifier        = Modifier.pressCursor(),
                 colors          = CheckboxDefaults.colors(
                     checkedColor   = NxColor.lead(),
                     uncheckedColor = NxInk.quiet.copy(alpha = 0.4f)

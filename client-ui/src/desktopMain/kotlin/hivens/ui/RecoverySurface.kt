@@ -10,13 +10,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -37,6 +34,10 @@ import hivens.launcher.platform.AppRelauncher
 import hivens.ui.bootstrap.RecoveryIo
 import hivens.ui.diag.UiRecoverySignal
 import hivens.ui.i18n.NexiraStrings
+import hivens.ui.press.Button
+import hivens.ui.press.OutlinedButton
+import hivens.ui.press.TextButton
+import hivens.ui.press.pressCursor
 import hivens.widget.api.BootValues
 import java.nio.file.Path
 import java.util.Locale
@@ -134,7 +135,7 @@ fun RecoveryWindow(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp),
                         ) {
-                            Switch(checked = module.id in disabled, onCheckedChange = { setDisabled(module.id, it) })
+                            Switch(checked = module.id in disabled, onCheckedChange = { setDisabled(module.id, it) }, modifier = Modifier.pressCursor())
                             Text(label, color = MaterialTheme.colorScheme.onSurface)
                         }
                     }

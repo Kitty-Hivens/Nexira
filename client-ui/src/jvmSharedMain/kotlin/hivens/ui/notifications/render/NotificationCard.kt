@@ -27,11 +27,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
@@ -62,6 +60,8 @@ import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationEvent
 import hivens.ui.notifications.NotificationGroup
 import hivens.ui.notifications.Severity
+import hivens.ui.press.IconButton
+import hivens.ui.press.TextButton
 import hivens.ui.theme.Motion
 import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxSurface

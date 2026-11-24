@@ -9,7 +9,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.drag
@@ -32,9 +31,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -51,12 +48,16 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.i18n.api.Strings
+import hivens.ui.cursor.dragCursor
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.customization.NavSelectionStyle
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.press.IconButton
+import hivens.ui.press.OutlinedButton
+import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetToggle
 import hivens.ui.nx.NxRow
@@ -131,11 +132,13 @@ internal fun EditorSidePanel(
                 .padding(top = 64.dp, bottom = 96.dp, end = 16.dp),
         ) {
         Column(Modifier.fillMaxSize()) {
+            var moving by remember { mutableStateOf(false) }
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier              = Modifier
                     .fillMaxWidth()
+                    .dragCursor(moving)
                     .pointerInput(Unit) {
                         // No slop: a header is a handle. detectDragGestures holds the
                         // first few pixels back before it reports anything, which on a
@@ -145,12 +148,17 @@ internal fun EditorSidePanel(
                         awaitEachGesture {
                             val down = awaitFirstDown(requireUnconsumed = true)
                             down.consume()
-                            drag(down.id) { change ->
-                                // Delta first: positionChange() reports Offset.Zero once
-                                // the change is consumed, so claiming it before reading it
-                                // moves the panel by nothing.
-                                offset.drag(change.positionChange())
-                                change.consume()
+                            try {
+                                moving = true
+                                drag(down.id) { change ->
+                                    // Delta first: positionChange() reports Offset.Zero once
+                                    // the change is consumed, so claiming it before reading it
+                                    // moves the panel by nothing.
+                                    offset.drag(change.positionChange())
+                                    change.consume()
+                                }
+                            } finally {
+                                moving = false
                             }
                         }
                     }

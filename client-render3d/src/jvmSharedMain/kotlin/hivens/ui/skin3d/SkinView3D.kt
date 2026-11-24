@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.toPixelMap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalWindowInfo
+import hivens.ui.cursor.dragCursor
 import hivens.ui.render3d.Texture
 import hivens.ui.scene3d.Node
 import hivens.ui.scene3d.OrthoCamera
@@ -157,7 +158,7 @@ fun SkinView3D(
     }
 
     val gestureModifier = if (interactive) {
-        Modifier.pointerInput(Unit) {
+        Modifier.dragCursor(dragging).pointerInput(Unit) {
             detectDragGestures(
                 onDragStart = { dragging = true },
                 onDragEnd = { dragging = false },

@@ -19,6 +19,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import hivens.ui.cursor.CursorRole
+import hivens.ui.cursor.cursor
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -227,6 +229,7 @@ internal fun LogCanvas(
                 // viewport was known.
                 state.scroll.reclamp()
             }
+            .cursor(CursorRole.Text)
             .onWheelScroll { dy ->
                 if (dy != 0f) state.scroll.scrollBy(dy * lineHeightPx * SCROLL_LINES_PER_NOTCH)
             }

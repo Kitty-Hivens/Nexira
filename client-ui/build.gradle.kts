@@ -190,6 +190,7 @@ kotlin {
                 implementation(project(":look:feedback-api"))
                 implementation(project(":look:type-api"))
                 implementation(project(":look:icon-api"))
+                implementation(project(":look:cursor-api"))
                 implementation(project(":look:packs"))
                 // The nx motion, shape, stroke, surface, timing, feedback and type providers, compiled in like the
                 // colour one.
@@ -202,6 +203,8 @@ kotlin {
                 implementation(project(":look:type-nx"))
                 // The Google icon provider, compiled in the same way.
                 implementation(project(":look:icon-google-rounded"))
+                implementation(project(":look:cursor-system"))
+                implementation(project(":look:cursor-nx"))
                 // The nx providers' controls, compiled in like the providers: the shell names
                 // nothing of them beyond their CompiledModule, and draws their widgets by kind.
                 implementation(project(":look:colour-nx-controls"))

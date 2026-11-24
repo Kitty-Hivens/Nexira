@@ -10,7 +10,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -31,6 +30,7 @@ import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxAlertDialog
 import hivens.ui.nx.CalloutBanner
 import hivens.ui.nx.CalloutTone
+import hivens.ui.press.TextButton
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.OnFill

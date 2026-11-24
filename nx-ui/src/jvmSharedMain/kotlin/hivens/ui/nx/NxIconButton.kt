@@ -1,7 +1,6 @@
 package hivens.ui.nx
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,6 +21,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
+import hivens.ui.press.clickable
 import hivens.ui.theme.NeutralTheme
 import hivens.look.feedback.api.Feedback
 import hivens.look.feedback.api.FeedbackTarget

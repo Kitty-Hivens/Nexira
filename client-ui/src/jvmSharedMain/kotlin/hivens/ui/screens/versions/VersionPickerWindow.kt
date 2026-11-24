@@ -2,7 +2,6 @@ package hivens.ui.screens.versions
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -69,6 +68,7 @@ import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxVerticalScrollbar
+import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind

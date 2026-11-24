@@ -231,6 +231,10 @@ include(":look:type-nx")
 include(":look:icon-api")
 // The Google icon provider: Material Symbols Rounded, every icon of it, with no settings of its own.
 include(":look:icon-google-rounded")
+include(":look:cursor-api")
+// The system's pointers, and the nx cursor provider that stands on them, neither with settings of its own.
+include(":look:cursor-system")
+include(":look:cursor-nx")
 // What previews and tests draw with beyond what nx-ui answers: the interface it asks, and the
 // implementation, which is in no application.
 include(":look:preview-api")

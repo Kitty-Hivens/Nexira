@@ -1,6 +1,5 @@
 package hivens.ui.screens.library
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,6 +48,8 @@ import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxDialog
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxMenuItem
+import hivens.ui.press.clickable
+import hivens.ui.press.pressCursor
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -222,7 +223,7 @@ fun LibraryScreen(
             val onLead = NxColor.on(lead)
             FloatingActionButton(
                 onClick = { menuOpen = true },
-                modifier = Modifier.layerTrigger(),
+                modifier = Modifier.layerTrigger().pressCursor(),
                 containerColor = lead,
                 contentColor = onLead,
             ) {

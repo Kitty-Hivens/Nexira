@@ -21,8 +21,9 @@ import hivens.ui.components.rememberLaunchControl
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
+import hivens.ui.press.OutlinedButton
+import hivens.ui.press.clickable
 import hivens.ui.screens.library.PendingUpdateBadge
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -38,7 +39,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue

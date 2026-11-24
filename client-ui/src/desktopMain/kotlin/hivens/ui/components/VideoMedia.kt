@@ -1,7 +1,6 @@
 package hivens.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -34,6 +33,7 @@ import hivens.media.VideoCacheService
 import hivens.media.YtDlpService
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxProgressBar
+import hivens.ui.press.clickable
 import hivens.ui.render.openInBrowser
 import hivens.ui.utils.humanSize
 import kotlinx.coroutines.CancellationException

@@ -2,12 +2,12 @@ package hivens.ui.feature.catalogue.project
 
 import androidx.compose.foundation.background
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.press.clickable
 import hivens.ui.theme.decorativeColor
 import hivens.ui.nx.InitialsAvatar
 import coil3.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column

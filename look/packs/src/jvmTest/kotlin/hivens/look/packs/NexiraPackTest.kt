@@ -12,6 +12,8 @@ import hivens.look.colour.api.ColourAnswers
 import hivens.look.colour.api.ColourApi
 import hivens.look.colour.api.ColourModule
 import hivens.look.colour.api.Ink
+import hivens.look.cursor.api.Cursor
+import hivens.look.cursor.api.CursorModule
 import hivens.look.manager.LookManagerModule
 import hivens.look.motion.api.Motion
 import hivens.look.motion.api.MotionModule
@@ -58,7 +60,7 @@ import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
- * The default pack names nx for colour, motion, shape, stroke, surface, timing, feedback and type and
+ * The default pack names nx for colour, motion, shape, stroke, surface, timing, feedback, type and cursor and
  * Google's icons for icon, which is every axis that exists, and the look manager takes the colour axis and the pack from the modules compiled in, read
  * here the way the boot window reads them.
  */
@@ -67,10 +69,10 @@ class NexiraPackTest {
     @Test
     fun `the default pack names a family for every axis that exists, and no axis that does not exist`() {
         assertEquals(LookApi.DEFAULT_PACK, NexiraPack.id)
-        assertEquals(mapOf(Colour.id to "nx", Motion.id to "nx", Shape.id to "nx", Stroke.id to "nx", Surface.id to "nx", Timing.id to "nx", Feedback.id to "nx", Type.id to "nx", Icon.id to "google-rounded"), NexiraPack.providers)
+        assertEquals(mapOf(Colour.id to "nx", Motion.id to "nx", Shape.id to "nx", Stroke.id to "nx", Surface.id to "nx", Timing.id to "nx", Feedback.id to "nx", Type.id to "nx", Cursor.id to "nx", Icon.id to "google-rounded"), NexiraPack.providers)
         val axes = (ColourModule.contributions + MotionModule.contributions + ShapeModule.contributions + StrokeModule.contributions +
             SurfaceModule.contributions + TimingModule.contributions + FeedbackModule.contributions +
-            TypeModule.contributions + IconModule.contributions)
+            TypeModule.contributions + IconModule.contributions + CursorModule.contributions)
             .filterIsInstance<LookAxis<*>>().map { it.id }.toSet()
         assertTrue(axes.containsAll(NexiraPack.providers.keys), "the pack names an axis no look module brings: ${NexiraPack.providers.keys - axes}")
         assertEquals(listOf<Any>(NexiraPack), LookPacksModule.contributions)

@@ -1,0 +1,86 @@
+public final class hivens/look/cursor/api/Cursor : hivens/look/manager/api/LookAxis {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/cursor/api/Cursor;
+	public fun getLabel ()Ljava/lang/String;
+	public final fun pointer (Lhivens/look/cursor/api/CursorRole;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/input/pointer/PointerIcon;
+	public final fun resize (Lhivens/look/cursor/api/CursorEdge;Landroidx/compose/runtime/Composer;I)Landroidx/compose/ui/input/pointer/PointerIcon;
+}
+
+public final class hivens/look/cursor/api/CursorAnswers {
+	public static final field $stable I
+	public static final field Companion Lhivens/look/cursor/api/CursorAnswers$Companion;
+	public final fun pointer (Lhivens/look/cursor/api/CursorRole;)Landroidx/compose/ui/input/pointer/PointerIcon;
+	public final fun resize (Lhivens/look/cursor/api/CursorEdge;)Landroidx/compose/ui/input/pointer/PointerIcon;
+}
+
+public final class hivens/look/cursor/api/CursorAnswers$Builder {
+	public static final field $stable I
+	public final fun getPointer ()Lkotlin/jvm/functions/Function1;
+	public final fun getResize ()Lkotlin/jvm/functions/Function1;
+	public final fun setPointer (Lkotlin/jvm/functions/Function1;)V
+	public final fun setResize (Lkotlin/jvm/functions/Function1;)V
+}
+
+public final class hivens/look/cursor/api/CursorAnswers$Companion {
+	public final fun build (Lhivens/look/cursor/api/CursorAnswers;Lkotlin/jvm/functions/Function1;)Lhivens/look/cursor/api/CursorAnswers;
+	public static synthetic fun build$default (Lhivens/look/cursor/api/CursorAnswers$Companion;Lhivens/look/cursor/api/CursorAnswers;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lhivens/look/cursor/api/CursorAnswers;
+	public final fun getBASE ()Lhivens/look/cursor/api/CursorAnswers;
+}
+
+public final class hivens/look/cursor/api/CursorApi {
+	public static final field $stable I
+	public static final field AXIS Ljava/lang/String;
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/look/cursor/api/CursorApi;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public final class hivens/look/cursor/api/CursorEdge : java/lang/Enum {
+	public static final field East Lhivens/look/cursor/api/CursorEdge;
+	public static final field North Lhivens/look/cursor/api/CursorEdge;
+	public static final field NorthEast Lhivens/look/cursor/api/CursorEdge;
+	public static final field NorthWest Lhivens/look/cursor/api/CursorEdge;
+	public static final field South Lhivens/look/cursor/api/CursorEdge;
+	public static final field SouthEast Lhivens/look/cursor/api/CursorEdge;
+	public static final field SouthWest Lhivens/look/cursor/api/CursorEdge;
+	public static final field West Lhivens/look/cursor/api/CursorEdge;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lhivens/look/cursor/api/CursorEdge;
+	public static fun values ()[Lhivens/look/cursor/api/CursorEdge;
+}
+
+public final class hivens/look/cursor/api/CursorKt {
+	public static final fun cursor (Landroidx/compose/ui/Modifier;Lhivens/look/cursor/api/CursorEdge;)Landroidx/compose/ui/Modifier;
+	public static final fun cursor (Landroidx/compose/ui/Modifier;Lhivens/look/cursor/api/CursorRole;)Landroidx/compose/ui/Modifier;
+}
+
+public final class hivens/look/cursor/api/CursorModule : hivens/widget/api/CompiledModule {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/look/cursor/api/CursorModule;
+	public fun getApiPackages ()Ljava/util/Map;
+	public fun getBoot ()Lhivens/widget/api/BootAnswers;
+	public fun getContributionKinds ()Ljava/util/List;
+	public fun getContributions ()Ljava/util/List;
+	public fun getId ()Ljava/lang/String;
+	public fun getName ()Ljava/lang/String;
+	public fun getProvides ()Ljava/util/Map;
+	public fun getRequires ()Ljava/util/Map;
+	public fun getStrings ()Lhivens/widget/api/ModuleStrings;
+	public fun getUses ()Ljava/util/Map;
+	public fun getVersion ()Lhivens/widget/model/ApiVersion;
+	public fun getWidgets ()Lhivens/widget/api/WidgetRegistry;
+}
+
+public final class hivens/look/cursor/api/CursorRole : java/lang/Enum {
+	public static final field Disabled Lhivens/look/cursor/api/CursorRole;
+	public static final field Draggable Lhivens/look/cursor/api/CursorRole;
+	public static final field Dragging Lhivens/look/cursor/api/CursorRole;
+	public static final field Link Lhivens/look/cursor/api/CursorRole;
+	public static final field Pressable Lhivens/look/cursor/api/CursorRole;
+	public static final field Refused Lhivens/look/cursor/api/CursorRole;
+	public static final field Text Lhivens/look/cursor/api/CursorRole;
+	public static fun getEntries ()Lkotlin/enums/EnumEntries;
+	public static fun valueOf (Ljava/lang/String;)Lhivens/look/cursor/api/CursorRole;
+	public static fun values ()[Lhivens/look/cursor/api/CursorRole;
+}
+

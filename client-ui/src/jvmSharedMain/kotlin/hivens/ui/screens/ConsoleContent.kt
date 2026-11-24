@@ -4,7 +4,6 @@ import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +28,6 @@ import hivens.ui.nx.NxBasicTextField
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -87,6 +85,9 @@ import androidx.compose.ui.text.input.ImeAction
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxSteadyText
+import hivens.ui.press.IconButton
+import hivens.ui.press.clickable
+import hivens.ui.press.pressCursor
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -989,6 +990,7 @@ private fun Toolbar(
                             )
                         },
                         onClick = { onToggleGutter(); gearOpen = false },
+                        modifier = Modifier.pressCursor(),
                     )
                     DropdownMenuItem(
                         text = {
@@ -999,6 +1001,7 @@ private fun Toolbar(
                             )
                         },
                         onClick = { onToggleTimestamps(); gearOpen = false },
+                        modifier = Modifier.pressCursor(),
                     )
                 }
             }

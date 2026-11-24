@@ -1,7 +1,6 @@
 package hivens.ui.widgets.profile
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +17,7 @@ import hivens.accounts.api.FaceChoice
 import hivens.accounts.api.SessionState
 import hivens.accounts.api.SessionView
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource

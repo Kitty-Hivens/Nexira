@@ -1,7 +1,6 @@
 package hivens.ui.feature.catalogue.project
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -56,6 +55,7 @@ import hivens.ui.feature.catalogue.project.disclosureLine
 import hivens.ui.feature.catalogue.project.Environment
 import hivens.ui.feature.catalogue.browse.ProjectTag
 import hivens.ui.feature.catalogue.browse.tagSearch
+import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.feature.catalogue.project.environmentLabel
 import hivens.ui.feature.catalogue.project.environments

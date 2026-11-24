@@ -1,6 +1,5 @@
 package hivens.ui.editor.props
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -31,6 +30,7 @@ import hivens.ui.nx.NxColorField
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSelect
 import hivens.ui.nx.NxSwitch
+import hivens.ui.press.clickable
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor

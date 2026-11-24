@@ -9,7 +9,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -78,6 +77,7 @@ import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxTooltip
 import hivens.ui.nx.RetryStateBlock
+import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.feature.catalogue.project.compactCount
 import hivens.ui.feature.catalogue.project.loaderLabel

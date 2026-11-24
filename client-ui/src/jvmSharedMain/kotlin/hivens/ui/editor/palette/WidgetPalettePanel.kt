@@ -27,9 +27,9 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import hivens.ui.cursor.dragCursor
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxBasicTextField
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,6 +55,7 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.i18n.api.LocalTranslator
+import hivens.ui.press.IconButton
 import hivens.ui.widgets.modules.LocalWidgetLabels
 import hivens.widget.api.WidgetDescriptor
 import hivens.ui.icons.NxIcon
@@ -165,11 +166,13 @@ fun WidgetPalettePanel(
         ) {
         Column(Modifier.fillMaxSize()) {
             // Header
+            var moving by remember { mutableStateOf(false) }
             Row(
                 verticalAlignment     = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier              = Modifier
                     .fillMaxWidth()
+                    .dragCursor(moving)
                     .pointerInput(Unit) {
                         // No slop: a header is a handle. detectDragGestures holds the
                         // first few pixels back before it reports anything, which on a
@@ -185,12 +188,17 @@ fun WidgetPalettePanel(
                             // panel instead of widening it.
                             if (currentEvent.buttons.isSecondaryPressed) return@awaitEachGesture
                             down.consume()
-                            drag(down.id) { change ->
-                                // Delta first: positionChange() reports Offset.Zero once
-                                // the change is consumed, so claiming it before reading it
-                                // moves the panel by nothing.
-                                paletteOffset.drag(change.positionChange())
-                                change.consume()
+                            try {
+                                moving = true
+                                drag(down.id) { change ->
+                                    // Delta first: positionChange() reports Offset.Zero once
+                                    // the change is consumed, so claiming it before reading it
+                                    // moves the panel by nothing.
+                                    paletteOffset.drag(change.positionChange())
+                                    change.consume()
+                                }
+                            } finally {
+                                moving = false
                             }
                         }
                     }

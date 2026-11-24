@@ -8,7 +8,6 @@ import hivens.ui.nx.NxSliderTrack
 import hivens.ui.nx.NxSwitch
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -22,6 +21,10 @@ import androidx.compose.ui.unit.dp
 import hivens.core.jvm.*
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.press.IconButton
+import hivens.ui.press.TextButton
+import hivens.ui.press.clickable
+import hivens.ui.press.pressCursor
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalMonoFamily
@@ -132,6 +135,7 @@ fun JvmArgsBuilderDialog(
                         Tab(
                             selected = selectedTabIdx == idx,
                             onClick = { selectedTabIdx = idx },
+                            modifier = Modifier.pressCursor(),
                             text = { Text(label, style = MaterialTheme.typography.titleSmall) },
                             icon = { Symbol(icon, null, modifier = Modifier.size(18.dp)) },
                             selectedContentColor = NxColor.lead(),
@@ -210,6 +214,7 @@ private fun PresetPickerRow(
                 FilterChip(
                     selected = isSelected,
                     onClick = { onSelected(preset) },
+                    modifier = Modifier.pressCursor(),
                     label = { Text(preset.displayName.substringBefore(" ("), style = MaterialTheme.typography.labelMedium) },
                     colors = FilterChipDefaults.filterChipColors(
                         selectedContainerColor = NxColor.wash(NxColor.lead(), 0.2f),
@@ -278,7 +283,7 @@ private fun GcOption(label: String, hint: String, selected: Boolean, onClick: ()
                     .padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                RadioButton(selected = selected, onClick = onClick,
+                RadioButton(selected = selected, onClick = onClick, modifier = Modifier.pressCursor(),
                     colors = RadioButtonDefaults.colors(
                         selectedColor = NxColor.lead(),
                         unselectedColor = NxInk.quiet,

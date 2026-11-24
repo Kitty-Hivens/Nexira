@@ -1,0 +1,40 @@
+name: cursor-lint
+
+# A press written with Compose's own modifier has no pointer a look could answer, so a
+# look that puts a hand over buttons would put it over some of them. This keeps every
+# press and every pointer asked of the cursor axis.
+
+on:
+  pull_request:
+    branches: [stable, dev]
+    paths:
+      - "**/*.kt"
+      - "scripts/check-cursor.py"
+      - ".github/workflows/cursor-lint.yml"
+  push:
+    branches: [dev, stable]
+    paths:
+      - "**/*.kt"
+      - "scripts/check-cursor.py"
+      - ".github/workflows/cursor-lint.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: Cursor-axis bypasses
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      # Strict: the baseline is clean, so this only ever fires on a newly introduced
+      # bypass. An exemption is a line in the script saying why the pointer there is no
+      # look's to answer.
+      - name: Scan for cursor-axis bypasses
+        run: python3 scripts/check-cursor.py --strict

@@ -2,11 +2,11 @@ package hivens.ui.components
 
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxAlertDialog
+import hivens.ui.press.TextButton
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.OnFill

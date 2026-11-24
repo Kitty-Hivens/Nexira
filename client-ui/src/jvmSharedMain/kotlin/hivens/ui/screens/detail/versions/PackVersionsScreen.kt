@@ -1,7 +1,6 @@
 package hivens.ui.screens.detail.versions
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -95,6 +94,7 @@ import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxSteadyText
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.components.rememberRunningPackGuard
+import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface

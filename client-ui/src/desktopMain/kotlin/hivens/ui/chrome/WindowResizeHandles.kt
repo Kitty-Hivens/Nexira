@@ -14,15 +14,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.awt.ComposeWindow
-import androidx.compose.ui.input.pointer.PointerIcon
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import hivens.ui.cursor.CursorEdge
+import hivens.ui.cursor.cursor
 import hivens.window.WindowEdge
 import hivens.window.WindowHost
 import hivens.window.resizedBounds
-import java.awt.Cursor
 import java.awt.MouseInfo
 
 /**
@@ -93,7 +92,7 @@ private fun BoxScope.Grip(
         Modifier
             .align(align)
             .then(sizeMod)
-            .pointerHoverIcon(PointerIcon(Cursor.getPredefinedCursor(edge.cursor)))
+            .cursor(edge.pulled())
             .pointerInput(edge, window) {
                 awaitPointerEventScope {
                     while (true) {
@@ -111,4 +110,15 @@ private fun BoxScope.Grip(
                 }
             },
     )
+}
+
+private fun WindowEdge.pulled(): CursorEdge = when (this) {
+    WindowEdge.N -> CursorEdge.North
+    WindowEdge.S -> CursorEdge.South
+    WindowEdge.W -> CursorEdge.West
+    WindowEdge.E -> CursorEdge.East
+    WindowEdge.NW -> CursorEdge.NorthWest
+    WindowEdge.NE -> CursorEdge.NorthEast
+    WindowEdge.SW -> CursorEdge.SouthWest
+    WindowEdge.SE -> CursorEdge.SouthEast
 }

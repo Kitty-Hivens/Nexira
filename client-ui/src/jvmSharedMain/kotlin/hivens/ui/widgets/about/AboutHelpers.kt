@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -20,10 +19,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import hivens.ui.cursor.CursorRole
+import hivens.ui.cursor.cursor
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.platform.SystemActions
+import hivens.ui.press.OutlinedButton
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -95,7 +97,7 @@ private val STACK_BELOW = 420.dp
 internal fun LinkButton(label: String, url: String, icon: IconKey) {
     OutlinedButton(
         onClick        = { SystemActions.openUrl(url) },
-        modifier       = Modifier.fillMaxWidth(),
+        modifier       = Modifier.fillMaxWidth().cursor(CursorRole.Link),
         shape          = MaterialTheme.shapes.small,
         border         = BorderStroke(1.dp, NxInk.line.copy(alpha = 0.2f)),
         contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),

@@ -1,6 +1,5 @@
 package hivens.window
 
-import java.awt.Cursor
 import java.awt.Dimension
 import java.awt.GraphicsConfiguration
 import java.awt.GraphicsEnvironment
@@ -94,19 +93,17 @@ enum class WindowEdge(
     val top: Boolean,
     val right: Boolean,
     val bottom: Boolean,
-    /** The AWT cursor that shows over it. */
-    val cursor: Int,
     /** The EWMH `_NET_WM_MOVERESIZE` direction for it. */
     internal val ewmh: Int,
 ) {
-    W(true, false, false, false, Cursor.W_RESIZE_CURSOR, 7),
-    E(false, false, true, false, Cursor.E_RESIZE_CURSOR, 3),
-    N(false, true, false, false, Cursor.N_RESIZE_CURSOR, 1),
-    S(false, false, false, true, Cursor.S_RESIZE_CURSOR, 5),
-    NW(true, true, false, false, Cursor.NW_RESIZE_CURSOR, 0),
-    NE(false, true, true, false, Cursor.NE_RESIZE_CURSOR, 2),
-    SW(true, false, false, true, Cursor.SW_RESIZE_CURSOR, 6),
-    SE(false, false, true, true, Cursor.SE_RESIZE_CURSOR, 4);
+    W(true, false, false, false, 7),
+    E(false, false, true, false, 3),
+    N(false, true, false, false, 1),
+    S(false, false, false, true, 5),
+    NW(true, true, false, false, 0),
+    NE(false, true, true, false, 2),
+    SW(true, false, false, true, 6),
+    SE(false, false, true, true, 4);
 
     val isCorner: Boolean get() = (left || right) && (top || bottom)
 }

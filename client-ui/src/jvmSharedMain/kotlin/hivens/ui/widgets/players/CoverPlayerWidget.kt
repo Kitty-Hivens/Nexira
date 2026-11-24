@@ -2,7 +2,6 @@ package hivens.ui.widgets.players
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -47,6 +46,7 @@ import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxPanelGroup
 import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
+import hivens.ui.press.clickable
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.familyForText

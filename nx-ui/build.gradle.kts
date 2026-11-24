@@ -70,6 +70,8 @@ kotlin {
                 api(project(":look:type-api"))
                 // The library every icon here is drawn from: the icon axis's answers, the same way.
                 api(project(":look:icon-api"))
+                // The pointer over everything here: the cursor axis's answers, the same way.
+                api(project(":look:cursor-api"))
                 // Where a preview or a test finds what draws it beyond what this module answers.
                 implementation(project(":look:preview-api"))
             }

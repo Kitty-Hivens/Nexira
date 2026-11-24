@@ -1,7 +1,12 @@
 package hivens.ui.editor.decoration
 
 import hivens.i18n.api.Strings
+import hivens.ui.cursor.CursorEdge
+import hivens.ui.cursor.cursor
+import hivens.ui.cursor.dragCursor
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.press.TextButton
+import hivens.ui.press.clickable
 import hivens.ui.widgets.modules.widgetLabel
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -10,7 +15,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
@@ -36,7 +40,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -66,7 +69,6 @@ import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
-import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
 import androidx.compose.ui.layout.LayoutCoordinates
@@ -84,7 +86,6 @@ import hivens.ui.editor.EditModeController
 import hivens.ui.editor.ResizeBounds
 import hivens.ui.editor.ResizeEdge
 import hivens.ui.editor.canvasResize
-import hivens.ui.editor.resizePointerIcon
 import hivens.ui.editor.guideLeadDp
 import hivens.ui.editor.placementDragOffset
 import hivens.ui.editor.gridDragCell
@@ -229,6 +230,8 @@ fun EditableWidgetChrome(
     val widthBounds = remember(sizing) { ResizeBounds.of(sizing.minWidth, sizing.maxWidth) }
     val heightBounds = remember(sizing) { ResizeBounds.of(sizing.minHeight, sizing.maxHeight) }
     var resizing by remember { mutableStateOf(false) }
+    // A placed widget is under the pointer while it moves. One in a flow is drawn as a ghost that hides it.
+    var moving by remember { mutableStateOf(false) }
     // Read outside the draw lambda: gridGeo is a State and the guides only apply
     // where the unit is the dp.
     val latticeGeo = gridGeo.value
@@ -424,6 +427,7 @@ fun EditableWidgetChrome(
             Box(
                 Modifier
                     .matchParentSize()
+                    .dragCursor(moving)
                     .pointerInput(instance.instanceId) {
                         // Right-click detection. The drag gesture below starts with
                         // awaitFirstDown, which fires ONLY on the primary (left) button --
@@ -503,6 +507,7 @@ fun EditableWidgetChrome(
                                     // The free move and the resize handles write on every
                                     // frame, so they put back the placement they started from.
                                     try {
+                                        moving = true
                                         drag(down.id) { change ->
                                             acc += change.positionChange()
                                             pointer += change.positionChange()
@@ -520,6 +525,7 @@ fun EditableWidgetChrome(
                                             editController.moveWidgetInGrid(path, instance.instanceId, col, row, geo.columns)
                                         }
                                     } finally {
+                                        moving = false
                                         autoScroll.stop()
                                         latticeDrag = Offset.Zero
                                     }
@@ -560,6 +566,7 @@ fun EditableWidgetChrome(
                                         wrote = true
                                     }
                                     try {
+                                        moving = true
                                         released = drag(down.id) { change ->
                                             pointer += change.positionChange()
                                             autoScroll.move(pointer)
@@ -590,6 +597,7 @@ fun EditableWidgetChrome(
                                             change.consume()
                                         }
                                     } finally {
+                                        moving = false
                                         autoScroll.stop()
                                         registry.publishOverlap(emptySet())
                                         if (wrote && !released) editController.restoreWidgetPlacement(path, instance.instanceId, p)
@@ -686,7 +694,7 @@ fun EditableWidgetChrome(
                         modifier = Modifier
                             .size(hit)
                             .onGloballyPositioned { handleOrigin = it.positionInWindow() }
-                            .pointerHoverIcon(remember(edge) { resizePointerIcon(edge) })
+                            .cursor(edge.pulled())
                             .pointerInput(instance.instanceId, edge) {
                                 // Custom gesture (not detectDragGestures) so the press
                                 // is consumed -- otherwise the body drag overlay also
@@ -1090,3 +1098,13 @@ private fun ResizeEdge.fingerSize(visual: DpSize, widget: DpSize): DpSize {
     }
 }
 
+private fun ResizeEdge.pulled(): CursorEdge = when (this) {
+    ResizeEdge.North -> CursorEdge.North
+    ResizeEdge.South -> CursorEdge.South
+    ResizeEdge.West -> CursorEdge.West
+    ResizeEdge.East -> CursorEdge.East
+    ResizeEdge.NorthWest -> CursorEdge.NorthWest
+    ResizeEdge.NorthEast -> CursorEdge.NorthEast
+    ResizeEdge.SouthWest -> CursorEdge.SouthWest
+    ResizeEdge.SouthEast -> CursorEdge.SouthEast
+}

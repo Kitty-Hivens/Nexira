@@ -3,7 +3,6 @@ package hivens.ui.nx
 import hivens.look.feedback.api.Feedback
 import hivens.look.feedback.api.FeedbackTarget
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -19,6 +18,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.look.shape.api.Shape
+import hivens.ui.press.clickable
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk

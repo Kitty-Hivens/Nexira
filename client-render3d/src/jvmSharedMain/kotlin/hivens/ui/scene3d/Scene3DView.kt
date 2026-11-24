@@ -19,6 +19,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
+import hivens.ui.cursor.dragCursor
 import hivens.ui.render3d.TriBatch
 import hivens.ui.render3d.downsampleInto
 import hivens.ui.render3d.rasterizeInto
@@ -113,9 +114,14 @@ fun Scene3DView(
     prepareFrame: (() -> Unit)? = null,
     supersample: Int = 2,
 ) {
+    var dragging by remember { mutableStateOf(false) }
     val gestureModifier = if (interactive) {
-        Modifier.pointerInput(Unit) {
-            detectDragGestures { change, drag ->
+        Modifier.dragCursor(dragging).pointerInput(Unit) {
+            detectDragGestures(
+                onDragStart = { dragging = true },
+                onDragEnd = { dragging = false },
+                onDragCancel = { dragging = false },
+            ) { change, drag ->
                 change.consume()
                 state.cameraYaw = (state.cameraYaw + drag.x * 0.01f) % TWO_PI
                 state.cameraPitch += -drag.y * 0.01f

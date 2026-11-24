@@ -6,7 +6,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -62,6 +61,7 @@ import hivens.ui.nx.NxButtonStyle
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxSwitch
 import hivens.ui.nx.NxTooltip
+import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.Motion

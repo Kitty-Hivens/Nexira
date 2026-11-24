@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -27,6 +26,7 @@ import hivens.ui.nx.NxChoiceChip
 import hivens.ui.nx.NxField
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxToggle
+import hivens.ui.press.OutlinedButton
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetToggle

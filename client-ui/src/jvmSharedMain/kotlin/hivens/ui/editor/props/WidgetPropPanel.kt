@@ -2,6 +2,8 @@ package hivens.ui.editor.props
 
 import hivens.i18n.api.Strings
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.press.IconButton
+import hivens.ui.press.TextButton
 import hivens.ui.widgets.modules.widgetLabel
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
@@ -24,10 +26,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf

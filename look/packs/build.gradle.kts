@@ -23,6 +23,7 @@ kotlin.sourceSets.named("jvmTest") {
         implementation(project(":look:feedback-api"))
         implementation(project(":look:type-api"))
         implementation(project(":look:icon-api"))
+        implementation(project(":look:cursor-api"))
         implementation(libs.compose.runtime)
     }
 }

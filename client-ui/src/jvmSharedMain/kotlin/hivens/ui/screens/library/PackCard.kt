@@ -1,7 +1,6 @@
 package hivens.ui.screens.library
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -47,6 +46,7 @@ import hivens.ui.nx.NxKebabButton
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.theme.Dimens
 import hivens.ui.theme.familyForText

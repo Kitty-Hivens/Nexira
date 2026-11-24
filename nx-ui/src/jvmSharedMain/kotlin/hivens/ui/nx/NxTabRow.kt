@@ -3,7 +3,6 @@ package hivens.ui.nx
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.VectorConverter
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -40,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import hivens.look.stroke.api.Stroke
 import hivens.look.stroke.api.StrokeState
 import hivens.look.stroke.api.drawStroke
+import hivens.ui.press.clickable
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor

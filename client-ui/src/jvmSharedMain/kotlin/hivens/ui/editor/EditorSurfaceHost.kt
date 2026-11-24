@@ -9,7 +9,6 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -29,7 +28,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
@@ -99,6 +97,8 @@ import hivens.ui.nx.NxAlertDialog
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.WidthClass
+import hivens.ui.press.TextButton
+import hivens.ui.press.clickable
 import hivens.ui.theme.Motion
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind

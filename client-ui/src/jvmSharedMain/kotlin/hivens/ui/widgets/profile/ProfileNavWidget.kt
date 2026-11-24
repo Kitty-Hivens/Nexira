@@ -1,7 +1,6 @@
 package hivens.ui.widgets.profile
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import hivens.accounts.api.AccountKeys
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxNavRowContent
+import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull

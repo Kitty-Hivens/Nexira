@@ -1,6 +1,5 @@
 package hivens.ui.editor
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -45,6 +44,7 @@ import hivens.ui.layers.layerTrigger
 import hivens.ui.nx.NxContextMenu
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMenuItem
+import hivens.ui.press.clickable
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.widget.api.LocalLayoutGraph

@@ -1,6 +1,5 @@
 package hivens.ui.widgets.shell
 
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.widthIn
@@ -21,6 +20,7 @@ import hivens.ui.chrome.rememberCrumbLabel
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.press.clickable
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberScopedAction

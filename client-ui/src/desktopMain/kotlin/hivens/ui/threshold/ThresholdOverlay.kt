@@ -4,7 +4,6 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -41,6 +40,7 @@ import androidx.compose.ui.unit.sp
 import hivens.i18n.api.Strings
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.press_start_2p
+import hivens.ui.press.clickable
 import hivens.ui.theme.Motion
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first

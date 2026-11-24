@@ -3,7 +3,6 @@ package hivens.ui.nx
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.hoverable
@@ -55,6 +54,7 @@ import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.press.clickable
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme

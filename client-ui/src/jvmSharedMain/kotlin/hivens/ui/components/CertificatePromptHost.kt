@@ -4,11 +4,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -19,6 +17,8 @@ import hivens.core.diag.ActionRing
 import hivens.launcher.network.CertificateTrustGate
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxAlertDialog
+import hivens.ui.press.Button
+import hivens.ui.press.TextButton
 import hivens.ui.puppet.PuppetClick
 import org.koin.compose.koinInject
 import java.time.Instant

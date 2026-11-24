@@ -1,7 +1,6 @@
 package hivens.ui.widgets.home.new
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -34,6 +33,7 @@ import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.InitialsAvatar
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
+import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.library.PendingUpdateBadge
 import hivens.ui.screens.library.lastPlayedLabel

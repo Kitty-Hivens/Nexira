@@ -5,7 +5,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -53,6 +52,7 @@ import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
+import hivens.ui.press.clickable
 import hivens.ui.screens.library.PendingUpdateBadge
 import hivens.ui.screens.library.lastPlayedLabel
 import hivens.ui.screens.library.rememberPackArt

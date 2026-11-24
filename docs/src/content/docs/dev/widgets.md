@@ -126,6 +126,7 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 | `nexira.look.feedback` | `:look:feedback-api`  | `hivens.look.feedback.api` | Asking how a widget answers hover, focus, press and drag, and answering the feedback axis |
 | `nexira.look.type`     | `:look:type-api`      | `hivens.look.type.api`     | Asking the face text is drawn in, and answering the type axis                             |
 | `nexira.look.icon`     | `:look:icon-api`      | `hivens.look.icon.api`     | Drawing an icon of the look's library or one of your own, and answering the icon axis     |
+| `nexira.look.cursor`   | `:look:cursor-api`    | `hivens.look.cursor.api`   | Asking the pointer over what you draw, and answering the cursor axis                      |
 
 Each entry is an API id and the version you compiled against. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
 
@@ -398,6 +399,12 @@ The icon axis, `icon`, comes with the launcher in `:look:icon-api` (`nexira.look
 A library need not have a name. `IconKey.named(name, otherwise)` carries a drawing of the widget's own for that case, and `IconKey.of(drawing)` is an icon the widget draws itself under every look. Either is an `IconDrawing`, a class with one composable, which draws in the room it is given.
 
 A provider of icons answers with `IconAnswers.build { library = { name -> ... } }`, the `IconDrawing` of a name and null where its library has none. When no provider is chosen for the axis, the icons a control cannot be found without (close, back, check, more, add and the chevrons) are drawn as plain strokes and every other is blank, in the same room. The default pack names `google-rounded` for icon, Material Symbols Rounded.
+
+### Cursor
+
+The cursor axis, `cursor`, comes with the launcher in `:look:cursor-api` (`nexira.look.cursor`). A widget asks it the pointer over what it draws, by what can be done there: `Modifier.cursor(CursorRole.Draggable)` with `Pressable`, `Disabled`, `Link`, `Text`, `Draggable`, `Dragging` or `Refused`, and `Modifier.cursor(CursorEdge.SouthEast)` for an edge that is pulled to resize. A pointer asked deeper, or later in the chain, wins. Where the look leaves a role alone, the pointer around stays. Compose's own `clickable` asks for no pointer, so a module that draws with `nx-ui` presses with the modifiers and buttons of `hivens.ui.press`, which are Compose's and Material's with the look's pointer and are called the same.
+
+A provider of the cursor answers with `CursorAnswers.build { pointer = { role -> ... }; resize = { edge -> ... } }`, each a Compose `PointerIcon` or null to leave it alone. When no provider is chosen for the axis, what is pressed is under the arrow, text and links under Compose's own pointers, an edge under the platform's arrows, and dragging has none. The default pack names the `nx` family, which stands on `system`: what the person's system has for a role, on Linux by name from the cursor theme, and nothing where it has none.
 
 ## Catalogue sources
 

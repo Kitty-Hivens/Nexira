@@ -16,6 +16,8 @@ import androidx.compose.ui.unit.dp
 import hivens.core.api.interfaces.IUpdateApplicator
 import hivens.core.data.LauncherUpdate
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.press.Button
+import hivens.ui.press.TextButton
 import hivens.update.UpdateService
 import hivens.ui.chrome.LocalWindowHide
 import hivens.ui.icons.NxIcon

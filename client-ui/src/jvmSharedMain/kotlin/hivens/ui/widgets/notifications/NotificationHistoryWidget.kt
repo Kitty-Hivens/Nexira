@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,6 +53,7 @@ import hivens.ui.notifications.NotificationArchiveStore
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.notifications.Severity
 import hivens.ui.notifications.render.NotificationAvatar
+import hivens.ui.press.clickable
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status

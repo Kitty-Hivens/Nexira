@@ -1,7 +1,6 @@
 package hivens.ui.feature.catalogue.project
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -53,6 +52,7 @@ import hivens.catalogue.api.gameVersionChips
 import hivens.core.update.VersionChannel
 import hivens.i18n.api.Strings
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.press.clickable
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.ui.components.LoaderGlyph

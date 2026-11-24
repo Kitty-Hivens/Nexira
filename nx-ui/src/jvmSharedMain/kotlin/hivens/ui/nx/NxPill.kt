@@ -12,9 +12,9 @@ import hivens.look.stroke.api.Stroke
 import hivens.look.stroke.api.collectStrokeState
 import hivens.look.stroke.api.stroke
 import hivens.ui.layers.layerTrigger
+import hivens.ui.press.clickable
 import hivens.ui.theme.Motion
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row

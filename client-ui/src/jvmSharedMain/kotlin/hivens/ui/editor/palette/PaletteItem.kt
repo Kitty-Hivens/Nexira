@@ -1,6 +1,8 @@
 package hivens.ui.editor.palette
 
 import hivens.i18n.api.Strings
+import hivens.ui.cursor.CursorRole
+import hivens.ui.cursor.cursor
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.widgets.modules.widgetLabel
 import androidx.compose.foundation.background
@@ -111,6 +113,7 @@ fun PaletteItem(
             .onGloballyPositioned { c: LayoutCoordinates -> rowBounds = c.boundsInWindow() }
             .clip(RoundedCornerShape(8.dp))
             .background(background)
+            .cursor(CursorRole.Draggable)
             .dragSource(
                 controller            = controller,
                 payload               = DragPayload.PaletteWidget(descriptor.kind),

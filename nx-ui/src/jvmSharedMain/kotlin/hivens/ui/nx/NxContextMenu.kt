@@ -4,7 +4,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -66,6 +65,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.AnchoredLayer
 import hivens.ui.layers.layerTrigger
+import hivens.ui.press.clickable
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NeutralTheme
