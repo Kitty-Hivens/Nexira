@@ -7,7 +7,7 @@ import hivens.ui.nx.StateLayerAlphas
 
 /**
  * nx's feedback as the feedback axis's answers: what the nx feedback provider answers, and what
- * [NxThemed] draws previews and tests in. Made once, so a role is the same value wherever it is read.
+ * previews and tests draw in. Made once, so a role is the same value wherever it is read.
  */
 fun nxFeedbackAnswers(): FeedbackAnswers = NxFeedback.ANSWERS
 

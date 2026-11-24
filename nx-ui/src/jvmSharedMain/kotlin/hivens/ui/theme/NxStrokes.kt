@@ -6,8 +6,8 @@ import hivens.look.stroke.api.StrokeAnswers
 import hivens.look.stroke.api.StrokeRole
 
 /**
- * nx's strokes as the stroke axis's answers: what the nx stroke provider answers, and what [NxThemed]
- * draws previews and tests in. Made once, so a role is the same value wherever it is read.
+ * nx's strokes as the stroke axis's answers: what the nx stroke provider answers, and what previews
+ * and tests draw in. Made once, so a role is the same value wherever it is read.
  */
 fun nxStrokeAnswers(): StrokeAnswers = NxStroke.ANSWERS
 

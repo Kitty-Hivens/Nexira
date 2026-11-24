@@ -1,27 +1,14 @@
 package hivens.ui.theme
 
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
-import hivens.look.shape.api.Shape
+import hivens.look.shape.api.PlateOutline
 import hivens.look.shape.api.ShapeAnswers
 
-/** How the shape axis outlines a widget's plate, see [hivens.look.shape.api.PlateOutline]. */
-typealias PlateOutline = hivens.look.shape.api.PlateOutline
-
 /**
- * The plate outline the shape axis answers here: what a widget's own plate takes where its node
- * leaves a field unsaid. See [hivens.look.shape.api.ShapeAnswers.plate].
- */
-val plateOutline: PlateOutline
-    @Composable @ReadOnlyComposable
-    get() = Shape.plate
-
-/**
- * nx's corners as the shape axis's answers: what the nx shape provider answers, and what [NxThemed]
- * draws previews and tests in. Made once, so a role is the same value wherever it is read.
+ * nx's corners as the shape axis's answers: what the nx shape provider answers, and what previews
+ * and tests draw in. Made once, so a role is the same value wherever it is read.
  */
 fun nxShapeAnswers(): ShapeAnswers = NxShape.ANSWERS
 

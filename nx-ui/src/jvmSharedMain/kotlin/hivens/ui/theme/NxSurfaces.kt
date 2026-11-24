@@ -1,29 +1,15 @@
 package hivens.ui.theme
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.ui.graphics.Color
 import hivens.look.surface.api.PlaneAnswer
 import hivens.look.surface.api.PlaneMaterial
 import hivens.look.surface.api.PlateAnswer
-import hivens.look.surface.api.Surface
 import hivens.look.surface.api.SurfaceAnswers
 import hivens.look.surface.api.SurfaceKind
 
-/** What a widget's own plate takes for a field its node leaves empty, see [hivens.look.surface.api.PlateAnswer]. */
-typealias PlateSurface = hivens.look.surface.api.PlateAnswer
-
 /**
- * What the surface axis answers here for a widget's own plate where its node leaves a field empty.
- * See [hivens.look.surface.api.SurfaceAnswers.plate].
- */
-val plateSurface: PlateSurface
-    @Composable @ReadOnlyComposable
-    get() = Surface.plate
-
-/**
- * nx's planes as the surface axis's answers: what the nx surface provider answers, and what [NxThemed]
- * draws previews and tests in. Made once, so a role is the same value wherever it is read.
+ * nx's planes as the surface axis's answers: what the nx surface provider answers, and what previews and
+ * tests draw in. Made once, so a role is the same value wherever it is read.
  */
 fun nxSurfaceAnswers(): SurfaceAnswers = NxSurface.ANSWERS
 
