@@ -1,17 +1,7 @@
 package hivens.look.icon.google.rounded
 
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.text.BasicText
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.style.LineHeightStyle
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import hivens.look.icon.api.IconDrawing
 import hivens.look.icon.api.IconStyle
 import java.util.concurrent.ConcurrentHashMap
@@ -34,7 +24,7 @@ internal object SymbolFont {
     private val face: SymbolFace by lazy { symbolFace(resource("material_symbols_rounded.ttf").use { it.readBytes() }) }
 
     private val drawings = ConcurrentHashMap<String, IconDrawing>()
-    private val families = ConcurrentHashMap<SymbolAxes, FontFamily>()
+    private val inks = ConcurrentHashMap<SymbolAxes, SymbolInk>()
 
     /** Reads the font and the names, where they are not read yet. */
     fun load() {
@@ -50,8 +40,8 @@ internal object SymbolFont {
         return drawings.computeIfAbsent(name) { Symbol(name, String(Character.toChars(codepoint))) }
     }
 
-    /** The family at [axes], the same instance for the same point. */
-    fun family(axes: SymbolAxes): FontFamily = families.computeIfAbsent(axes, face::at)
+    /** The face at [axes], the same instance for the same point. */
+    fun ink(axes: SymbolAxes): SymbolInk = inks.computeIfAbsent(axes, face::at)
 
     private fun resource(name: String) = requireNotNull(SymbolFont::class.java.getResourceAsStream(name)) { "$name is not in the module" }
 }
@@ -80,8 +70,17 @@ internal data class SymbolAxes(private val fillSteps: Int, val weight: Int, priv
 
 /** The face read from the font's bytes, and its copies at points on its axes. */
 internal interface SymbolFace {
-    /** The family of the face at [axes], every other axis at its default. */
-    fun at(axes: SymbolAxes): FontFamily
+    /** The face at [axes], every other axis at its default. */
+    fun at(axes: SymbolAxes): SymbolInk
+}
+
+/** The face at one point on its axes. */
+internal interface SymbolInk {
+    /**
+     * Draws the one character [glyph] in the middle of the scope, its em the shorter side. A glyph whose
+     * ink reaches the edges of its em is not cut off by the room: it runs over by a hair.
+     */
+    fun DrawScope.draw(glyph: String, tint: Color)
 }
 
 /** The face the font's [bytes] hold. */
@@ -90,27 +89,10 @@ internal expect fun symbolFace(bytes: ByteArray): SymbolFace
 /** The icon [name], drawn as the one character [glyph] of the font. */
 private class Symbol(private val name: String, private val glyph: String) : IconDrawing() {
 
-    @Composable
-    override fun Draw(style: IconStyle) {
-        BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            // Density's public toSp, which lint resolves through an interface it reads as
-            // restricted. Not worked out from fontScale by hand: that would lose the
-            // non-linear font scaling toSp applies.
-            @Suppress("RestrictedApi")
-            val size = with(LocalDensity.current) { minOf(maxWidth, maxHeight).toSp() }
-            val family = SymbolFont.family(SymbolAxes.of(style, size.value))
-            val text = remember(style.tint, size, family) {
-                TextStyle(
-                    color = style.tint,
-                    fontSize = size,
-                    fontFamily = family,
-                    lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
-                )
-            }
-            // Unbounded, so a glyph whose ink reaches the edges of its em is not cut off by the
-            // room: it runs over by a hair into whatever is around.
-            BasicText(glyph, Modifier.wrapContentSize(unbounded = true), text)
-        }
+    override fun DrawScope.draw(style: IconStyle) {
+        if (size.minDimension <= 0f) return
+        val ink = SymbolFont.ink(SymbolAxes.of(style, size.minDimension.toSp().value))
+        with(ink) { draw(glyph, style.tint) }
     }
 
     override fun toString(): String = "Material Symbols Rounded $name"

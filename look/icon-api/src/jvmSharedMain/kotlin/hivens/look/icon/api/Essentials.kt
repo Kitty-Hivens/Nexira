@@ -1,14 +1,11 @@
 package hivens.look.icon.api
 
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
@@ -57,17 +54,14 @@ private class Lines(private val strokes: List<List<Offset>>) : IconDrawing() {
         }
     }
 
-    @Composable
-    override fun Draw(style: IconStyle) = Spacer(
-        Modifier.drawBehind {
-            val side = size.minDimension
-            translate((size.width - side) / 2f, (size.height - side) / 2f) {
-                scale(side / GRID, pivot = Offset.Zero) {
-                    drawPath(path, style.tint, style = Stroke(STROKE, cap = StrokeCap.Round, join = StrokeJoin.Round))
-                }
+    override fun DrawScope.draw(style: IconStyle) {
+        val side = size.minDimension
+        translate((size.width - side) / 2f, (size.height - side) / 2f) {
+            scale(side / GRID, pivot = Offset.Zero) {
+                drawPath(path, style.tint, style = Stroke(STROKE, cap = StrokeCap.Round, join = StrokeJoin.Round))
             }
-        },
-    )
+        }
+    }
 }
 
 private const val GRID = 24f

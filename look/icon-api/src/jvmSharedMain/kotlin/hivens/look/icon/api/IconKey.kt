@@ -1,8 +1,8 @@
 package hivens.look.icon.api
 
-import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 
 /**
  * An icon a component draws: one of the look's library, by its [name], or a drawing of the component's
@@ -39,7 +39,7 @@ class IconKey private constructor(
     }
 }
 
-/** How a component wants an icon drawn. Made by [Icon.Draw] and read by a drawing. */
+/** How a component wants an icon drawn. Made by [Icon.Draw] and [drawIcon], and read by a drawing. */
 @Immutable
 class IconStyle internal constructor(
     /** The colour of the icon. A drawing in colours of its own may leave it. */
@@ -59,13 +59,12 @@ class IconStyle internal constructor(
 /**
  * One icon as a library or a component draws it.
  *
- * It is handed its room as constraints that leave no choice of size, and draws in the middle of it, so
- * no library moves a layout. What it cannot draw of the [IconStyle], a filling or a weight its library
- * has no shape for, it draws as the nearest it has.
+ * It draws and lays nothing out, so no library moves a layout, and a component that draws itself puts
+ * one into its own drawing ([drawIcon]). It may be drawn on any thread. What it cannot draw of the
+ * [IconStyle], a filling or a weight its library has no shape for, it draws as the nearest it has.
  */
 @Immutable
 abstract class IconDrawing {
-    /** Draws the icon in the room it is given, as [style] wants it. */
-    @Composable
-    abstract fun Draw(style: IconStyle)
+    /** Draws the icon in the middle of this scope, which is all the room it has, as [style] wants it. */
+    abstract fun DrawScope.draw(style: IconStyle)
 }

@@ -1,18 +1,25 @@
 package hivens.look.icon.google.rounded
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.look.icon.api.Icon
 import hivens.look.icon.api.IconAnswers
 import hivens.look.icon.api.IconApi
+import hivens.look.icon.api.IconDrawing
 import hivens.look.icon.api.IconKey
+import hivens.look.icon.api.IconStyle
 import hivens.look.icon.api.Icons
+import hivens.look.icon.api.drawIcon
 import hivens.look.manager.api.LookContext
 import hivens.widget.api.BootContext
 import hivens.widget.api.LevelServices
@@ -73,11 +80,11 @@ class GoogleRoundedProviderTest {
     }
 
     @Test
-    fun `the font is one face, and a point on its axes is the same family wherever it is asked`() {
+    fun `the font is one face, and a point on its axes is the same one wherever it is asked`() {
         val regular = SymbolAxes(0, 400, 48)
-        assertSame(SymbolFont.family(regular), SymbolFont.family(SymbolAxes(0, 400, 48)))
+        assertSame(SymbolFont.ink(regular), SymbolFont.ink(SymbolAxes(0, 400, 48)))
         val points = listOf(regular, SymbolAxes(32, 400, 48), SymbolAxes(0, 500, 48), SymbolAxes(0, 400, 96))
-        assertEquals(points.size, points.map(SymbolFont::family).toSet().size)
+        assertEquals(points.size, points.map(SymbolFont::ink).toSet().size)
         assertEquals(points.size, points.map { it.key }.toSet().size, "two points under one name would draw as the first of them")
     }
 
@@ -98,6 +105,45 @@ class GoogleRoundedProviderTest {
         val large = draw(Icons.Star, side = 64)
         assertTrue(small.width in 8..18, "16 of room, ${small.width} of ink")
         assertTrue(large.width in 40..66, "64 of room, ${large.width} of ink")
+    }
+
+    @Test
+    fun `drawn into a component's own drawing it is the same picture, where it was put`() {
+        val laid = draw(Icons.Star, side = 48)
+        val into = canvas { drawIcon(requireNotNull(SymbolFont.drawing("star")), Color.Black, size = Size(48f, 48f)) }
+        assertEquals(laid, into)
+        val moved = canvas { drawIcon(requireNotNull(SymbolFont.drawing("star")), Color.Black, topLeft = Offset(40f, 30f), size = Size(48f, 48f)) }
+        assertEquals(laid.ink, moved.ink, "the same ink elsewhere")
+        assertNotEquals(laid, moved)
+        assertEquals(0, canvas { drawIcon(requireNotNull(SymbolFont.drawing("star")), Color.Black, size = Size.Zero) }.ink, "no room is no icon")
+    }
+
+    @Test
+    fun `drawn into a component's own drawing it has the room and the style asked for, kept to what a style can be`() {
+        val seen = ArrayList<Pair<Size, IconStyle>>()
+        val noting = object : IconDrawing() {
+            override fun DrawScope.draw(style: IconStyle) {
+                seen += size to style
+            }
+        }
+        val _ = canvas {
+            drawIcon(noting, Color.Red)
+            drawIcon(noting, Color.Red, topLeft = Offset(10f, 20f))
+            drawIcon(noting, Color.Blue, topLeft = Offset(10f, 20f), size = Size(24f, 24f), fill = 3f, weight = 20)
+        }
+        assertEquals(listOf(Size(100f, 100f), Size(90f, 80f), Size(24f, 24f)), seen.map { it.first })
+        assertEquals(listOf(Color.Red, Color.Red, Color.Blue), seen.map { it.second.tint })
+        assertEquals(0f to 400, seen[0].second.let { it.fill to it.weight })
+        assertEquals(1f to 100, seen[2].second.let { it.fill to it.weight })
+    }
+
+    private fun canvas(block: DrawScope.() -> Unit): Drawn {
+        val scene = ImageComposeScene(100, 100, Density(1f)) { Canvas(Modifier.size(100.dp), block) }
+        try {
+            return scene.render(0L).use { Drawn.of(it) }
+        } finally {
+            scene.close()
+        }
     }
 
     /** What an icon left on a transparent 100 by 100 canvas it was drawn on at [side] by [side]. */

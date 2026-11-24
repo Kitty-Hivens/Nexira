@@ -34,7 +34,7 @@ public final class hivens/look/icon/api/IconApi {
 public abstract class hivens/look/icon/api/IconDrawing {
 	public static final field $stable I
 	public fun <init> ()V
-	public abstract fun Draw (Lhivens/look/icon/api/IconStyle;Landroidx/compose/runtime/Composer;I)V
+	public abstract fun draw (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lhivens/look/icon/api/IconStyle;)V
 }
 
 public final class hivens/look/icon/api/IconKey {
@@ -51,6 +51,11 @@ public final class hivens/look/icon/api/IconKey$Companion {
 	public final fun named (Ljava/lang/String;Lhivens/look/icon/api/IconDrawing;)Lhivens/look/icon/api/IconKey;
 	public static synthetic fun named$default (Lhivens/look/icon/api/IconKey$Companion;Ljava/lang/String;Lhivens/look/icon/api/IconDrawing;ILjava/lang/Object;)Lhivens/look/icon/api/IconKey;
 	public final fun of (Lhivens/look/icon/api/IconDrawing;)Lhivens/look/icon/api/IconKey;
+}
+
+public final class hivens/look/icon/api/IconKt {
+	public static final fun drawIcon-dATYh9I (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lhivens/look/icon/api/IconDrawing;JJJFI)V
+	public static synthetic fun drawIcon-dATYh9I$default (Landroidx/compose/ui/graphics/drawscope/DrawScope;Lhivens/look/icon/api/IconDrawing;JJJFIILjava/lang/Object;)V
 }
 
 public final class hivens/look/icon/api/IconModule : hivens/widget/api/CompiledModule {

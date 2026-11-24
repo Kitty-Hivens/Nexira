@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Composition
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Recomposer
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import hivens.widget.model.ApiVersion
 import kotlinx.coroutines.Dispatchers
 import java.lang.reflect.Modifier
@@ -19,13 +20,11 @@ import kotlin.test.assertTrue
 class IconApiTest {
 
     private object Star : IconDrawing() {
-        @Composable
-        override fun Draw(style: IconStyle) = Unit
+        override fun DrawScope.draw(style: IconStyle) = Unit
     }
 
     private object Dot : IconDrawing() {
-        @Composable
-        override fun Draw(style: IconStyle) = Unit
+        override fun DrawScope.draw(style: IconStyle) = Unit
     }
 
     /** A library that has one icon. */

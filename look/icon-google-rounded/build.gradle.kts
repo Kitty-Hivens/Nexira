@@ -15,7 +15,6 @@ kotlin.sourceSets.named("jvmSharedMain") {
         api(project(":widget-api"))
         implementation(project(":look:icon-api"))
         implementation(libs.compose.runtime)
-        implementation(libs.compose.foundation)
         implementation(libs.compose.ui)
     }
 }
