@@ -4,7 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import hivens.look.icon.api.Icon
 import hivens.look.icon.google.rounded.googleRoundedIcons
-import hivens.ui.theme.PreviewLook
+import hivens.look.preview.api.PreviewLook
 
 /** Previews and tests draw icons from the library the launcher ships. */
 class LauncherPreviewLook : PreviewLook {

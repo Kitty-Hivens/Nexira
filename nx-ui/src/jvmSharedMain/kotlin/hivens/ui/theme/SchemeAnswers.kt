@@ -8,6 +8,7 @@ import hivens.look.colour.api.ColourAnswers
 import hivens.look.manager.api.LocalLookProvision
 import hivens.look.manager.api.LookProvision
 import hivens.look.manager.api.Status as LookStatus
+import hivens.look.preview.api.PreviewLook
 import hivens.look.shape.api.Shape
 import hivens.look.stroke.api.Stroke
 import hivens.look.surface.api.Surface

@@ -231,7 +231,9 @@ include(":look:type-nx")
 include(":look:icon-api")
 // The Google icon provider: Material Symbols Rounded, every icon of it, with no settings of its own.
 include(":look:icon-google-rounded")
-// What previews and tests draw with beyond what nx-ui answers. In no application.
+// What previews and tests draw with beyond what nx-ui answers: the interface it asks, and the
+// implementation, which is in no application.
+include(":look:preview-api")
 include(":look:preview")
 include(":profiler-agent")
 include(":authlib-agent")
