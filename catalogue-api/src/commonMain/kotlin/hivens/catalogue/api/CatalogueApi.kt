@@ -22,5 +22,5 @@ object CatalogueApi {
      * The module builds stamp their manifests from the `nexira.catalogueApi` Gradle
      * property, which a test holds equal to this.
      */
-    val VERSION: ApiVersion = ApiVersion(1, 0)
+    val VERSION: ApiVersion = ApiVersion(2, 0)
 }

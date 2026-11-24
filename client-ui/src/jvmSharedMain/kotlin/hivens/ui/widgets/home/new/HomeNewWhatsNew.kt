@@ -74,7 +74,7 @@ fun HomeNewWhatsNew(instance: WidgetInstance) {
             NxRow(
                 title    = s.text("homeWhatsNewLauncher", Branding.TITLE, update.version),
                 subtitle = s.text("homeWhatsNewLauncherHint"),
-                icon     = NxIcon.NewReleases,
+                icon     = NxIcon.FiberNew,
                 iconTint = NxColor.lead(),
                 onClick  = { updateState.requestDetails() },
                 trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxInk.quiet) },

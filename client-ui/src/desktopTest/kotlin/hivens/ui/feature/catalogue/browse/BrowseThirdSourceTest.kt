@@ -18,7 +18,6 @@ import hivens.i18n.api.strings
 import hivens.source.mirror.MirrorPackSource
 import hivens.source.mirror.MirrorSourceModule
 import hivens.themes.Themes
-import hivens.ui.icons.NxIcon
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.theme.NxThemed
 import hivens.widget.api.CompiledModule
@@ -73,7 +72,7 @@ class BrowseThirdSourceTest {
         id = "Shelf",
         module = ShelfModule.id,
         label = "shelf.name",
-        icon = SourceIcon.Glyph(NxIcon.Inventory2.codepoint),
+        icon = SourceIcon.Named("inventory_2"),
         filters = listOf(
             SourceFilter("era", "shelf.era", listOf(SourceFilterOption("dusty", "shelf.dusty"), SourceFilterOption("new", "shelf.new"))),
         ),

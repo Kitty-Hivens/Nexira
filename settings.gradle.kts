@@ -228,5 +228,10 @@ include(":look:feedback-nx")
 include(":look:type-api")
 // The nx type provider: nx's bundled faces, with no settings of its own.
 include(":look:type-nx")
+include(":look:icon-api")
+// The Google icon provider: Material Symbols Rounded, every icon of it, with no settings of its own.
+include(":look:icon-google-rounded")
+// What previews and tests draw with beyond what nx-ui answers. In no application.
+include(":look:preview")
 include(":profiler-agent")
 include(":authlib-agent")

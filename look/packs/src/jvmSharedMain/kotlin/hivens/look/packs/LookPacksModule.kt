@@ -31,7 +31,9 @@ object NexiraPack : LookPack {
     override val id: String = LookApi.DEFAULT_PACK
     override val label: String = "packs.nexira"
 
-    // By id, as a pack knows no axis and no provider: every axis that exists, each answered by the nx family.
+    // By id, as a pack knows no axis and no provider: every axis that exists, each answered by the nx family
+    // but the icons, which are Google's.
     override val providers: Map<String, String> =
-        listOf("colour", "motion", "shape", "stroke", "surface", "timing", "feedback", "type").associateWith { "nx" }
+        listOf("colour", "motion", "shape", "stroke", "surface", "timing", "feedback", "type").associateWith { "nx" } +
+            ("icon" to "google-rounded")
 }

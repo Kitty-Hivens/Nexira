@@ -17,7 +17,6 @@ import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.sources.EngineSources
 import hivens.launcher.sources.SourcePackWork
 import hivens.launcher.update.PackUpdateService
-import hivens.ui.icons.NxIcon
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.HostApi
 import hivens.widget.api.KeyContribution
@@ -92,7 +91,7 @@ object MirrorPackSource : PackSourceContribution {
 
     override val id: String = ID
     override val label: String = LABEL
-    override val icon: SourceIcon = SourceIcon.Glyph(NxIcon.Storage.codepoint)
+    override val icon: SourceIcon = SourceIcon.Named("storage")
     override val paged: Boolean = false
     override val filters: List<SourceFilter> = listOf(
         SourceFilter(
@@ -100,8 +99,8 @@ object MirrorPackSource : PackSourceContribution {
             label = BUILT_BY_LABEL,
             options = listOf(
                 // The mirror's own packs go by the mirror's name.
-                SourceFilterOption(OWN, LABEL, SourceIcon.Glyph(NxIcon.Verified.codepoint)),
-                SourceFilterOption(COMMUNITY, COMMUNITY_LABEL, SourceIcon.Glyph(NxIcon.Groups.codepoint)),
+                SourceFilterOption(OWN, LABEL, SourceIcon.Named("verified")),
+                SourceFilterOption(COMMUNITY, COMMUNITY_LABEL, SourceIcon.Named("groups")),
             ),
         ),
     )

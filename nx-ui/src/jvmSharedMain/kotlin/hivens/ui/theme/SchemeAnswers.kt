@@ -5,6 +5,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import hivens.look.colour.api.Colour
 import hivens.look.colour.api.ColourAnswers
+import hivens.look.manager.api.LocalLookProvision
+import hivens.look.manager.api.LookProvision
 import hivens.look.manager.api.Status as LookStatus
 import hivens.look.shape.api.Shape
 import hivens.look.stroke.api.Stroke
@@ -55,6 +57,9 @@ fun Scheme.colourAnswers(): ColourAnswers {
  * the feedback axis ([nxFeedbackAnswers]) and the type axis ([nxTypeAnswers]), and the bridge
  * ([NxTheme]) set from them. For what draws one theme on purpose, a preview of it or a render of a
  * component in it. [interfaceText] decides the interface face as it does for [NxTheme].
+ *
+ * Icons are drawn as the look around draws them, and where none is around, in a preview or a test, as
+ * the [PreviewLook] there answers.
  */
 @Composable
 fun NxThemed(
@@ -76,7 +81,12 @@ fun NxThemed(
         Feedback.local provides nxFeedbackAnswers(),
         Type.local provides nxTypeAnswers(),
     ) {
-        NxTheme(interfaceText = interfaceText, content = content)
+        val preview = if (LocalLookProvision.current === LookProvision.NONE) PreviewLook.found else null
+        if (preview == null) {
+            NxTheme(interfaceText = interfaceText, content = content)
+        } else {
+            preview.Provide { NxTheme(interfaceText = interfaceText, content = content) }
+        }
     }
 }
 

@@ -68,6 +68,8 @@ kotlin {
                 api(project(":look:feedback-api"))
                 // The faces every text here is drawn in: the type axis's answers, the same way.
                 api(project(":look:type-api"))
+                // The library every icon here is drawn from: the icon axis's answers, the same way.
+                api(project(":look:icon-api"))
             }
         }
 
@@ -96,12 +98,14 @@ kotlin {
                 // (ImageComposeScene) can create a Skia surface. Test-only -- the
                 // published leaf module stays free of any compose.desktop dep.
                 implementation(compose.desktop.currentOs)
+                // What the previews drawn by the tests take from providers this module does not know.
+                runtimeOnly(project(":look:preview"))
             }
         }
     }
 }
 
-// Own composeResources -- the icon + typography fonts live here. The generated
+// Own composeResources -- the typography fonts live here. The generated
 // Res accessor uses a DIFFERENT package than client-ui's (hivens.ui.generated.resources)
 // so the two Res objects never collide on the classpath.
 // Every class this artifact holds, one binary name per line, for the widget module loader:
@@ -137,6 +141,8 @@ kotlin.sourceSets.getByName("desktopMain").resources.srcDir(files(sharedClassLis
 // path only, so it reaches neither the published artifact nor the app.
 dependencies {
     "androidRuntimeClasspath"(libs.compose.ui.tooling)
+    // The same for what the IDE's previews take from providers this module does not know.
+    "androidRuntimeClasspath"(project(":look:preview"))
 }
 
 compose.resources {

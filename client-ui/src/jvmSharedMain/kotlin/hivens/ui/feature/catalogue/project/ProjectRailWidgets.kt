@@ -494,7 +494,7 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
         // Put into words here: the page hands the moments over as they are.
         if (p.answersPublished) {
             DatedFact(
-                NxIcon.NewReleases,
+                NxIcon.FiberNew,
                 relativeAge(p.published, s).takeIf { it.isNotBlank() }?.let { s.text("modPublishedOn", it) } ?: if (p.pending) PENDING else s.text("modPublishedUnknown"),
                 formatBuildTimestamp(p.published),
             )
@@ -521,7 +521,7 @@ fun ProjectDetailsWidget(instance: WidgetInstance) {
         // read-only dialog the page replaces, so they follow it here rather than
         // being lost on the way: a reader who used to check a jar's dependencies
         // must not find that the richer surface tells them less.
-        p.sizeBytes?.let { Fact(NxIcon.InsertDriveFile, "${s.text("contentDetailSize")}: ${humanSize(it, s)}") }
+        p.sizeBytes?.let { Fact(NxIcon.FilePresent, "${s.text("contentDetailSize")}: ${humanSize(it, s)}") }
         if (p.authors.isNotEmpty()) {
             Fact(NxIcon.Person, "${s.text("contentDetailAuthors")}: ${p.authors.joinToString(", ")}")
         }

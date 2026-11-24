@@ -2,13 +2,11 @@ package hivens.ui.icons
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -17,34 +15,23 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontVariation
-import androidx.compose.ui.text.style.LineHeightStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import hivens.nx.ui.generated.resources.Res
-import hivens.nx.ui.generated.resources.material_symbols
+import hivens.look.icon.api.Icon
 import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxThemed
-import org.jetbrains.compose.resources.Font
-
-/** A Material Symbols glyph identified by its codepoint. See [NxIcon] for the catalog. */
-@JvmInline
-value class IconKey(val codepoint: Int)
 
 /**
- * Renders a Material Symbols icon as a font glyph from the bundled subset font, replacing
- * the multi-MB material-icons-extended dependency. Drop-in for `Icon`: same argument order,
- * honours `Modifier.size(...)` (defaults to 24.dp like `Icon`). Sizes above 24.dp need the
- * explicit [size] parameter. The variable axes are driven per call:
+ * Draws [icon] the way the look's icon library draws it. Drop-in for Material's `Icon`: the same argument
+ * order, and it honours `Modifier.size(...)`, 24.dp like `Icon` where none is given. A size above that
+ * needs the explicit [size] parameter.
  *
  * - [fill] 0f outlined .. 1f filled (animatable for the usual toggle effect)
  * - [weight] 100..700 stroke weight.
@@ -62,47 +49,17 @@ fun Symbol(
     // Caller modifier before the default size: the reverse order lets size(24)
     // clamp a smaller caller size up (size enforces incoming constraints).
     val base = modifier.then(Modifier.size(size ?: 24.dp))
-    BoxWithConstraints(
+    Icon.Draw(
+        key      = icon,
         modifier = if (contentDescription != null) {
             base.semantics { this.contentDescription = contentDescription }
         } else {
             base
         },
-        contentAlignment = Alignment.Center,
-    ) {
-        // Density's public toSp, which lint resolves through an interface it reads as
-        // restricted. Not worked out from fontScale by hand: that would lose the
-        // non-linear font scaling toSp applies.
-        @Suppress("RestrictedApi")
-        val px = with(LocalDensity.current) { maxHeight.toSp() }
-        // Remembered per axis value: every icon on screen built a fresh settings
-        // object and font family on each composition, so a list of rows recomposing
-        // allocated a font family per glyph per frame.
-        val opsz = px.value.coerceIn(24f, 48f)
-        val settings = remember(fill, weight, opsz) {
-            FontVariation.Settings(
-                FontVariation.Setting("FILL", fill.coerceIn(0f, 1f)),
-                FontVariation.Setting("wght", weight.toFloat()),
-                FontVariation.Setting("opsz", opsz),
-                FontVariation.Setting("GRAD", 0f),
-            )
-        }
-        val font = Font(Res.font.material_symbols, variationSettings = settings)
-        val family = remember(font) { FontFamily(font) }
-        Text(
-            // Unbounded so a dense glyph (globe, description) whose ink reaches the
-            // em edges isn't clipped by the size-px box -- it overflows by a hair
-            // into the caller's own padding instead of "sinking in".
-            modifier = Modifier.wrapContentSize(unbounded = true),
-            text = String(Character.toChars(icon.codepoint)),
-            color = tint,
-            fontSize = px,
-            fontFamily = family,
-            style = TextStyle(
-                lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.Both),
-            ),
-        )
-    }
+        tint     = tint.takeOrElse { LocalContentColor.current },
+        fill     = fill,
+        weight   = weight,
+    )
 }
 
 @Preview
@@ -114,16 +71,16 @@ private fun SymbolDarkPreview() = SymbolCatalogue(dark = true)
 private fun SymbolLightPreview() = SymbolCatalogue(dark = false)
 
 /**
- * Every glyph [NxIcon] holds, read off the object itself so the sheet follows the generated
- * catalogue, then the axes one glyph can be drawn at.
+ * Every icon [NxIcon] holds, read off the object itself so the sheet follows the generated
+ * list, then the ways one icon can be drawn.
  */
 @Composable
 private fun SymbolCatalogue(dark: Boolean) {
     val catalogue = remember {
         NxIcon::class.java.declaredFields
-            .filter { it.type == Int::class.javaPrimitiveType && !it.name.startsWith("$") }
+            .filter { it.type == IconKey::class.java }
             .onEach { it.isAccessible = true }
-            .map { it.name to IconKey(it.getInt(null)) }
+            .map { it.name to it.get(null) as IconKey }
             .sortedBy { it.first }
     }
     NxThemed(NeutralTheme, dark = dark) {

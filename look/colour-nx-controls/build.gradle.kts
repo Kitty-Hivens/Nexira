@@ -36,6 +36,8 @@ kotlin {
             dependencies {
                 implementation(project(":look:colour-nx"))
                 implementation(compose.desktop.currentOs)
+                // The icon library the tests draw with where no look is around.
+                runtimeOnly(project(":look:preview"))
             }
         }
     }

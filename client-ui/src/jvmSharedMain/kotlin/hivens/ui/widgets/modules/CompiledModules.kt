@@ -5,6 +5,8 @@ import hivens.catalogue.CatalogueModule
 import hivens.i18n.I18nModule
 import hivens.look.colour.api.ColourModule
 import hivens.look.colour.nx.controls.ColourNxControls
+import hivens.look.icon.api.IconModule
+import hivens.look.icon.google.rounded.IconGoogleRoundedModule
 import hivens.look.manager.LookManagerModule
 import hivens.look.motion.api.MotionModule
 import hivens.look.motion.nx.MotionNxModule
@@ -44,6 +46,7 @@ val CompiledModules: List<CompiledModule> =
         TimingModule, TimingNxModule,
         FeedbackModule, FeedbackNxModule,
         TypeModule, TypeNxModule,
+        IconModule, IconGoogleRoundedModule,
         PacksModule, AccountsModule, CatalogueModule, MirrorSourceModule, ModrinthSourceModule,
     )
 

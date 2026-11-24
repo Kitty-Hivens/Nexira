@@ -9,7 +9,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
-import hivens.ui.icons.NxIcon
+import hivens.ui.theme.PreviewLook
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.EncodedImageFormat
 import org.jetbrains.skia.IRect
@@ -59,7 +59,7 @@ class PreviewRenderTest {
     }
 
     /** Where this module's own compiled classes are, a directory under Gradle and possibly a jar elsewhere. */
-    private fun classesRoot(): Path = Paths.get(NxIcon::class.java.protectionDomain.codeSource.location.toURI())
+    private fun classesRoot(): Path = Paths.get(PreviewLook::class.java.protectionDomain.codeSource.location.toURI())
 
     private fun findPreviews(): List<PreviewFunction> {
         val root = classesRoot()

@@ -1,31 +1,34 @@
 #!/usr/bin/env python3
-"""Regenerate the bundled Material Symbols icon set for Nexira.
+"""Regenerate what the launcher keeps of Material Symbols Rounded.
 
-Reads tools/icons/icons.txt and writes:
-  - nx-ui/src/desktopMain/kotlin/hivens/ui/icons/NxIcon.kt   (typed codepoint catalog)
-  - nx-ui/src/commonMain/composeResources/font/material_symbols.ttf   (subset)
+Writes, all committed, so a normal build does not need this script:
+  - look/icon-google-rounded: the font with every icon and all four axes, without its
+    OpenType layout, and the table of every name, its aliases included, to the codepoint
+    it is drawn by.
+  - look/icon-api: Icons.kt, a constant for each name in icons.txt, which is what the
+    launcher itself draws.
 
-Icons are rendered by codepoint (not ligature), so the font is subset with
---unicodes to exactly the listed glyphs -- it carries only what the app uses.
-The variable axes (FILL, wght, opsz, GRAD) are kept so Symbol() can fill/weight.
+The font is drawn by codepoint and not by ligature, so a name that is not there is known
+to be missing instead of being written out as letters.
 
-Adding an icon = add a line to icons.txt and run this script, then reference
-NxIcon.<Name>. Normal builds do not need this script -- the outputs are committed.
+Adding an icon to the launcher = add its Material Symbols name to icons.txt, run this
+script, then use Icons.<Name>. A module may ask for any other name without it.
 
-Requires: Python fontTools (pyftsubset) and the Material Symbols Rounded variable
-font installed locally (Arch: ttf-material-symbols-variable).
+Requires Python fontTools and the Material Symbols Rounded variable font installed
+locally (Arch: ttf-material-symbols-variable).
 """
 import os
-import re
-import subprocess
 import sys
 
+from fontTools import subset
 from fontTools.ttLib import TTFont
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MANIFEST = os.path.join(ROOT, "tools", "icons", "icons.txt")
-KT_OUT = os.path.join(ROOT, "nx-ui", "src", "desktopMain", "kotlin", "hivens", "ui", "icons", "NxIcon.kt")
-FONT_OUT = os.path.join(ROOT, "nx-ui", "src", "commonMain", "composeResources", "font", "material_symbols.ttf")
+KT_OUT = os.path.join(ROOT, "look", "icon-api", "src", "jvmSharedMain", "kotlin", "hivens", "look", "icon", "api", "Icons.kt")
+PROVIDER = os.path.join(ROOT, "look", "icon-google-rounded", "src", "jvmSharedMain", "resources", "hivens", "look", "icon", "google", "rounded")
+FONT_OUT = os.path.join(PROVIDER, "material_symbols_rounded.ttf")
+NAMES_OUT = os.path.join(PROVIDER, "names.tsv")
 
 FONT_CANDIDATES = [
     "/usr/share/fonts/ttf-material-symbols-variable/MaterialSymbolsRounded[FILL,GRAD,opsz,wght].ttf",
@@ -33,23 +36,15 @@ FONT_CANDIDATES = [
 ]
 
 
-def snake(name):
-    s = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name)
-    s = re.sub(r"(?<=[a-zA-Z])(?=[0-9])", "_", s)
-    return s.lower()
-
-
 def read_manifest():
-    entries = []
     with open(MANIFEST, encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
-            name, lig = (p.strip() for p in line.split("=", 1)) if "=" in line else (line, snake(line))
-            entries.append((name, lig))
-    entries.sort()
-    return entries
+        names = {line.strip() for line in f}
+    return sorted(n for n in names if n and not n.startswith("#"))
+
+
+def constant(name):
+    parts = name.split("_")
+    return "".join(p[:1].upper() + p[1:] for p in parts)
 
 
 def find_source_font():
@@ -59,53 +54,68 @@ def find_source_font():
     sys.exit("Material Symbols Rounded variable font not found; install ttf-material-symbols-variable.")
 
 
+def names_of(font):
+    """Every name the font answers to, the aliases among them, to the codepoint that draws it."""
+    cmap = font.getBestCmap()
+    drawn_by = {}
+    for cp, glyph in sorted(cmap.items()):
+        drawn_by.setdefault(glyph, cp)
+    letters = {glyph: chr(cp) for cp, glyph in cmap.items() if cp < 0x80}
+
+    names = {}
+    for lookup in font["GSUB"].table.LookupList.Lookup:
+        for sub in lookup.SubTable:
+            sub = getattr(sub, "ExtSubTable", sub)
+            for first, ligatures in getattr(sub, "ligatures", {}).items():
+                for ligature in ligatures:
+                    spelled = [first, *ligature.Component]
+                    if ligature.LigGlyph in drawn_by and all(g in letters for g in spelled):
+                        names["".join(letters[g] for g in spelled)] = drawn_by[ligature.LigGlyph]
+    # A glyph's own name where it spells no ligature. Its letters and digits are no icons.
+    for glyph, cp in drawn_by.items():
+        if cp >= 0xE000:
+            names.setdefault(glyph, cp)
+    return names
+
+
 def main():
-    entries = read_manifest()
+    wanted = read_manifest()
     src = find_source_font()
+    font = TTFont(src)
+    names = names_of(font)
 
-    # ligature (== glyph name) -> codepoint, via the source cmap
-    name_to_cp = {}
-    for cp, gname in TTFont(src).getBestCmap().items():
-        name_to_cp.setdefault(gname, cp)
-
-    resolved = []  # (PascalName, codepoint)
-    missing = []
-    for name, lig in entries:
-        cp = name_to_cp.get(lig)
-        (resolved if cp is not None else missing).append((name, cp if cp is not None else lig))
+    missing = [n for n in wanted if n not in names]
     if missing:
-        sys.exit("No codepoint for: " + ", ".join(f"{n} ({l})" for n, l in missing))
+        sys.exit("Material Symbols has no: " + ", ".join(missing))
 
-    # NxIcon.kt
     lines = [
         "// Generated by tools/icons/regenerate.py -- do not edit by hand.",
-        "// Each entry is a Material Symbols codepoint, rendered via Symbol(NxIcon.X).",
-        "package hivens.ui.icons",
+        "package hivens.look.icon.api",
         "",
-        "/** Material Symbols glyphs bundled in the app. Add to tools/icons/icons.txt and regenerate. */",
-        "object NxIcon {",
+        "/**",
+        " * The icons the launcher itself draws, each by its Material Symbols name. Any other name is asked for with",
+        " * [IconKey.named]. What a provider of another library covers of these decides how much of the launcher it draws.",
+        " */",
+        "object Icons {",
     ]
-    lines += [f"    val {name} = IconKey(0x{cp:04x})" for name, cp in resolved]
+    lines += [f'    val {constant(n)}: IconKey = IconKey.named("{n}")' for n in wanted]
     lines.append("}")
-    os.makedirs(os.path.dirname(KT_OUT), exist_ok=True)
     with open(KT_OUT, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
 
-    # subset by codepoint; drop OpenType layout (we render by codepoint), keep axes
-    codepoints = sorted({cp for _, cp in resolved})
-    os.makedirs(os.path.dirname(FONT_OUT), exist_ok=True)
-    subprocess.run(
-        [
-            "pyftsubset", src,
-            "--unicodes=" + ",".join(f"U+{cp:04X}" for cp in codepoints),
-            "--layout-features=",
-            "--output-file=" + FONT_OUT,
-        ],
-        check=True,
-    )
-    print(f"icons: {len(resolved)}   distinct glyphs: {len(codepoints)}")
-    print(f"catalog: {os.path.relpath(KT_OUT, ROOT)}")
-    print(f"font:    {os.path.relpath(FONT_OUT, ROOT)}  ({os.path.getsize(FONT_OUT) // 1024} KB)")
+    os.makedirs(PROVIDER, exist_ok=True)
+    with open(NAMES_OUT, "w", encoding="utf-8") as f:
+        f.writelines(f"{n}\t{cp:x}\n" for n, cp in sorted(names.items()))
+
+    options = subset.Options()
+    options.layout_features = []
+    subsetter = subset.Subsetter(options)
+    subsetter.populate(unicodes=sorted(set(names.values())))
+    subsetter.subset(font)
+    font.save(FONT_OUT)
+
+    print(f"launcher icons: {len(wanted)}   names: {len(names)}   glyphs: {len(set(names.values()))}")
+    print(f"font: {os.path.relpath(FONT_OUT, ROOT)}  ({os.path.getsize(FONT_OUT) // 1024} KB)")
 
 
 if __name__ == "__main__":

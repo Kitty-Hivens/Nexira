@@ -94,7 +94,7 @@ fun AboutUpdatePanelWidget(instance: WidgetInstance) {
 
             Spacer(Modifier.height(16.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Symbol(NxIcon.NewReleases, null, tint = availAccent, modifier = Modifier.size(18.dp))
+                Symbol(NxIcon.FiberNew, null, tint = availAccent, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
                 Text(
                     text       = current.update.version,

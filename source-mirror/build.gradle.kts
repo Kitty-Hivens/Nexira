@@ -48,8 +48,6 @@ kotlin {
                 implementation(project(":widget-api"))
                 implementation(project(":client-core"))
                 implementation(project(":client-launcher"))
-                // The source's marks are glyphs of the launcher's icon set.
-                implementation(project(":nx-ui"))
                 implementation(libs.slf4j.api)
             }
         }

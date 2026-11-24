@@ -189,6 +189,7 @@ kotlin {
                 implementation(project(":look:timing-api"))
                 implementation(project(":look:feedback-api"))
                 implementation(project(":look:type-api"))
+                implementation(project(":look:icon-api"))
                 implementation(project(":look:packs"))
                 // The nx motion, shape, stroke, surface, timing, feedback and type providers, compiled in like the
                 // colour one.
@@ -199,6 +200,8 @@ kotlin {
                 implementation(project(":look:timing-nx"))
                 implementation(project(":look:feedback-nx"))
                 implementation(project(":look:type-nx"))
+                // The Google icon provider, compiled in the same way.
+                implementation(project(":look:icon-google-rounded"))
                 // The nx providers' controls, compiled in like the providers: the shell names
                 // nothing of them beyond their CompiledModule, and draws their widgets by kind.
                 implementation(project(":look:colour-nx-controls"))
@@ -337,6 +340,8 @@ kotlin {
         // in fakes from sibling modules.
         getByName("desktopTest") {
             dependencies {
+                // The icon library the tests draw with where no look is around.
+                runtimeOnly(project(":look:preview"))
                 // The root applies this to every `java` module; a KMP module has
                 // no such plugin, so it pins the same JUnit here -- otherwise the
                 // one kotlin("test") brings along wins and this module drifts off

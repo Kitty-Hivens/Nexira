@@ -23,7 +23,6 @@ import hivens.launcher.sources.SourcePackWork
 import hivens.launcher.update.ApplyJournal
 import hivens.launcher.update.ArchivePackUpdater
 import hivens.launcher.update.PackSnapshotService
-import hivens.ui.icons.NxIcon
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.HostApi
 import hivens.widget.api.KeyContribution
@@ -120,7 +119,7 @@ object ModrinthPackSource : PackSourceContribution {
 
     override val id: String = ID
     override val label: String = LABEL
-    override val icon: SourceIcon = SourceIcon.Glyph(NxIcon.Public.codepoint)
+    override val icon: SourceIcon = SourceIcon.Named("public")
     override val packType: String = ProjectTypes.MODPACK
 
     override fun open(services: LevelServices): PackListing = services.get<ModrinthAnswers>().packs

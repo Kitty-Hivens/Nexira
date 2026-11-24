@@ -374,7 +374,7 @@ class HomeConceptsProbe {
                                 }
                             }
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                Symbol(NxIcon.NewReleases, null, tint = NxColor.lead())
+                                Symbol(NxIcon.FiberNew, null, tint = NxColor.lead())
                                 Text("Nexira 2.5.0", color = NxInk.main, fontWeight = FontWeight.Medium)
                             }
                         }

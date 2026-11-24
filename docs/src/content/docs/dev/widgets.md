@@ -102,7 +102,7 @@ These always come from the launcher, and a copy in your jar is ignored. That is 
 To use another module's API, for example the packs, the accounts, the catalogue or the language module, name it in the manifest beside the other attributes:
 
 ```kotlin
-"Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.themes=1.0, nexira.packs=2.0, nexira.accounts=1.0, nexira.catalogue=1.0",
+"Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.themes=1.0, nexira.packs=2.0, nexira.accounts=1.0, nexira.catalogue=2.0",
 ```
 
 | API id                 | Artifact              | Package                    | What it is for                                                                            |
@@ -121,6 +121,7 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 | `nexira.look.timing`   | `:look:timing-api`    | `hivens.look.timing.api`   | Asking the delay before a tooltip appears, and answering the timing axis                  |
 | `nexira.look.feedback` | `:look:feedback-api`  | `hivens.look.feedback.api` | Asking how a widget answers hover, focus, press and drag, and answering the feedback axis |
 | `nexira.look.type`     | `:look:type-api`      | `hivens.look.type.api`     | Asking the face text is drawn in, and answering the type axis                             |
+| `nexira.look.icon`     | `:look:icon-api`      | `hivens.look.icon.api`     | Drawing an icon of the look's library or one of your own, and answering the icon axis     |
 
 Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
 
@@ -362,6 +363,14 @@ The type axis, `type`, comes with the launcher in `:look:type-api` (`nexira.look
 
 A provider of type answers with `TypeAnswers.build { face = { role -> ... }; mono = ...; forText = { text -> ... } }`, a face being `TypeFace.of(family)` or a class of its own extending `TypeFace`. When no provider is chosen for the axis, every role is Compose's default family, code its monospace, and no script gets a face of its own. The default pack names the `nx` family for type.
 
+### Icons
+
+The icon axis, `icon`, comes with the launcher in `:look:icon-api` (`nexira.look.icon`). An icon is asked by its Material Symbols name, any name fonts.google.com/icons shows: `IconKey.named("rocket_launch")`, and the ones the launcher itself draws are constants of `Icons`, `Icons.Delete` being `delete`. That set is the vocabulary of the axis, so nobody guesses what a library calls an icon: a provider of another library translates these names to its own. `Icon.Draw(key, modifier, tint, fill, weight)` draws one in the room the modifier gives it. The size, the colour, how far it is filled and how heavy its strokes are, are the widget's, and no library moves a layout.
+
+A library need not have a name. `IconKey.named(name, otherwise)` carries a drawing of the widget's own for that case, and `IconKey.of(drawing)` is an icon the widget draws itself under every look. Either is an `IconDrawing`, a class with one composable, which draws in the room it is given.
+
+A provider of icons answers with `IconAnswers.build { library = { name -> ... } }`, the `IconDrawing` of a name and null where its library has none. When no provider is chosen for the axis, the icons a control cannot be found without (close, back, check, more, add and the chevrons) are drawn as plain strokes and every other is blank, in the same room. The default pack names `google-rounded` for icon, Material Symbols Rounded.
+
 ## Catalogue sources
 
 The catalogue is an engine over sources. Every source it lists packs from, and every source it searches mods, resource packs and shaders in, is a module's contribution: the Hivens mirror and Modrinth ship as two modules of their own, `nexira.source.mirror` and `nexira.source.modrinth`, and a source of yours is a third one beside them. Nothing in the launcher names a source.
@@ -372,7 +381,7 @@ To bring one, name `nexira.catalogue` in the manifest, compile against `:catalog
 class Shelf : PackSourceContribution {
     override val id = "Shelf"                   // what every pack record from it carries, for ever
     override val label = "shelf.name"           // a key into your words: shelf.name=The Shelf
-    override val icon = SourceIcon.Glyph(NxIcon.Inventory2.codepoint)
+    override val icon = SourceIcon.Named("inventory_2")        // a Material Symbols name
     override val paged = false                  // it answers with its whole listing
     override val filters = listOf(
         SourceFilter("era", "shelf.era", listOf(SourceFilterOption("dusty", "shelf.dusty"), SourceFilterOption("new", "shelf.new"))),

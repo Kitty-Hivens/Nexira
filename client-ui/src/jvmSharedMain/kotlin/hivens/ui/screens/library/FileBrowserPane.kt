@@ -308,7 +308,7 @@ private fun fileIconFor(path: Path): IconKey {
     return when (ext) {
         in TEXT_EXTENSIONS -> NxIcon.Description
         in IMAGE_EXTENSIONS -> NxIcon.Image
-        else -> NxIcon.InsertDriveFile
+        else -> NxIcon.FilePresent
     }
 }
 

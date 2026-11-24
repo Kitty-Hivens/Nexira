@@ -430,7 +430,7 @@ private fun Files(v: ProjectBuild) {
                         }
                     } else {
                         Symbol(
-                            NxIcon.InsertDriveFile,
+                            NxIcon.FilePresent,
                             contentDescription = null,
                             tint = NxInk.quiet,
                             size = 16.dp,

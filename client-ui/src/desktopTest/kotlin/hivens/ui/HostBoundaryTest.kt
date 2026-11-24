@@ -50,6 +50,8 @@ class HostBoundaryTest {
         "import hivens.look.feedback.nx.FeedbackNxModule",
         "import hivens.look.type.api.TypeModule",
         "import hivens.look.type.nx.TypeNxModule",
+        "import hivens.look.icon.api.IconModule",
+        "import hivens.look.icon.google.rounded.IconGoogleRoundedModule",
     )
 
     /** The recovery surface, and the one engine of the launcher's own words it may make. */

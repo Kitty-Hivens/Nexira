@@ -3,10 +3,10 @@ package hivens.catalogue.api
 /** How a source is drawn beside its name. */
 sealed interface SourceIcon {
     /**
-     * A glyph of the launcher's icon font, Material Symbols, by its codepoint: what a
-     * module reads off the design system's icon set (`NxIcon.Storage.codepoint`).
+     * An icon of the look's library, by its Material Symbols name, `storage` or any other
+     * the icon axis is asked by. A library that has no such icon draws nothing.
      */
-    data class Glyph(val codepoint: Int) : SourceIcon
+    data class Named(val name: String) : SourceIcon
 
     /** The source's own mark as SVG, drawn in the ink of the text beside it. */
     data class Svg(val markup: String) : SourceIcon

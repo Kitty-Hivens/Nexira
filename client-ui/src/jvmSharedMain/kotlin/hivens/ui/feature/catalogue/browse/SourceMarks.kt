@@ -19,7 +19,7 @@ import hivens.ui.icons.Symbol
 internal fun sourceLabel(source: SourceView): String = strings(source.module).text(source.label)
 
 /**
- * A source's mark in [tint]: the glyph it names, its own SVG, or the plain mark of a
+ * A source's mark in [tint]: the icon it names, its own SVG, or the plain mark of a
  * source that names neither or whose SVG does not draw here.
  */
 @Composable
@@ -28,8 +28,8 @@ internal fun SourceMark(icon: SourceIcon?, tint: Color, size: Dp, modifier: Modi
     if (svg != null) {
         Image(svg, contentDescription = null, colorFilter = ColorFilter.tint(tint), modifier = modifier.size(size))
     } else {
-        Symbol(glyphOf(icon), contentDescription = null, tint = tint, fill = fill, size = size, modifier = modifier)
+        Symbol(iconOf(icon), contentDescription = null, tint = tint, fill = fill, size = size, modifier = modifier)
     }
 }
 
-private fun glyphOf(icon: SourceIcon?): IconKey = (icon as? SourceIcon.Glyph)?.let { IconKey(it.codepoint) } ?: NxIcon.Language
+private fun iconOf(icon: SourceIcon?): IconKey = (icon as? SourceIcon.Named)?.let { IconKey.named(it.name) } ?: NxIcon.Language
