@@ -8,6 +8,7 @@ import hivens.core.data.PackReference
 import hivens.launcher.modrinth.ModrinthClient
 import hivens.launcher.sources.EngineSources
 import hivens.launcher.sources.PackArt
+import hivens.launcher.sources.PackArtMemory
 import hivens.launcher.sources.PackArtResolver
 import hivens.launcher.sources.SourceWorks
 import hivens.test.testTransferEngine
@@ -43,7 +44,12 @@ class PackArtResolverTest {
     )
 
     /** Answers the project, the first request only after [first] has run. Every address asked lands in [asked]. */
-    private fun resolver(calls: AtomicInteger, asked: MutableList<String> = mutableListOf(), first: suspend () -> Unit): PackArtResolver {
+    private fun resolver(
+        calls: AtomicInteger,
+        asked: MutableList<String> = mutableListOf(),
+        memory: PackArtMemory = PackArtMemory.None,
+        first: suspend () -> Unit,
+    ): PackArtResolver {
         val engine = MockEngine { request ->
             asked += request.url.toString()
             if (calls.incrementAndGet() == 1) first()
@@ -52,7 +58,7 @@ class PackArtResolverTest {
         val provider = HttpClientProvider { HttpClient(engine) }
         val modrinth = ModrinthClient(provider, testTransferEngine(provider))
         // Modrinth's own work, archive installs and updates aside: the cover is all this asks of it.
-        return PackArtResolver(SourceWorks.of(EngineSources.Modrinth to ModrinthPackWork(modrinth, mockk(), mockk())))
+        return PackArtResolver(SourceWorks.of(EngineSources.Modrinth to ModrinthPackWork(modrinth, mockk(), mockk())), memory)
     }
 
     @Test
@@ -139,6 +145,52 @@ class PackArtResolverTest {
         assertEquals(PackArt("https://cdn/icon.png", "https://cdn/detached-banner.png"), art.resolve(detached))
         assertEquals(PackArt("https://cdn/icon.png", null), art.cached(fresh), "the detached pack's banner is not the fresh one's")
         assertEquals(1, asked.size, "one source, asked once")
+    }
+
+    private class HeldMemory(var held: Map<String, PackArt> = emptyMap()) : PackArtMemory {
+        val saves = AtomicInteger()
+        override fun load(): Map<String, PackArt> = held
+        override fun save(art: Map<String, PackArt>) {
+            saves.incrementAndGet()
+            held = art.toMap()
+        }
+    }
+
+    @Test
+    fun `what the source answered is drawn at once on the next run, and the source is asked again`() = runBlocking {
+        val memory = HeldMemory()
+        resolver(AtomicInteger(), memory = memory) {}.resolve(instance)
+
+        val asked = mutableListOf<String>()
+        val next = resolver(AtomicInteger(), asked, memory) {}
+        assertEquals("https://cdn/icon.png", next.cached(instance)?.iconUrl, "known before anything is asked")
+        assertEquals(false, next.answered(instance), "an answer from an earlier run is not this run's")
+        assertEquals(emptyList(), asked)
+
+        next.resolve(instance)
+        assertEquals(1, asked.size)
+        assertEquals(1, memory.saves.get(), "an answer that has not changed is not written again")
+    }
+
+    /** The address written down at install can be one the source has since moved the picture from. */
+    @Test
+    fun `an answer from an earlier run stands over the art captured at install`() = runBlocking {
+        val memory = HeldMemory()
+        val installed = instance.copy(iconUrl = "https://cdn/moved-away.png", bannerUrl = "https://cdn/banner.png")
+        resolver(AtomicInteger(), memory = memory) {}.resolve(installed)
+
+        val next = resolver(AtomicInteger(), memory = memory) { throw java.io.IOException("offline") }
+        val expected = PackArt("https://cdn/icon.png", "https://cdn/banner.png")
+        assertEquals(expected, next.cached(installed))
+        assertEquals(expected, next.resolve(installed), "and a failed lookup keeps it")
+        assertEquals(false, next.answered(installed))
+    }
+
+    @Test
+    fun `a pack with no source to ask is not written down`() = runBlocking {
+        val memory = HeldMemory()
+        resolver(AtomicInteger(), memory = memory) {}.resolve(instance.copy(packRef = PackReference(PackOrigin.Local, "AABBCCDD")))
+        assertEquals(0, memory.saves.get())
     }
 
     @Test

@@ -101,6 +101,7 @@ import hivens.launcher.smrt.SmrtPackClient
 import hivens.launcher.smrt.SmrtSyncService
 import hivens.launcher.smrt.ModStraySweep
 import hivens.launcher.smrt.SyncStraySweep
+import hivens.launcher.sources.FilePackArtMemory
 import hivens.launcher.sources.PackArtResolver
 import hivens.launcher.sources.RoutingPackUpdater
 import hivens.launcher.sources.SourceWorks
@@ -499,7 +500,12 @@ val mirrorModule = module {
     // Resolves an installed instance's native cover from its source when the
     // install didn't capture one (pre-field instances), so Library cards and the
     // PackDetail hero show real art instead of the pixel placeholder.
-    single { PackArtResolver(sources = get()) }
+    single {
+        PackArtResolver(
+            sources = get(),
+            memory  = FilePackArtMemory(get<Path>().resolve("cache").resolve("pack-art.json"), get()),
+        )
+    }
 
     // Install write side: hands a (pack, version) to the installer of the source it
     // came from.
