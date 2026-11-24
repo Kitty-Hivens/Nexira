@@ -191,10 +191,11 @@ class KeptDownloadsTest {
     fun `a download with no digest is not kept, and neither is one whose digest is no digest`() = runTest {
         val dir = instance("first")
         val _ = engine.fetch(mod(dir, A, a).copy(expect = null))
-        kept.claim(dir.resolve("x"), Digest(DigestAlgorithm.SHA1, "../../../../etc/passwd"))
+        kept.claim(dir.resolve("x"), Digest(DigestAlgorithm.SHA1, "../escaped"))
         Files.write(dir.resolve("x"), a)
         assertEquals(0, end(dir, keep = true))
         assertEquals(emptyList(), held())
+        assertFalse(Files.exists(store.resolveSibling("escaped")), "a manifest does not say where a file is kept")
     }
 
     @Test
@@ -209,6 +210,9 @@ class KeptDownloadsTest {
         put("sha1-first", 40, ageDays = 3)
         put("sha1-second", 40, ageDays = 2)
         put("sha1-third", 40, ageDays = 1)
+
+        KeptDownloads(store, maxAge = 7.days, maxBytes = 1_000, clock = { now }).prune()
+        assertEquals(listOf("sha1-first", "sha1-second", "sha1-third"), held(), "by age alone")
 
         KeptDownloads(store, maxAge = 7.days, maxBytes = 100, clock = { now }).prune()
         assertEquals(listOf("sha1-second", "sha1-third"), held())
