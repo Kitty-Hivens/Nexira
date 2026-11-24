@@ -41,14 +41,15 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil3.PlatformContext
 import coil3.SingletonImageLoader
 import coil3.compose.LocalPlatformContext
-import coil3.request.ImageRequest
 import hivens.catalogue.api.CatalogueCard
 import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.ResultsScroll
@@ -65,6 +66,7 @@ import hivens.ui.nx.NxBasicTextField
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.RetryStateBlock
+import hivens.ui.pictures.warm
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
 import hivens.ui.surface.NxSurface
@@ -177,6 +179,7 @@ internal fun PackBrowse(
 ) {
     val s = nexiraStrings()
     val imageContext = LocalPlatformContext.current
+    val density = LocalDensity.current
     val retry = rememberScopedAction(CatalogueKeys.RetryResults)
     val more = rememberScopedAction(CatalogueKeys.MoreResults)
     val scroll = rememberScopedCommand(CatalogueKeys.ScrollResults)
@@ -191,7 +194,7 @@ internal fun PackBrowse(
     LaunchedEffect(results.question, results.packs) {
         val packs = results.packs
         if (results.status != SearchStatus.Loaded || packs.size <= prefetched) return@LaunchedEffect
-        prefetchCardArt(imageContext, packs.subList(prefetched, packs.size))
+        warmCardArt(imageContext, density, packs.subList(prefetched, packs.size))
         prefetched = packs.size
     }
 
@@ -238,18 +241,16 @@ internal fun PackBrowse(
     }
 }
 
-/**
- * Warms the image cache for a whole page of cards.
- *
- * A request with no target still runs and still lands in the loader's cache, so
- * the card that composes later finds its icon and its banner already decoded and
- * draws them on its first frame instead of fading them in over a placeholder.
- */
-private fun prefetchCardArt(context: PlatformContext, packs: List<CatalogueCard>) {
+/** The icon and the banner of every card on a page, decoded at the size the cards draw them. */
+private fun warmCardArt(context: PlatformContext, density: Density, packs: List<CatalogueCard>) {
     val loader = SingletonImageLoader.get(context)
-    packs.forEach { pack ->
-        listOfNotNull(pack.iconUrl, pack.bannerUrl).forEach { url ->
-            loader.enqueue(ImageRequest.Builder(context).data(url).build())
+    with(density) {
+        val icon = Dimens.packAvatar.roundToPx()
+        val width = Dimens.contentMaxWidth.roundToPx()
+        val height = Dimens.packCardHeight.roundToPx()
+        packs.forEach { pack ->
+            pack.iconUrl?.let { loader.warm(context, it, icon, icon) }
+            pack.bannerUrl?.let { loader.warm(context, it, width, height) }
         }
     }
 }

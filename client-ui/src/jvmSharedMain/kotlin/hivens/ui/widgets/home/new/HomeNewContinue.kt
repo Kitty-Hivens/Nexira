@@ -19,18 +19,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import hivens.ui.Screen
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
+import hivens.ui.pictures.Picture
 import hivens.ui.press.clickable
 import hivens.ui.screens.library.PendingUpdateBadge
 import hivens.ui.screens.library.lastPlayedLabel
@@ -120,12 +119,9 @@ fun HomeNewContinue(instance: WidgetInstance) {
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 if (art.iconUrl != null) {
-                    AsyncImage(
-                        model              = art.iconUrl,
-                        contentDescription = null,
-                        contentScale       = ContentScale.Crop,
-                        modifier           = Modifier.size(markHeight).clip(RoundedCornerShape(markHeight / 5)),
-                    )
+                    Picture(art.iconUrl, Modifier.size(markHeight).clip(RoundedCornerShape(markHeight / 5))) {
+                        Box(Modifier.matchParentSize().pixelArtBackground(pack.id, hueA, hueB))
+                    }
                 } else {
                     Box(
                         Modifier.size(width = MARK_STRIP, height = markHeight)

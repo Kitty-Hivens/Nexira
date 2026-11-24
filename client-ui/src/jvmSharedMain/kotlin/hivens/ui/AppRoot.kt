@@ -13,14 +13,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import coil3.ComponentRegistry
-import coil3.ImageLoader
 import coil3.SingletonImageLoader
-import coil3.disk.DiskCache
-import coil3.disk.directory
-import coil3.network.okhttp.OkHttpNetworkFetcherFactory
-import coil3.annotation.ExperimentalCoilApi
-import coil3.network.NetworkFetcher
-import coil3.network.cachecontrol.CacheControlCacheStrategy
 import hivens.accounts.api.AccountKeys
 import hivens.themes.api.ThemeInputs
 import hivens.ui.background.BackgroundManager
@@ -29,6 +22,9 @@ import hivens.ui.components.SignOutPrompt
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.render.NotificationStack
+import hivens.ui.pictures.PictureRechecks
+import hivens.ui.pictures.WarmLibrary
+import hivens.ui.pictures.pictureLoader
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.WallpaperTone
 import hivens.ui.widgets.ChildLevel
@@ -38,6 +34,7 @@ import hivens.widget.api.LocalScope
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.ScopeLevel
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -51,9 +48,6 @@ import org.koin.compose.getKoin
 import org.koin.compose.koinInject
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
-
-/** The most the image cache keeps on disk before it evicts the least recently used. */
-private const val IMAGE_CACHE_BYTES = 256L * 1024 * 1024
 
 /**
  * Whatever the host feeds into the history besides the screens: thumb buttons on a
@@ -98,6 +92,7 @@ fun AppRoot(
     // news / skin images would diverge from auth and protocol traffic
     // on the same host.
     val routingCallFactory: Call.Factory       = koinInject()
+    val appScope: CoroutineScope               = koinInject()
 
     // Register the routing-aware Coil loader exactly once. setSafe is
     // idempotent (it no-ops once a loader exists), but allocating the factory
@@ -108,30 +103,18 @@ fun AppRoot(
     @Suppress("RememberReturnType")
     remember(routingCallFactory) {
         SingletonImageLoader.setSafe { context ->
-            ImageLoader.Builder(context)
-                // In the launcher's own data, not the default under the system temp
-                // dir: that one is a tmpfs on many Linux machines, emptied on every
-                // boot, so every icon and banner was downloaded again each day, and it
-                // is shared with any other program built on the same library.
-                .diskCache {
-                    DiskCache.Builder()
-                        .directory(dataDirectory.resolve("cache").resolve("images").toFile())
-                        .maxSizeBytes(IMAGE_CACHE_BYTES)
-                        .build()
-                }
-                .components {
-                    // Art on the mirror keeps one address when the picture behind it
-                    // changes, and the default strategy never asks the server again,
-                    // so an icon cached once stayed for good. This one revalidates by
-                    // the ETag and Last-Modified the server sends.
-                    add(revalidatingFetcherFactory(routingCallFactory))
-                    // Pack descriptions carry rows of shields.io badges, and
-                    // shields.io answers with SVG.
-                    addPlatformDecoders()
-                }
-                .build()
+            pictureLoader(
+                context   = context,
+                directory = dataDirectory.resolve("cache").resolve("images"),
+                calls     = routingCallFactory,
+                rechecks  = PictureRechecks(appScope),
+                // Pack descriptions carry rows of shields.io badges, and shields.io answers with SVG.
+                decoders  = { addPlatformDecoders() },
+            )
         }
     }
+
+    WarmLibrary()
 
     // Navigation history, with Home as its home. navigate() pushes, a rail switch
     // leaves Home and the section, and back() pops to the actual previous screen
@@ -266,11 +249,3 @@ fun AppRoot(
     }
     } // end ChildLevel(Composition)
 }
-
-/** Experimental in Coil, so the opt-in is kept to this one factory rather than to the whole shell. */
-@OptIn(ExperimentalCoilApi::class)
-private fun revalidatingFetcherFactory(callFactory: Call.Factory): NetworkFetcher.Factory =
-    OkHttpNetworkFetcherFactory(
-        callFactory = { callFactory },
-        cacheStrategy = { CacheControlCacheStrategy() },
-    )

@@ -42,14 +42,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
+import coil3.SingletonImageLoader
+import coil3.compose.LocalPlatformContext
 import hivens.catalogue.api.CatalogueCard
 import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.InstallProblem
@@ -77,6 +78,8 @@ import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxTooltip
 import hivens.ui.nx.RetryStateBlock
+import hivens.ui.pictures.Picture
+import hivens.ui.pictures.warm
 import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.feature.catalogue.project.compactCount
@@ -151,6 +154,15 @@ internal fun ProjectResults(
     PuppetClick("browse.retry") { retry?.invoke() }
 
     choosing?.let { subject -> InstallDialog(subject) { choosing = null } }
+
+    // Every icon of a page as the page lands, rather than as its card scrolls into view.
+    val imageContext = LocalPlatformContext.current
+    val iconEdge = with(LocalDensity.current) { ICON_WIDE.roundToPx() }
+    val warmed = remember(results.question) { HashSet<String>() }
+    LaunchedEffect(results.question, results.projects, iconEdge) {
+        val loader = SingletonImageLoader.get(imageContext)
+        results.projects.mapNotNull { it.iconUrl }.filter { warmed.add(it) }.forEach { loader.warm(imageContext, it, iconEdge, iconEdge) }
+    }
 
     when (results.status) {
         SearchStatus.Loading -> BrowseLoading()
@@ -504,10 +516,8 @@ private fun ProjectTags(tags: List<String>, max: Int) {
 @Composable
 private fun ProjectIcon(hit: ProjectHit, size: Dp) {
     val shape = MaterialTheme.shapes.medium
-    if (hit.iconUrl != null) {
-        AsyncImage(model = hit.iconUrl, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(size).clip(shape))
-    } else {
-        Box(Modifier.size(size).clip(shape).background(decorativeColor(hit.title)), contentAlignment = Alignment.Center) {
+    Picture(hit.iconUrl, Modifier.size(size).clip(shape)) {
+        Box(Modifier.matchParentSize().background(decorativeColor(hit.title)), contentAlignment = Alignment.Center) {
             Text(
                 hit.title.firstOrNull()?.uppercase() ?: "?",
                 style      = if (size >= ICON_WIDE) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
