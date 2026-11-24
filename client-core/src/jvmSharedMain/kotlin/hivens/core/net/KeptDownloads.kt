@@ -7,6 +7,7 @@ import java.nio.file.StandardCopyOption
 import java.nio.file.attribute.FileTime
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.io.path.listDirectoryEntries
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.days
 import kotlin.time.toJavaDuration
@@ -104,7 +105,7 @@ class KeptDownloads(
         if (!Files.isDirectory(dir)) return
         runCatching {
             val oldest = clock().minus(maxAge.toJavaDuration())
-            val files = Files.list(dir).use { all -> all.filter { Files.isRegularFile(it) }.toList() }
+            val files = dir.listDirectoryEntries().filter { Files.isRegularFile(it) }
                 .map { Triple(it, Files.getLastModifiedTime(it).toInstant(), Files.size(it)) }
                 .sortedByDescending { it.second }
             var held = 0L
