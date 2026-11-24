@@ -114,6 +114,60 @@ class CleanroomResolverTest {
         assertEquals(setOf("1.11.3"), speech("osx", arm64 = true))
     }
 
+    /**
+     * Resolves the real 0.7.16 `version.json` through an installer built around it, the jars it
+     * bundles standing in as empty files.
+     */
+    private suspend fun resolved07(os: String, arm64: Boolean): LoaderProfile {
+        val text = javaClass.getResourceAsStream("/loader/cleanroom/cleanroom-0.7.16-alpha-version.json")
+            ?.readBytes() ?: error("fixture missing")
+        val libraries = json.decodeFromString(LoaderVersionJson.serializer(), text.decodeToString()).libraries
+        val installer = ByteArrayOutputStream().also { bytes ->
+            ZipOutputStream(bytes).use { zip ->
+                zip.putNextEntry(ZipEntry("version.json")); zip.write(text); zip.closeEntry()
+                libraries.mapNotNull { it.downloads?.artifact }.filter { it.url.isBlank() }.map { it.path }.distinct().forEach {
+                    zip.putNextEntry(ZipEntry("maven/$it")); zip.closeEntry()
+                }
+            }
+        }.toByteArray()
+        val provider = HttpClientProvider { HttpClient(MockEngine { respond(ByteReadChannel(installer), HttpStatusCode.OK) }) }
+        return CleanroomResolver(provider, testTransferEngine(provider), json, releaseBase = "https://cr.invalid/dl", mojangOs = os, arm64 = arm64)
+            .resolve("1.12.2", "0.7.16-alpha")
+    }
+
+    @Test
+    fun `a native listed under its library's plain name from 0_7 is the native of this host and no other`() = runTest {
+        suspend fun natives(os: String, arm64: Boolean) = resolved07(os, arm64).nativesOverride.orEmpty().map { it.coord }
+
+        listOf(
+            Triple("windows", false, setOf("natives-windows")),
+            Triple("windows", true, setOf("natives-windows-arm64")),
+            Triple("linux", false, setOf("natives-linux")),
+            Triple("linux", true, setOf("natives-linux-arm64")),
+            Triple("osx", true, setOf("natives-macos-arm64")),
+        ).forEach { (os, arm64, classifiers) ->
+            assertEquals(classifiers, natives(os, arm64).mapTo(HashSet()) { it.classifier.orEmpty() }, "$os arm64=$arm64")
+        }
+        // Mojang's own jars of the time spell an Intel Mac the older way.
+        assertTrue(setOf("natives-macos", "natives-osx").containsAll(natives("osx", false).map { it.classifier.orEmpty() }))
+
+        val windows = natives("windows", false).map { it.groupArtifact }
+        assertTrue(windows.containsAll(listOf("org.lwjgl:lwjgl", "org.lwjgl:lwjgl-opengl", "org.lwjgl:lwjgl-openal")), "got $windows")
+        assertEquals(windows.distinct(), windows, "each native once")
+    }
+
+    @Test
+    fun `from 0_7 the base jar stays on the classpath beside its native, and only this host's architecture does`() = runTest {
+        val libs = resolved07("linux", arm64 = false).libraries.map { it.coord }
+
+        assertTrue(libs.any { it.groupArtifact == "org.lwjgl:lwjgl" && it.classifier == null })
+        assertTrue(libs.any { it.groupArtifact == "com.mojang:text2speech" && it.classifier == null })
+        assertTrue(libs.none { it.nativeClassifier != null }, "no natives leaked into the classpath")
+        val epoll = libs.filter { it.groupArtifact == "io.netty:netty-transport-native-epoll" }.map { it.classifier }
+        assertTrue("linux-x86_64" in epoll, "got $epoll")
+        assertTrue(epoll.none { it == "linux-aarch_64" || it == "linux-riscv64" }, "got $epoll")
+    }
+
     @Test
     fun `registry resolves the cleanroom loader id case-insensitively`() {
         val registry = LoaderRegistry(listOf(resolver))

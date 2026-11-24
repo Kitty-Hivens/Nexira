@@ -127,6 +127,8 @@ data class MojangRule(
 @Serializable
 data class MojangOs(
     val name: String? = null,
+    /** `x64`, `arm64` and the rest, as a loader's json narrows a system to one architecture. */
+    val arch: String? = null,
 )
 
 /**
@@ -136,7 +138,8 @@ data class MojangOs(
  * version json expresses "allow everywhere, disallow on osx" and the reverse.
  * No rules at all means the library is unconditional.
  *
- * [arm64] says the host is one, for the rules that name an architecture.
+ * [arm64] says the host is one, for the rules that name an architecture. A host is
+ * 64-bit here, so a rule for any other architecture matches none.
  *
  * Anyone reading a version json has to apply this, not just the classpath
  * builder: a mac-only entry like `ca.weblite:java-objc-bridge` is absent from a
@@ -150,11 +153,15 @@ fun libraryRulesAllow(rules: List<MojangRule>, mojangOs: String, arm64: Boolean 
         // An os name with the architecture after it (`osx-arm64`) is how a loader's
         // own json names an Apple Silicon build. Mojang's manifests never do, so it
         // matches only a host that says it is one.
-        val matches = rule.os?.name?.let { it == mojangOs || (arm64 && it == "$mojangOs-arm64") } ?: true
-        if (matches) allowed = rule.action == "allow"
+        val system = rule.os?.name?.let { it == mojangOs || (arm64 && it == "$mojangOs-arm64") } ?: true
+        val processor = rule.os?.arch?.let { it in if (arm64) ARM64_ARCHES else X64_ARCHES } ?: true
+        if (system && processor) allowed = rule.action == "allow"
     }
     return allowed
 }
+
+private val ARM64_ARCHES = setOf("arm64", "aarch64")
+private val X64_ARCHES = setOf("x64", "x86_64", "amd64")
 
 // -- the asset index (e.g. 1.12.json) --------------------------------------
 

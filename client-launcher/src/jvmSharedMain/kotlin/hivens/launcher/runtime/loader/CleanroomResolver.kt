@@ -7,6 +7,7 @@ import hivens.core.net.TransferEngine
 import hivens.core.platform.Arch
 import hivens.core.platform.OS
 import hivens.launcher.runtime.MavenCoord
+import hivens.launcher.runtime.MojangArtifact
 import hivens.launcher.runtime.MojangLibrary
 import hivens.launcher.runtime.libraryRulesAllow
 import io.ktor.client.request.prepareGet
@@ -107,7 +108,7 @@ class CleanroomResolver(
             buildProfile(
                 version.mainClass,
                 version.minecraftArguments,
-                hostLibraries(version.libraries).map { toSpec(it, zip) },
+                hostLibraries(version.libraries).flatMap { toSpecs(it, zip) },
             ).copy(version = loaderVersion)
         }
 
@@ -153,21 +154,35 @@ class CleanroomResolver(
      * Apple Silicon and one for everything else, and without the rules the merge
      * kept whichever came last and put the Apple Silicon one on every machine.
      *
-     * The natives are left for the provisioner, which keeps this host's by their
-     * classifier, so the override still describes every platform.
+     * A native named with its classifier is left for the provisioner, which keeps
+     * this host's by it. One listed under its library's plain name is told apart by
+     * its rules alone.
      */
     internal fun hostLibraries(libraries: List<MojangLibrary>): List<MojangLibrary> =
         libraries.filter { lib ->
             MavenCoord.parse(lib.name).nativeClassifier != null || libraryRulesAllow(lib.rules, mojangOs, arm64)
         }
 
-    /** A version.json library as a download spec: a Maven-Central url when the
-     *  entry carries one, else the bytes bundled in the installer's `maven/`
-     *  tree (the Cleanroom core jar, published with an empty url). */
-    private fun toSpec(lib: MojangLibrary, zip: ZipFile): LibrarySpec {
+    /**
+     * The jars one version.json library stands for. Up to 0.6 a native was a library
+     * of its own, named with its classifier. From 0.7 it is an entry under its
+     * library's plain name whose only jar is among the classifiers, so it is given
+     * back the name it had.
+     */
+    private fun toSpecs(lib: MojangLibrary, zip: ZipFile): List<LibrarySpec> {
         val coord = MavenCoord.parse(lib.name)
-        val artifact = lib.downloads?.artifact
-            ?: throw IOException("cleanroom library ${lib.name} has no downloads.artifact")
+        val jars = listOfNotNull(lib.downloads?.artifact?.let { coord to it }) +
+            lib.downloads?.classifiers.orEmpty()
+                .filterKeys { it.startsWith("natives") }
+                .map { (classifier, jar) -> coord.copy(classifier = classifier) to jar }
+        if (jars.isEmpty()) throw IOException("cleanroom library ${lib.name} has nothing to download")
+        return jars.map { (named, jar) -> toSpec(named, jar, zip) }
+    }
+
+    /** One jar as a download spec: a Maven-Central url when it carries one, else the
+     *  bytes bundled in the installer's `maven/` tree (the Cleanroom core jar,
+     *  published with an empty url). */
+    private fun toSpec(coord: MavenCoord, artifact: MojangArtifact, zip: ZipFile): LibrarySpec {
         if (artifact.url.isNotBlank()) {
             return LibrarySpec(coord, url = artifact.url, sha1 = artifact.sha1, size = artifact.size)
         }
