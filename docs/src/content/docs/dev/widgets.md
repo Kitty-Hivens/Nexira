@@ -71,6 +71,10 @@ The service entry the launcher discovers you by is generated for you into `META-
 
 ## Dependencies
 
+:::note[Moving from earlier launchers]
+`Nexira-Module-Requires` used to say only that the launcher carries an API. What it names is now brought in with your module, and a missing one makes the module wait where it used to be refused. Name an API your module does without in `Nexira-Module-Uses`.
+:::
+
 Each module is loaded through a class loader of its own, and that loader does not see the whole launcher. It sees a fixed set of shared classes, and looks everything else up in your jar.
 
 ```kotlin
@@ -123,7 +127,31 @@ To use another module's API, for example the packs, the accounts, the catalogue 
 | `nexira.look.type`     | `:look:type-api`      | `hivens.look.type.api`     | Asking the face text is drawn in, and answering the type axis                             |
 | `nexira.look.icon`     | `:look:icon-api`      | `hivens.look.icon.api`     | Drawing an icon of the look's library or one of your own, and answering the icon axis     |
 
-Each entry is an API id and the version you compiled against. The launcher refuses your jar, with the reason in the log, when it does not carry that API or carries a version that does not serve yours: another major version, or an older minor one. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
+Each entry is an API id and the version you compiled against. An API you name is visible to your module. One you do not name is not, even when the launcher carries it.
+
+### Requiring and using
+
+`Nexira-Module-Requires` names what your module does not run without. The launcher brings each in with your module, whether the document names it or not, and it resolves the modules of the folder and its own together, so yours loads after everything it requires. Where something is missing, is switched off, or is there in a version that does not serve yours (another major version, or an older minor one), your module waits: it is listed with the reason, its widgets stay in the layout, and it loads as soon as the reason is gone. Modules that require each other in a circle all wait.
+
+`Nexira-Module-Uses` names what your module makes use of where it is there and runs without. Nothing is brought in for it and nothing waits. The classes of an API you only use are visible while it is there in a version that serves yours, so ask before you touch them, by a key that answers or a source that is not null.
+
+```kotlin
+"Nexira-Module-Requires" to "nexira.catalogue=2.0",
+"Nexira-Module-Uses" to "nexira.packs=2.0",
+```
+
+A module can also be required by its id. It offers itself by it where its manifest states a version of its own, `"Nexira-Module-Version" to "1.0"`, and there need be no API behind it.
+
+### Publishing an API
+
+Another module can compile against yours. Name the API and its version, and the packages of your jar it lives in:
+
+```kotlin
+"Nexira-Module-Provides" to "mymodule.wobble=1.0",
+"Nexira-Module-Api-Packages" to "mymodule.wobble=com.example.wobble.api",
+```
+
+A module that names `mymodule.wobble` in its manifest sees those packages, the same classes your module runs with, and nothing else of your jar. An API of several packages names its id once for each. A jar may carry an API and nothing more. An id the launcher or an earlier jar offers cannot be offered again, and a package the launcher shares with every module cannot be published: the launcher refuses the jar and says so. When your jar is replaced, the modules that require it are read again with it.
 
 :::note[Moving from earlier launchers]
 `nexira.packs` is 2.0. A pack's `source.origin`, an install's `origin` and an `InstallRequest`'s `origin` are the source's id exactly as the pack's record carries it, `Mirror` or `Local` say, where 1.0 gave the name in lower case. A request is matched by that id exactly, so `mirror` names no source. Rebuild against 2.0 and compare origins as the ids they are.
@@ -137,7 +165,7 @@ Module loading is no longer parent-first. Earlier launchers loaded a module over
 
 While the launcher runs your module's code itself, its constructors, its key declarations, its factories and its services, the thread's context class loader is your module's own loader. A bundled library that finds its providers with `ServiceLoader` then finds yours. Inside a widget's composition, and in coroutines your module starts, that is not so, so there pass your own class loader explicitly, `ServiceLoader.load(Service::class.java, MyModule::class.java.classLoader)`.
 
-Modules cannot see each other's classes. Two modules can carry a class of the same name without interfering.
+Modules cannot see each other's classes beyond an API one publishes and the other names. Two modules can carry a class of the same name without interfering.
 
 You may draw with the launcher's design system or bring your own. The example deliberately does the second: it defines its own palette and draws its own controls.
 

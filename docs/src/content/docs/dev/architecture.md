@@ -174,7 +174,7 @@ Four modules, four roles:
 - `widget-model` holds the graph (`LayoutGraph`, `SurfaceLayout`, `SlotContent`, `WidgetInstance`, recursive through `children`) and the identity types. It carries no Compose dependency, so a headless consumer can read a layout.
 - `widget-api` holds the runtime: the slot renderer, the widget registry, and the service, data and command registries.
 - `widget-processor` generates the registry from `@Widget` annotations.
-- `widget-loader` finds widget modules in the widgets folder at startup and hands their registries to the runtime.
+- `widget-loader` finds widget modules in the widgets folder at startup and hands their registries to the runtime. It loads each after what it requires, over one graph of the jars and what the launcher offers (`ModuleGraph` in `widget-model`), and leaves one whose requirements are not met waiting with the reason. The modules compiled in declare the same (`requires` and `uses`), a test holds them to what their classes name, and the host brings in what a named module requires.
 
 Extension happens through composition locals with identity defaults. The decorator that wraps every widget, the empty-slot placeholder, the unknown-widget placeholder, the slot chrome modifier and the per-instance backing renderer all default to doing nothing; the editor swaps in real ones. Production pays nothing for an editor it does not mount.
 

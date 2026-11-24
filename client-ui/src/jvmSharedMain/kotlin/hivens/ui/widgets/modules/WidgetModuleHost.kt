@@ -3,6 +3,8 @@ package hivens.ui.widgets.modules
 import hivens.widget.api.ModuleStrings
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.WidgetRegistry
+import hivens.widget.model.ModuleGraph
+import hivens.widget.model.ModuleWait
 import java.nio.file.Path
 
 /**
@@ -23,6 +25,9 @@ interface LoadedModule : AutoCloseable {
     /** The words it brought for what it declares for a person to read. */
     val strings: ModuleStrings get() = ModuleStrings.EMPTY
 
+    /** What it does not run without, by the names it asks for it by. */
+    val requires: Set<String> get() = emptySet()
+
     /** The names of the files this module's code is read from, so copies nothing reads any more can be swept. */
     val filesInUse: Set<String>
 
@@ -33,6 +38,9 @@ interface LoadedModule : AutoCloseable {
 /** A module found and switched off, so not loaded. */
 class OffModule(val id: String, val name: String, val file: Path)
 
+/** A module that waits, and every reason: something it requires is not there, is off, is in another version or does not run. */
+class WaitingModule(val id: String, val name: String, val file: Path, val reasons: List<ModuleWait>)
+
 /** A file in the modules folder that is not a module this launcher can load, and why. */
 class RefusedModule(val file: Path, val reason: String)
 
@@ -41,11 +49,14 @@ class ModuleScan(
     val loaded: List<LoadedModule> = emptyList(),
     val disabled: List<OffModule> = emptyList(),
     val rejected: List<RefusedModule> = emptyList(),
+    val waiting: List<WaitingModule> = emptyList(),
+    /** The modules of the folder by what they require of each other. */
+    val graph: ModuleGraph = ModuleGraph.EMPTY,
 )
 
 /** Finds the widget modules a host can load and brings them in. */
 interface WidgetModuleHost {
-    /** Reads the modules folder, loading every module not in [disabled]. */
+    /** Reads the modules folder, loading every module not in [disabled] whose requirements are met. */
     fun scan(disabled: Set<String>): ModuleScan
 
     /** The id of the module whose code is on [failure]'s stack, or null when none is. */

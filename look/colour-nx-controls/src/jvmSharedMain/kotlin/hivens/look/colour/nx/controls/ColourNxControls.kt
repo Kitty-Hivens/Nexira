@@ -1,8 +1,15 @@
 package hivens.look.colour.nx.controls
 
+import hivens.i18n.api.I18nApi
 import hivens.look.colour.api.Colour
+import hivens.look.colour.api.ColourApi
+import hivens.look.icon.api.IconApi
+import hivens.look.manager.api.LookApi
 import hivens.look.manager.api.LookKeys
 import hivens.look.manager.api.LookState
+import hivens.look.motion.api.MotionApi
+import hivens.look.shape.api.ShapeApi
+import hivens.look.surface.api.SurfaceApi
 import hivens.themes.api.ThemesApi
 import hivens.themes.api.ThemesKeys
 import hivens.widget.api.CompiledModule
@@ -13,6 +20,7 @@ import hivens.widget.api.ModuleKeys
 import hivens.widget.api.ModuleStrings
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.flowSource
+import hivens.widget.model.ApiVersion
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 import hivens.widget.model.WidgetDataSource
@@ -36,6 +44,8 @@ object ColourNxControls : CompiledModule {
     override val id: String = ID
     override val name: String = "controls.name"
     override val strings: ModuleStrings = ModuleStrings.resources(ColourNxControls::class.java, ID)
+    override val requires: Map<String, ApiVersion> = mapOf(ThemesApi.ID to ThemesApi.VERSION, LookApi.ID to LookApi.VERSION)
+    override val uses: Map<String, ApiVersion> = mapOf(ColourApi.ID to ColourApi.VERSION, MotionApi.ID to MotionApi.VERSION, ShapeApi.ID to ShapeApi.VERSION, SurfaceApi.ID to SurfaceApi.VERSION, IconApi.ID to IconApi.VERSION, I18nApi.ID to I18nApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(ControlsKeys)
     override val widgets: WidgetRegistry get() = controlsWidgets
 }

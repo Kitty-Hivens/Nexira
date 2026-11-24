@@ -12,10 +12,10 @@ import java.nio.file.Path
 /**
  * Widget modules as jars in a folder, each opened in a class loader of its own that
  * shows the jar the widget kernel and the libraries it shares with the launcher, and
- * nothing of the launcher itself (see [WidgetModuleLoader]). [offered] is the module
- * APIs this build carries, which a jar built against one of them has to find in a
- * version that serves it, and [apiPackages] where each lives, which a jar that names
- * it is shown. [contributionKinds] is what is read out of each jar besides its widgets.
+ * nothing of the launcher itself (see [WidgetModuleLoader]). [offered] is what a jar
+ * can require of this build, the module APIs it carries and its modules by id, each in
+ * a version that has to serve the one the jar names, and [apiPackages] where each API
+ * lives, which a jar that names it is shown. [contributionKinds] is what is read out of each jar besides its widgets.
  */
 class DesktopWidgetModuleHost(
     private val directory: Path,
@@ -38,6 +38,8 @@ class DesktopWidgetModuleHost(
             loaded   = scan.loaded.map(::JarModule),
             disabled = scan.disabled.map { OffModule(it.id, it.name, it.file) },
             rejected = scan.rejected.map { RefusedModule(it.file, it.reason) },
+            waiting  = scan.waiting.map { WaitingModule(it.id, it.name, it.file, it.reasons) },
+            graph    = scan.graph,
         )
     }
 
@@ -60,6 +62,7 @@ private class JarModule(private val module: LoadedWidgetModule) : LoadedModule {
     override val registry: WidgetRegistry get() = module.registry
     override val contributions: List<ModuleContribution> get() = module.contributions
     override val strings: ModuleStrings get() = module.strings
+    override val requires: Set<String> get() = module.requires.keys
 
     override val filesInUse: Set<String>
         get() = module.loader.urLs.map { Path.of(it.toURI()).fileName.toString() }.toSet()

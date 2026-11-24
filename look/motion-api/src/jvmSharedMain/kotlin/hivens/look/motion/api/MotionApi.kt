@@ -1,5 +1,6 @@
 package hivens.look.motion.api
 
+import hivens.look.manager.api.LookApi
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleStrings
@@ -42,6 +43,7 @@ object MotionModule : CompiledModule {
 
     // The API's own object lives in the API artifact's package, so the package is read off it.
     override val apiPackages: Map<String, Set<String>> = mapOf(MotionApi.ID to setOf(MotionApi::class.java.name.substringBeforeLast('.')))
+    override val requires: Map<String, ApiVersion> = mapOf(LookApi.ID to LookApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(Motion)
 
     internal const val NAME = "motion.name"

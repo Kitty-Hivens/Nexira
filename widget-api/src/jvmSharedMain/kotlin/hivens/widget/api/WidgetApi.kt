@@ -50,6 +50,10 @@ package hivens.widget.api
  *    ([SettingsDomain.firstRun]), which the host writes into the domain's file then.
  *    A widget's arrival is told whether the node itself names its character ([WidgetEntrance]),
  *    since a value the node names is played as set whatever the look holds still.
+ *    A module says what it does not run without and what it only uses ([CompiledModule.requires],
+ *    [CompiledModule.uses], [MANIFEST_REQUIRES], [MANIFEST_USES]), offers itself by its id where
+ *    it states a version, and a jar publishes APIs of its own ([MANIFEST_PROVIDES]). What a module
+ *    requires is brought in with it, where [MANIFEST_REQUIRES] named only what had to be carried.
  */
 object WidgetApi {
     const val VERSION: Int = 3
@@ -64,11 +68,40 @@ object WidgetApi {
     const val MANIFEST_NAME = "Nexira-Module-Name"
 
     /**
-     * Jar manifest attribute naming the module APIs the jar was compiled against, as
-     * `id=major.minor` entries separated by commas (see [hivens.widget.model.ApiVersion.parseAll]).
-     * Optional: a module that uses no other module's API leaves it out. The loader
-     * refuses a jar that names an API nothing here offers, or offers in a version that
-     * does not serve the one it was built against.
+     * Jar manifest attribute naming what the module does not run without, as
+     * `id=major.minor` entries separated by commas (see [hivens.widget.model.ApiVersion.parseAll]):
+     * the module APIs it was compiled against, and modules that offer themselves by their
+     * id. Optional. What it names is brought in with it, and where one is not there, is
+     * switched off or is in a version that does not serve the one named, the module waits
+     * (see [hivens.widget.model.ModuleGraph]). The classes of an API it names are visible to it.
      */
     const val MANIFEST_REQUIRES = "Nexira-Module-Requires"
+
+    /**
+     * Jar manifest attribute naming what the module makes use of where it is there and runs
+     * without, in the form of [MANIFEST_REQUIRES]. Optional. Nothing is brought in for it. The
+     * classes of an API it names are visible to it where the API is there in a version that
+     * serves, so the module asks before it touches them.
+     */
+    const val MANIFEST_USES = "Nexira-Module-Uses"
+
+    /**
+     * Jar manifest attribute carrying the module's own version, as `major.minor`. Optional: with
+     * it the module offers itself by its id, so another can require it without an API of its own.
+     */
+    const val MANIFEST_MODULE_VERSION = "Nexira-Module-Version"
+
+    /**
+     * Jar manifest attribute naming the APIs the jar publishes for other modules to compile
+     * against, in the form of [MANIFEST_REQUIRES]. Optional. Each needs its packages in
+     * [MANIFEST_API_PACKAGES].
+     */
+    const val MANIFEST_PROVIDES = "Nexira-Module-Provides"
+
+    /**
+     * Jar manifest attribute naming the packages each API in [MANIFEST_PROVIDES] lives in, as
+     * `id=package` entries separated by commas, an id once for each of its packages. What of the
+     * jar a module that names the API is shown.
+     */
+    const val MANIFEST_API_PACKAGES = "Nexira-Module-Api-Packages"
 }

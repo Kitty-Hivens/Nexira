@@ -11,6 +11,7 @@ import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ScreenEffect
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
+import hivens.widget.model.ModuleWait
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -45,8 +46,13 @@ import kotlin.time.Duration.Companion.seconds
  * module cannot be switched off, so they are always there, and they are named in
  * the words of the module that brought them, as a jar's are.
  *
+ * A module that requires another runs only while that one does (see
+ * [hivens.widget.model.ModuleGraph]). Until then it waits in the list with the reason.
+ * Switching off a module others require is not refused: those wait too, and come back
+ * with it.
+ *
  * Every module ever loaded is remembered with the widget kinds it brought, until
- * somebody forgets it. That is what keeps a module that is off, broken or gone
+ * somebody forgets it. That is what keeps a module that is off, waiting, broken or gone
  * from losing its widgets to the schema-bump prune, which otherwise reads "not in
  * the registry" as "renamed away" and deletes them for good.
  */
@@ -80,7 +86,21 @@ class WidgetModules(
     /** One line of the module list. */
     sealed interface Entry {
         /** Loaded and in the registry. */
-        data class Loaded(val id: String, val name: String, val file: Path, val kinds: Int, val contributions: Int = 0) : Entry
+        data class Loaded(
+            val id: String,
+            val name: String,
+            val file: Path,
+            val kinds: Int,
+            val contributions: Int = 0,
+            /** The names of the modules that stop when this one is switched off, since they require it. */
+            val stops: List<String> = emptyList(),
+        ) : Entry
+
+        /**
+         * On, and waiting for what it requires, with every reason. Its widgets are kept, as those of a
+         * module that is off are.
+         */
+        data class Waiting(val id: String, val name: String, val file: Path, val reasons: List<ModuleWait>) : Entry
 
         /** Switched off. [crash] is the failure that switched it off, null when a person did. */
         data class Off(val id: String, val name: String, val file: Path, val crash: String?) : Entry
@@ -101,7 +121,19 @@ class WidgetModules(
         val widgetModules: Map<WidgetKind, String> = emptyMap(),
         /** The words each loaded module ships, by module id, for the language module. */
         val words: Map<String, ModuleStrings> = emptyMap(),
+        /** What the loaded modules do not run without, by the names they ask for it by. */
+        val requires: Set<String> = emptySet(),
     ) {
+        /** What the person knows the module [id] by, its id where the list has no line for it. */
+        fun nameOf(id: String): String = entries.firstNotNullOfOrNull { entry ->
+            when (entry) {
+                is Entry.Loaded -> entry.name.takeIf { entry.id == id }
+                is Entry.Waiting -> entry.name.takeIf { entry.id == id }
+                is Entry.Off -> entry.name.takeIf { entry.id == id }
+                is Entry.Refused, is Entry.Gone -> null
+            }
+        } ?: id
+
         /** The contributions of one kind, in the order the modules load. */
         inline fun <reified T : ModuleContribution> of(): List<Contributed<T>> =
             contributions.mapNotNull { c -> (c.item as? T)?.let { Contributed(c.moduleId, c.moduleName, it) } }
@@ -263,9 +295,14 @@ class WidgetModules(
         val contributions = scan.loaded.flatMap { module ->
             module.contributions.map { Contributed(module.id, module.name, it) }
         }
-        val present = (scan.loaded.map { it.id } + scan.disabled.map { it.id }).toSet()
+        val present = (scan.loaded.map { it.id } + scan.disabled.map { it.id } + scan.waiting.map { it.id }).toSet()
+        val names = scan.loaded.associate { it.id to it.name }
         val entries = buildList {
-            scan.loaded.forEach { add(Entry.Loaded(it.id, it.name, it.file, it.registry.all().size, it.contributions.size)) }
+            scan.loaded.forEach { module ->
+                val stops = scan.graph.dependantsOf(module.id).mapNotNull(names::get)
+                add(Entry.Loaded(module.id, module.name, module.file, module.registry.all().size, module.contributions.size, stops))
+            }
+            scan.waiting.forEach { add(Entry.Waiting(it.id, it.name, it.file, it.reasons)) }
             scan.disabled.forEach { add(Entry.Off(it.id, it.name, it.file, saved.disabled[it.id]?.takeIf { s -> s.isNotBlank() })) }
             scan.rejected.forEach { add(Entry.Refused(it.file, it.reason)) }
             (saved.known.keys + saved.disabled.keys).filter { it !in present }.sorted().forEach { add(Entry.Gone(it)) }
@@ -274,7 +311,14 @@ class WidgetModules(
         val widgetModules = scan.loaded.flatMap { module ->
             (module.registry.all().keys + particleWidgets.getValue(module.id).all().keys).map { it to module.id }
         }.toMap() + compiled.flatMap { module -> module.widgets.all().keys.map { it to module.id } }.toMap()
-        return Snapshot(composite, entries, contributions, widgetModules, scan.loaded.associate { it.id to it.strings })
+        return Snapshot(
+            registry      = composite,
+            entries       = entries,
+            contributions = contributions,
+            widgetModules = widgetModules,
+            words         = scan.loaded.associate { it.id to it.strings },
+            requires      = scan.loaded.flatMapTo(HashSet()) { it.requires },
+        )
     }
 
     private fun release(leaving: List<LoadedModule>) {

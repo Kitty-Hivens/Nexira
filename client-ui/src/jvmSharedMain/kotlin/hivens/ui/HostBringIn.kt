@@ -4,6 +4,8 @@ import hivens.widget.api.BringIn
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleKeysResult
 import hivens.widget.api.WidgetScope
+import hivens.ui.widgets.modules.moduleGraph
+import hivens.widget.model.ModuleGraph
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -27,7 +29,8 @@ internal class ModulesIn(named: Set<String>) {
 /**
  * Brings in a module of [compiled] the document does not name, through the same registration the
  * document's modules went through ([compiledModuleKeys]), into [keys], then adds it to [modules] and has
- * the levels under [app] read its keys again where a reader found them missing.
+ * the levels under [app] read its keys again where a reader found them missing. What the module requires
+ * goes in before it.
  *
  * One bring-in at a time, under one lock, since checking that a key is free and registering it are two
  * steps. Registering and telling the levels are safe from any thread, so a bring-in runs on the thread
@@ -42,6 +45,7 @@ internal class HostBringIn(
     private val nameOf: (moduleId: String, key: String) -> String = { _, key -> key },
 ) : BringIn {
     private val lock = Any()
+    private val graph: ModuleGraph by lazy { moduleGraph(compiled) }
     private val refused: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
     override fun bringIn(moduleId: String): Boolean {
@@ -60,6 +64,16 @@ internal class HostBringIn(
         val module = compiled.firstOrNull { it.id == moduleId }
         if (module == null) {
             log.warn("The module '{}' was asked to be brought in, and this launcher carries no compiled module of that id", moduleId)
+            refused += moduleId
+            return false
+        }
+        graph.waiting[moduleId]?.let { reasons ->
+            log.error("The module '{}' is not brought in, since what it requires is not in this build: {}", moduleId, reasons)
+            refused += moduleId
+            return false
+        }
+        graph.requiredBy(listOf(moduleId)).firstOrNull { !(settled(it) ?: bring(it)) }?.let { missing ->
+            log.warn("The module '{}' is not brought in, since the module '{}' it requires is not", moduleId, missing)
             refused += moduleId
             return false
         }

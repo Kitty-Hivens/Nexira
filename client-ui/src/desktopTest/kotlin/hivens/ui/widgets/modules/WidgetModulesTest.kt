@@ -3,7 +3,13 @@ package hivens.ui.widgets.modules
 import hivens.i18n.I18nEngine
 import hivens.i18n.wordsOf
 import hivens.test.stopThenDelete
+import hivens.themes.api.ThemesApi
+import hivens.ui.editor.props.words
+import hivens.ui.i18n.NexiraStrings
+import hivens.widget.api.WidgetApi
 import hivens.widget.generated.GeneratedWidgetRegistry
+import hivens.widget.model.ApiVersion
+import hivens.widget.model.ModuleWait
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -11,6 +17,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.jar.JarEntry
+import java.util.jar.JarFile
+import java.util.jar.JarOutputStream
+import java.util.jar.Manifest
 import kotlin.io.path.copyTo
 import kotlin.io.path.createDirectories
 import kotlin.test.AfterTest
@@ -191,5 +201,112 @@ class WidgetModulesTest {
     fun `a crash in the launcher's own code is no module's`() {
         install()
         assertNull(modules().culpritOf(IllegalStateException("ours")))
+    }
+
+    // -- modules that require each other ---------------------------------------
+
+    /** The fixture under [id], as a module of version 1.0 that requires [requires]. */
+    private fun installAs(id: String, requires: String? = null) {
+        val themes = "${ThemesApi.ID}=${ThemesApi.VERSION}"
+        JarFile(fixtureJar.toFile()).use { source ->
+            val manifest = Manifest(source.manifest).apply {
+                mainAttributes.putValue(WidgetApi.MANIFEST_ID, id)
+                mainAttributes.putValue(WidgetApi.MANIFEST_NAME, "Module $id")
+                mainAttributes.putValue(WidgetApi.MANIFEST_MODULE_VERSION, "1.0")
+                mainAttributes.putValue(WidgetApi.MANIFEST_REQUIRES, listOfNotNull(themes, requires).joinToString(","))
+            }
+            JarOutputStream(Files.newOutputStream(folder.resolve("$id.jar")), manifest).use { out ->
+                source.entries().asSequence().filterNot { it.isDirectory || it.name.equals("META-INF/MANIFEST.MF", ignoreCase = true) }.forEach { entry ->
+                    out.putNextEntry(JarEntry(entry.name))
+                    source.getInputStream(entry).use { it.copyTo(out) }
+                    out.closeEntry()
+                }
+            }
+        }
+    }
+
+    private inline fun <reified T : WidgetModules.Entry> WidgetModules.lines(): List<T> = state.value.entries.filterIsInstance<T>()
+
+    @Test
+    fun `a module waits for one that is not there, is not taken for gone, and keeps its widgets`() {
+        installAs("base")
+        installAs("app", requires = "base=1.0")
+        val m = modules()
+        assertEquals(listOf("base", "app"), m.lines<WidgetModules.Entry.Loaded>().map { it.id })
+
+        Files.delete(folder.resolve("base.jar"))
+        m.reload()
+
+        val waiting = m.lines<WidgetModules.Entry.Waiting>().single()
+        assertEquals("app" to "Module app", waiting.id to waiting.name)
+        assertEquals(listOf<ModuleWait>(ModuleWait.Missing("base", ApiVersion(1, 0))), waiting.reasons)
+        assertEquals(listOf("base"), m.lines<WidgetModules.Entry.Gone>().map { it.id })
+        assertNull(m.registry[fixtureKind])
+        assertTrue(fixtureKind in m.knownKinds())
+
+        installAs("base")
+        m.reload()
+        assertEquals(listOf("base", "app"), m.lines<WidgetModules.Entry.Loaded>().map { it.id }, "it comes back by itself")
+    }
+
+    @Test
+    fun `a module others require can be switched off, says who stops with it, and they wait until it is back`() {
+        installAs("base")
+        installAs("mid", requires = "base=1.0")
+        installAs("top", requires = "mid=1.0")
+        val m = modules()
+        assertEquals(listOf("Module mid", "Module top"), m.lines<WidgetModules.Entry.Loaded>().single { it.id == "base" }.stops)
+        assertEquals(emptyList(), m.lines<WidgetModules.Entry.Loaded>().single { it.id == "top" }.stops)
+
+        m.setEnabled("base", false)
+
+        assertEquals(emptyList(), m.lines<WidgetModules.Entry.Loaded>())
+        val reasons = m.lines<WidgetModules.Entry.Waiting>().associate { it.id to it.reasons }
+        assertEquals(listOf<ModuleWait>(ModuleWait.Off("base", "base")), reasons["mid"])
+        assertEquals(listOf<ModuleWait>(ModuleWait.Stopped("mid", "mid")), reasons["top"])
+        assertEquals("Module base", m.state.value.nameOf("base"), "the reason names it as the list does")
+
+        m.setEnabled("base", true)
+        assertEquals(listOf("base", "mid", "top"), m.lines<WidgetModules.Entry.Loaded>().map { it.id })
+    }
+
+    @Test
+    fun `a module that crashed takes those that require it with it, and they are not said to have crashed`() {
+        installAs("base")
+        installAs("app", requires = "base=1.0")
+        val m = modules()
+
+        m.switchOffAfterCrash("base", IllegalStateException("broke"))
+
+        assertEquals("broke", m.lines<WidgetModules.Entry.Off>().single().crash)
+        assertEquals(listOf<ModuleWait>(ModuleWait.Off("base", "base")), m.lines<WidgetModules.Entry.Waiting>().single().reasons)
+        assertEquals("Module base", m.crashNotice.value?.name)
+    }
+
+    @Test
+    fun `a waiting module can be switched off, and is off then`() {
+        installAs("app", requires = "base=1.0")
+        val m = modules()
+        m.setEnabled("app", false)
+        assertEquals(listOf("app"), m.lines<WidgetModules.Entry.Off>().map { it.id })
+        assertEquals(emptyList(), m.lines<WidgetModules.Entry.Waiting>())
+    }
+
+    @Test
+    fun `what the loaded modules require is answered by name, and what a waiting one requires is not`() {
+        installAs("base")
+        installAs("app", requires = "base=1.0, gone=1.0")
+        assertEquals(setOf(ThemesApi.ID), modules().state.value.requires)
+    }
+
+    @Test
+    fun `why a module waits is said in the person's words, naming the module`() {
+        val s = NexiraStrings.translator("en").strings(NexiraStrings.NAMESPACE)
+        val name: (String) -> String = { "<$it>" }
+        assertEquals("Needs wobble 1.0, which is not here.", words(s, ModuleWait.Missing("wobble", ApiVersion(1, 0)), name))
+        assertEquals("Needs wobble 2.0, and 1.3 is here.", words(s, ModuleWait.OtherVersion("wobble", ApiVersion(2, 0), ApiVersion(1, 3), "base"), name))
+        assertTrue("<base>" in words(s, ModuleWait.Off("wobble", "base"), name))
+        assertTrue("<base>" in words(s, ModuleWait.Stopped("wobble", "base"), name))
+        assertTrue("<a>, <b>" in words(s, ModuleWait.Cycle(listOf("a", "b")), name))
     }
 }

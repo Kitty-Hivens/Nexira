@@ -15,9 +15,13 @@ import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.registerModuleKeys
 import hivens.widget.model.ApiVersion
+import hivens.widget.model.ModuleWait
 import org.slf4j.Logger
 import java.io.ByteArrayInputStream
 import java.io.InputStream
+import java.lang.classfile.ClassFile
+import java.lang.constant.ClassDesc
+import java.lang.reflect.AccessFlag
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.jar.Attributes
@@ -449,34 +453,36 @@ class WidgetModuleLoaderTest {
     }
 
     @Test
-    fun `a jar built against another major of an API is refused, naming both versions`() {
+    fun `a jar built against another major of an API waits, naming both versions`() {
         install("other-major.jar", requires = "nexira.packs=2.0")
 
         val scan = scan(offered = mapOf("nexira.packs" to ApiVersion(1, 3)))
 
         assertEquals(emptyList(), scan.loaded)
-        val reason = scan.rejected.single().reason
-        assertTrue("2.0" in reason && "1.3" in reason, reason)
+        assertEquals(emptyList(), scan.rejected)
+        val waits = scan.waiting.single()
+        assertEquals("fixture" to "Fixture Module", waits.id to waits.name)
+        assertEquals(listOf<ModuleWait>(ModuleWait.OtherVersion("nexira.packs", ApiVersion(2, 0), ApiVersion(1, 3), "nexira.packs")), waits.reasons)
     }
 
     @Test
-    fun `a jar built against a newer minor than the one here is refused`() {
+    fun `a jar built against a newer minor than the one here waits`() {
         install("newer-minor.jar", requires = "nexira.packs=1.4")
 
         val scan = scan(offered = mapOf("nexira.packs" to ApiVersion(1, 3)))
 
         assertEquals(emptyList(), scan.loaded)
-        assertTrue("1.4" in scan.rejected.single().reason, scan.rejected.single().reason)
+        assertEquals(listOf<ModuleWait>(ModuleWait.OtherVersion("nexira.packs", ApiVersion(1, 4), ApiVersion(1, 3), "nexira.packs")), scan.waiting.single().reasons)
     }
 
     @Test
-    fun `a jar built against an API nothing here offers is refused by the API's name`() {
+    fun `a jar built against an API nothing here offers waits by the API's name`() {
         install("unknown-api.jar", requires = "nexira.packs=1.0, someone.else=1.0")
 
         val scan = scan(offered = mapOf("nexira.packs" to ApiVersion(1, 0)))
 
         assertEquals(emptyList(), scan.loaded)
-        assertTrue("someone.else" in scan.rejected.single().reason, scan.rejected.single().reason)
+        assertEquals(listOf<ModuleWait>(ModuleWait.Missing("someone.else", ApiVersion(1, 0))), scan.waiting.single().reasons)
     }
 
     @Test
@@ -501,6 +507,190 @@ class WidgetModuleLoaderTest {
         assertTrue(result is ModuleKeysResult.Registered, "$result")
         assertTrue(keys.javaClass.classLoader !== javaClass.classLoader, "the contribution resolved through the parent loader")
         assertEquals("sample", sources.sampleOf("fixture.greeting")?.invoke())
+    }
+
+    // -- what jars require of each other ---------------------------------------
+
+    @Test
+    fun `a jar loads after the jar it requires, whatever the files are called`() {
+        install("a.jar", id = "app", requires = "base=1.0")
+        install("b.jar", id = "base", version = "1.2")
+
+        val scan = scan()
+
+        assertEquals(listOf("base", "app"), scan.loaded.map { it.id })
+        assertEquals(mapOf("base" to ApiVersion(1, 0)), scan.loaded.last().requires)
+        assertEquals(listOf("app"), scan.graph.dependantsOf("base"))
+    }
+
+    @Test
+    fun `a jar whose requirement is missing waits, and one that requires that waits with it`() {
+        install("app.jar", id = "app", requires = "mid=1.0")
+        install("mid.jar", id = "mid", version = "1.0", requires = "base=1.0")
+        install("free.jar", id = "free")
+
+        val scan = scan()
+
+        assertEquals(listOf("free"), scan.loaded.map { it.id })
+        assertEquals(emptyList(), scan.rejected)
+        assertEquals(
+            mapOf("mid" to listOf<ModuleWait>(ModuleWait.Missing("base", ApiVersion(1, 0))), "app" to listOf<ModuleWait>(ModuleWait.Stopped("mid", "mid"))),
+            scan.waiting.associate { it.id to it.reasons },
+        )
+    }
+
+    @Test
+    fun `a jar that states no version cannot be required by its id`() {
+        install("app.jar", id = "app", requires = "base=1.0")
+        install("base.jar", id = "base")
+
+        assertEquals(listOf<ModuleWait>(ModuleWait.Missing("base", ApiVersion(1, 0))), scan().waiting.single().reasons)
+    }
+
+    @Test
+    fun `a jar whose requirement is switched off waits for it by name`() {
+        install("app.jar", id = "app", requires = "base=1.0")
+        install("base.jar", id = "base", version = "1.0")
+
+        val scan = WidgetModuleLoader(modules, disabled = setOf("base")).scan().also { opened += it.loaded }
+
+        assertEquals(emptyList(), scan.loaded)
+        assertEquals(listOf("base"), scan.disabled.map { it.id })
+        assertEquals(listOf<ModuleWait>(ModuleWait.Off("base", "base")), scan.waiting.single().reasons)
+    }
+
+    @Test
+    fun `jars that require each other in a circle wait with the circle`() {
+        install("a.jar", id = "a", version = "1.0", requires = "b=1.0")
+        install("b.jar", id = "b", version = "1.0", requires = "a=1.0")
+
+        val scan = scan()
+
+        assertEquals(emptyList(), scan.loaded)
+        assertEquals(setOf("a", "b"), scan.waiting.map { it.id }.toSet())
+        scan.waiting.forEach { assertEquals(listOf<ModuleWait>(ModuleWait.Cycle(listOf("a", "b"))), it.reasons) }
+    }
+
+    @Test
+    fun `a jar that requires one that does not load waits for it, and the one that did not load is refused`() {
+        install("app.jar", id = "app", requires = "base=1.0")
+        install("base.jar", id = "base", version = "1.0", withService = false)
+
+        val scan = scan()
+
+        assertEquals(emptyList(), scan.loaded)
+        assertTrue("neither a registry" in scan.rejected.single().reason, scan.rejected.single().reason)
+        assertEquals(listOf<ModuleWait>(ModuleWait.Stopped("base", "base")), scan.waiting.single().reasons)
+    }
+
+    @Test
+    fun `what a jar only uses is loaded before it and is not waited for`() {
+        install("a.jar", id = "app", uses = "base=1.0, gone=1.0")
+        install("b.jar", id = "base", version = "1.0")
+
+        val scan = scan()
+
+        assertEquals(listOf("base", "app"), scan.loaded.map { it.id })
+        assertEquals(emptyList(), scan.waiting)
+    }
+
+    @Test
+    fun `a jar that names an API it requires sees the classes of the jar that publishes it, the same ones`() {
+        install("a.jar", id = "app", requires = "wobble=1.0")
+        install("b.jar", id = "base", provides = "wobble=1.0", apiPackages = "wobble=fixture.wobble.api", classes = listOf(API, HIDDEN))
+
+        val (base, app) = scan().loaded
+
+        assertSame(base.loader.loadClass(API), app.loader.loadClass(API))
+        assertSame(base.loader, app.loader.loadClass(API).classLoader)
+        assertFailsWith<ClassNotFoundException>("a package it does not publish") { app.loader.loadClass(HIDDEN) }
+    }
+
+    @Test
+    fun `a jar that does not name an API does not see it, and one that only uses it does`() {
+        install("a.jar", id = "stranger")
+        install("b.jar", id = "base", provides = "wobble=1.1", apiPackages = "wobble=fixture.wobble.api", classes = listOf(API))
+        install("c.jar", id = "user", uses = "wobble=1.0")
+        install("d.jar", id = "newer", uses = "wobble=1.2")
+
+        val loaded = scan().loaded.associateBy { it.id }
+
+        assertEquals(setOf("stranger", "base", "user", "newer"), loaded.keys)
+        assertSame(loaded.getValue("base").loader.loadClass(API), loaded.getValue("user").loader.loadClass(API))
+        listOf("stranger", "newer").forEach { id -> assertFailsWith<ClassNotFoundException>(id) { loaded.getValue(id).loader.loadClass(API) } }
+    }
+
+    @Test
+    fun `a jar that carries nothing but an API is a module`() {
+        install("api.jar", id = "base", withService = false, provides = "wobble=1.0", apiPackages = "wobble=fixture.wobble.api", classes = listOf(API))
+
+        val scan = scan()
+
+        assertEquals(emptyList(), scan.rejected)
+        assertEquals(mapOf("wobble" to setOf("fixture.wobble.api")), scan.loaded.single().published)
+    }
+
+    @Test
+    fun `an API is published once, and never over the launcher's`() {
+        install("a.jar", id = "first", provides = "wobble=1.0", apiPackages = "wobble=fixture.wobble.api")
+        install("b.jar", id = "second", provides = "wobble=2.0", apiPackages = "wobble=fixture.other.api")
+        install("c.jar", id = "third", provides = "nexira.packs=1.0", apiPackages = "nexira.packs=fixture.packs.api")
+        install("d.jar", id = "fourth", provides = "mine=1.0", apiPackages = "mine=kotlin.mine")
+        install("e.jar", id = "nexira.packs")
+
+        val scan = scan(offered = mapOf("nexira.packs" to ApiVersion(1, 0)))
+
+        assertEquals(listOf("first"), scan.loaded.map { it.id })
+        val reasons = scan.rejected.associate { it.file.fileName.toString() to it.reason }
+        assertTrue("a.jar already offers" in reasons.getValue("b.jar"), "$reasons")
+        assertTrue("which this launcher offers" in reasons.getValue("c.jar"), "$reasons")
+        assertTrue("the launcher shares 'kotlin'" in reasons.getValue("d.jar"), "$reasons")
+        assertTrue("one of the launcher's own" in reasons.getValue("e.jar"), "$reasons")
+    }
+
+    @Test
+    fun `a manifest that contradicts itself is refused with what contradicts`() {
+        install("a.jar", id = "a", requires = "x=1.0", uses = "x=1.0")
+        install("b.jar", id = "b", provides = "x=1.0")
+        install("c.jar", id = "c", apiPackages = "x=some.pkg")
+        install("d.jar", id = "d", version = "one")
+        install("e.jar", id = "e", version = "1.0", provides = "e=2.0", apiPackages = "e=some.pkg")
+        install("f.jar", id = "f", provides = "f.api=1.0", apiPackages = "f.api")
+
+        val scan = scan()
+
+        assertEquals(emptyList(), scan.loaded)
+        val reasons = scan.rejected.associate { it.file.fileName.toString() to it.reason }
+        assertTrue("both in" in reasons.getValue("a.jar"), "$reasons")
+        assertTrue("names no package" in reasons.getValue("b.jar"), "$reasons")
+        assertTrue("which is not in ${WidgetApi.MANIFEST_PROVIDES}" in reasons.getValue("c.jar"), "$reasons")
+        assertTrue(WidgetApi.MANIFEST_MODULE_VERSION in reasons.getValue("d.jar"), "$reasons")
+        assertTrue("offers its own id at 2.0" in reasons.getValue("e.jar"), "$reasons")
+        assertTrue("which is not id=package" in reasons.getValue("f.jar"), "$reasons")
+    }
+
+    @Test
+    fun `a second jar of one id stands in for a first that does not load, where it declares the same`() {
+        install("a.jar", withService = false)
+        install("b.jar")
+
+        val scan = scan()
+
+        assertEquals("b.jar", scan.loaded.single().file.fileName.toString())
+        assertEquals(listOf("a.jar"), scan.rejected.map { it.file.fileName.toString() })
+    }
+
+    @Test
+    fun `a jar required of the launcher by its id alone needs none of its classes`() {
+        install("app.jar", id = "app", requires = "nexira.look.system=1.0")
+
+        val scan = WidgetModuleLoader(
+            modules,
+            offered = mapOf("nexira.look.system" to ApiVersion(1, 0)),
+            apiPackages = mapOf("nexira.look.system" to emptySet()),
+        ).scan().also { opened += it.loaded }
+
+        assertEquals(listOf("app"), scan.loaded.map { it.id })
     }
 
     // -- what a jar sees of the application -----------------------------------
@@ -670,6 +860,11 @@ class WidgetModuleLoaderTest {
         withRegistryService: Boolean = true,
         extra: Map<String, String> = emptyMap(),
         requires: String? = null,
+        uses: String? = null,
+        version: String? = null,
+        provides: String? = null,
+        apiPackages: String? = null,
+        classes: List<String> = emptyList(),
     ) {
         val manifest = Manifest().apply {
             mainAttributes[Attributes.Name.MANIFEST_VERSION] = "1.0"
@@ -677,6 +872,10 @@ class WidgetModuleLoaderTest {
             id?.let { mainAttributes.putValue(WidgetApi.MANIFEST_ID, it) }
             name?.let { mainAttributes.putValue(WidgetApi.MANIFEST_NAME, it) }
             requires?.let { mainAttributes.putValue(WidgetApi.MANIFEST_REQUIRES, it) }
+            uses?.let { mainAttributes.putValue(WidgetApi.MANIFEST_USES, it) }
+            version?.let { mainAttributes.putValue(WidgetApi.MANIFEST_MODULE_VERSION, it) }
+            provides?.let { mainAttributes.putValue(WidgetApi.MANIFEST_PROVIDES, it) }
+            apiPackages?.let { mainAttributes.putValue(WidgetApi.MANIFEST_API_PACKAGES, it) }
         }
         JarFile(fixtureJar.toFile()).use { source ->
             JarOutputStream(Files.newOutputStream(modules.resolve(fileName)), manifest).use { out ->
@@ -695,7 +894,18 @@ class WidgetModuleLoaderTest {
                     out.write(text.toByteArray(Charsets.UTF_8))
                     out.closeEntry()
                 }
+                classes.forEach { name ->
+                    out.putNextEntry(JarEntry(name.replace('.', '/') + ".class"))
+                    out.write(ClassFile.of().build(ClassDesc.of(name)) { it.withFlags(AccessFlag.PUBLIC, AccessFlag.INTERFACE, AccessFlag.ABSTRACT) })
+                    out.closeEntry()
+                }
             }
         }
+    }
+
+    private companion object {
+        /** Empty interfaces a test jar carries: one in a package it publishes, one in a package it does not. */
+        const val API = "fixture.wobble.api.Wobble"
+        const val HIDDEN = "fixture.wobble.Inside"
     }
 }

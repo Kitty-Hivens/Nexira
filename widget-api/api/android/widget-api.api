@@ -44,7 +44,10 @@ public abstract interface class hivens/widget/api/CompiledModule {
 	public abstract fun getId ()Ljava/lang/String;
 	public abstract fun getName ()Ljava/lang/String;
 	public fun getProvides ()Ljava/util/Map;
+	public fun getRequires ()Ljava/util/Map;
 	public fun getStrings ()Lhivens/widget/api/ModuleStrings;
+	public fun getUses ()Ljava/util/Map;
+	public fun getVersion ()Lhivens/widget/model/ApiVersion;
 	public fun getWidgets ()Lhivens/widget/api/WidgetRegistry;
 }
 
@@ -53,7 +56,10 @@ public final class hivens/widget/api/CompiledModule$DefaultImpls {
 	public static fun getBoot (Lhivens/widget/api/CompiledModule;)Lhivens/widget/api/BootAnswers;
 	public static fun getContributionKinds (Lhivens/widget/api/CompiledModule;)Ljava/util/List;
 	public static fun getProvides (Lhivens/widget/api/CompiledModule;)Ljava/util/Map;
+	public static fun getRequires (Lhivens/widget/api/CompiledModule;)Ljava/util/Map;
 	public static fun getStrings (Lhivens/widget/api/CompiledModule;)Lhivens/widget/api/ModuleStrings;
+	public static fun getUses (Lhivens/widget/api/CompiledModule;)Ljava/util/Map;
+	public static fun getVersion (Lhivens/widget/api/CompiledModule;)Lhivens/widget/model/ApiVersion;
 	public static fun getWidgets (Lhivens/widget/api/CompiledModule;)Lhivens/widget/api/WidgetRegistry;
 }
 
@@ -713,9 +719,13 @@ public abstract class hivens/widget/api/ViewportHandle {
 public final class hivens/widget/api/WidgetApi {
 	public static final field $stable I
 	public static final field INSTANCE Lhivens/widget/api/WidgetApi;
+	public static final field MANIFEST_API_PACKAGES Ljava/lang/String;
 	public static final field MANIFEST_ID Ljava/lang/String;
+	public static final field MANIFEST_MODULE_VERSION Ljava/lang/String;
 	public static final field MANIFEST_NAME Ljava/lang/String;
+	public static final field MANIFEST_PROVIDES Ljava/lang/String;
 	public static final field MANIFEST_REQUIRES Ljava/lang/String;
+	public static final field MANIFEST_USES Ljava/lang/String;
 	public static final field MANIFEST_VERSION Ljava/lang/String;
 	public static final field VERSION I
 }

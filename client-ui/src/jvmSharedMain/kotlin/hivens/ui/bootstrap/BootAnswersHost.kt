@@ -6,6 +6,7 @@ import hivens.ui.modulesNamedBy
 import hivens.ui.settings.SettingsDomainFiles
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.ui.widgets.modules.bootTakenContributions
+import hivens.ui.widgets.modules.broughtIn
 import hivens.ui.widgets.modules.fixedTakenWords
 import hivens.ui.widgets.modules.launcherWords
 import hivens.widget.api.BootContext
@@ -36,8 +37,8 @@ private val log = LoggerFactory.getLogger("BootAnswers")
 
 /**
  * What the modules compiled into the build answer of their app sources before the host is up, from
- * what [dataDir] holds: the [CompiledModule.boot] of every module the document names ([named]), in the
- * build's order, the first answer of a key kept. The window the launcher boots in is drawn and worded
+ * what [dataDir] holds: the [CompiledModule.boot] of every module the document names ([named]) and of what
+ * those require, in the build's order, the first answer of a key kept. The window the launcher boots in is drawn and worded
  * with these, and a module the document leaves out answers nothing, as its keys answer nothing once
  * the shell is up.
  *
@@ -52,10 +53,11 @@ fun bootValues(
     named: Set<String> = documentModules(dataDir),
 ): BootValues {
     val words = fixedTakenWords(launcherWords(compiled))
-    val taken = bootTakenContributions(named, compiled)
+    val brought = broughtIn(named, compiled)
+    val taken = bootTakenContributions(brought, compiled)
     return compiled.fold(BootValues.NONE) { gathered, module ->
         val answered = try {
-            answerOf(module, named, dataDir, words, taken, compiled)
+            answerOf(module, brought, dataDir, words, taken, compiled)
         } catch (e: Throwable) {
             if (e is VirtualMachineError) throw e
             log.warn("The module '{}' could not answer before the boot, and its values are drawn with the fallbacks", runCatching { module.id }.getOrNull(), e)
@@ -100,19 +102,19 @@ private val LayoutJson: Json = Json {
 }
 
 /**
- * What [module] answers, held to what it declares, or nothing where the document leaves it out or it
- * answers nothing. [compiled] are the modules whose context it may ask for, see [BootContext.ofModule].
+ * What [module] answers, held to what it declares, or nothing where it is not in [brought] or it answers
+ * nothing. [compiled] are the modules whose context it may ask for, see [BootContext.ofModule].
  */
 private fun answerOf(
     module: CompiledModule,
-    named: Set<String>,
+    brought: Set<String>,
     dataDir: Path,
     words: TakenWords,
     taken: TakenContributions,
     compiled: List<CompiledModule>,
 ): BootValues {
     val id = module.id
-    if (id !in named) return BootValues.NONE
+    if (id !in brought) return BootValues.NONE
     val answers = module.boot ?: return BootValues.NONE
     val owned = Owned.of(module.contributions)
     val answered = answers.answer(HostBootContext(id, dataDir, owned.domains, words, taken, compiled))

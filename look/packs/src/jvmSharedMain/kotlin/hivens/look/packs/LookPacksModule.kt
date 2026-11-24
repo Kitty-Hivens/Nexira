@@ -5,6 +5,7 @@ import hivens.look.manager.api.LookPack
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleStrings
+import hivens.widget.model.ApiVersion
 
 /**
  * The packs that ship, as the application carries them: compiled in, and read by the look manager
@@ -17,6 +18,7 @@ object LookPacksModule : CompiledModule {
     override val id: String = ID
     override val name: String = NAME
     override val strings: ModuleStrings = ModuleStrings.resources(LookPacksModule::class.java, ID)
+    override val requires: Map<String, ApiVersion> = mapOf(LookApi.ID to LookApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(NexiraPack)
 
     private const val NAME = "packs.name"

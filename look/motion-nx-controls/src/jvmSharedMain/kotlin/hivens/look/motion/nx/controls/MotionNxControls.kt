@@ -1,10 +1,14 @@
 package hivens.look.motion.nx.controls
 
 import androidx.compose.runtime.Composable
+import hivens.i18n.api.I18nApi
 import hivens.i18n.api.strings
+import hivens.look.icon.api.IconApi
+import hivens.look.manager.api.LookApi
 import hivens.look.manager.api.LookKeys
 import hivens.look.manager.api.LookState
 import hivens.look.motion.api.Motion
+import hivens.look.motion.api.MotionApi
 import hivens.look.motion.nx.MotionNxKeys
 import hivens.look.motion.nx.MotionNxModule
 import hivens.ui.icons.NxIcon
@@ -22,6 +26,7 @@ import hivens.widget.api.flowSource
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
+import hivens.widget.model.ApiVersion
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 import hivens.widget.model.Widget
@@ -46,6 +51,8 @@ object MotionNxControls : CompiledModule {
     override val id: String = ID
     override val name: String = "controls.name"
     override val strings: ModuleStrings = ModuleStrings.resources(MotionNxControls::class.java, ID)
+    override val requires: Map<String, ApiVersion> = mapOf(MotionNxModule.ID to MotionNxModule.version, LookApi.ID to LookApi.VERSION)
+    override val uses: Map<String, ApiVersion> = mapOf(MotionApi.ID to MotionApi.VERSION, IconApi.ID to IconApi.VERSION, I18nApi.ID to I18nApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(MotionControlsKeys)
     override val widgets: WidgetRegistry get() = controlsWidgets
 }

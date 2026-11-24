@@ -318,6 +318,102 @@ public final class hivens/widget/model/LayoutGraphKt {
 	public static final fun walkInstances (Lhivens/widget/model/LayoutGraph;)Lkotlin/sequences/Sequence;
 }
 
+public final class hivens/widget/model/ModuleGraph {
+	public static final field Companion Lhivens/widget/model/ModuleGraph$Companion;
+	public final fun dependantsOf (Ljava/lang/String;)Ljava/util/List;
+	public final fun getOrder ()Ljava/util/List;
+	public final fun getWaiting ()Ljava/util/Map;
+	public final fun providerOf (Ljava/lang/String;)Ljava/lang/String;
+	public final fun requiredBy (Ljava/util/Collection;)Ljava/util/List;
+	public final fun serves (Ljava/lang/String;Lhivens/widget/model/ApiVersion;)Z
+	public final fun versionOf (Ljava/lang/String;)Lhivens/widget/model/ApiVersion;
+}
+
+public final class hivens/widget/model/ModuleGraph$Companion {
+	public final fun getEMPTY ()Lhivens/widget/model/ModuleGraph;
+	public final fun of (Ljava/util/List;)Lhivens/widget/model/ModuleGraph;
+}
+
+public final class hivens/widget/model/ModuleNode {
+	public fun <init> (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;Z)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Ljava/util/Map;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getId ()Ljava/lang/String;
+	public final fun getOff ()Z
+	public final fun getOffers ()Ljava/util/Map;
+	public final fun getRequires ()Ljava/util/Map;
+	public final fun getUses ()Ljava/util/Map;
+}
+
+public abstract interface class hivens/widget/model/ModuleWait {
+}
+
+public final class hivens/widget/model/ModuleWait$Cycle : hivens/widget/model/ModuleWait {
+	public fun <init> (Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;)Lhivens/widget/model/ModuleWait$Cycle;
+	public static synthetic fun copy$default (Lhivens/widget/model/ModuleWait$Cycle;Ljava/util/List;ILjava/lang/Object;)Lhivens/widget/model/ModuleWait$Cycle;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getModules ()Ljava/util/List;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/ModuleWait$Missing : hivens/widget/model/ModuleWait {
+	public fun <init> (Ljava/lang/String;Lhivens/widget/model/ApiVersion;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lhivens/widget/model/ApiVersion;
+	public final fun copy (Ljava/lang/String;Lhivens/widget/model/ApiVersion;)Lhivens/widget/model/ModuleWait$Missing;
+	public static synthetic fun copy$default (Lhivens/widget/model/ModuleWait$Missing;Ljava/lang/String;Lhivens/widget/model/ApiVersion;ILjava/lang/Object;)Lhivens/widget/model/ModuleWait$Missing;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getName ()Ljava/lang/String;
+	public final fun getNeeded ()Lhivens/widget/model/ApiVersion;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/ModuleWait$Off : hivens/widget/model/ModuleWait {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/ModuleWait$Off;
+	public static synthetic fun copy$default (Lhivens/widget/model/ModuleWait$Off;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/ModuleWait$Off;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getModule ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/ModuleWait$OtherVersion : hivens/widget/model/ModuleWait {
+	public fun <init> (Ljava/lang/String;Lhivens/widget/model/ApiVersion;Lhivens/widget/model/ApiVersion;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Lhivens/widget/model/ApiVersion;
+	public final fun component3 ()Lhivens/widget/model/ApiVersion;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Lhivens/widget/model/ApiVersion;Lhivens/widget/model/ApiVersion;Ljava/lang/String;)Lhivens/widget/model/ModuleWait$OtherVersion;
+	public static synthetic fun copy$default (Lhivens/widget/model/ModuleWait$OtherVersion;Ljava/lang/String;Lhivens/widget/model/ApiVersion;Lhivens/widget/model/ApiVersion;Ljava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/ModuleWait$OtherVersion;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getHere ()Lhivens/widget/model/ApiVersion;
+	public final fun getModule ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public final fun getNeeded ()Lhivens/widget/model/ApiVersion;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/ModuleWait$Stopped : hivens/widget/model/ModuleWait {
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/ModuleWait$Stopped;
+	public static synthetic fun copy$default (Lhivens/widget/model/ModuleWait$Stopped;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/ModuleWait$Stopped;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getModule ()Ljava/lang/String;
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class hivens/widget/model/NestedSegment {
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;

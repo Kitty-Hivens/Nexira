@@ -82,8 +82,10 @@ import hivens.ui.widgets.levelServices
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
+import hivens.ui.widgets.modules.broughtIn
 import hivens.ui.widgets.modules.hostTakenContributions
 import hivens.ui.widgets.modules.hostTakenWords
+import hivens.ui.widgets.modules.moduleGraph
 import hivens.ui.widgets.profile.ProfileSelection
 import hivens.ui.widgets.profile.ProfileSelectionSource
 import hivens.ui.widgets.state.WidgetStateFlushHook
@@ -304,9 +306,12 @@ fun uiCoreModule(
     }
     single<WidgetRegistry> { get<WidgetModules>().registry }
 
-    // The compiled modules that are in: the ones the document names, read once, and the ones
-    // brought in since.
-    single { ModulesIn(modulesNamedBy(get<LayoutGraphRepository>().value()) { DefaultLayout.modules(get()) }) }
+    // The compiled modules that are in: the ones the document names, read once, the ones those
+    // and the jars switched on require, and the ones brought in since.
+    single {
+        val named = modulesNamedBy(get<LayoutGraphRepository>().value()) { DefaultLayout.modules(get()) }
+        ModulesIn(broughtIn(named, compiled, jarsRequire = get<WidgetModules>().state.value.requires))
+    }
 
     // What the modules brought in contribute of the kinds the compiled modules take: the
     // compiled modules in and the jars switched on, as either changes. The modules the host
@@ -438,6 +443,7 @@ fun uiCoreModule(
             failures = reportedTo(get(), keys),
         ).also { app ->
             followModuleReloads(get<WidgetModules>().state, keys, app, appScope)
+            followRequirements(get<WidgetModules>().state, compiled, get(), appScope)
             get<SourceWorks>().attach(sourceWorksOf(app))
         }
     }
@@ -882,6 +888,17 @@ internal fun followModuleReloads(modules: StateFlow<WidgetModules.Snapshot>, key
                 }
             }
         }
+    }
+}
+
+/**
+ * Brings in what the jars of [modules] require of [compiled] as they change, a jar switched on while the
+ * launcher runs say, so what it requires is there for what it contributes at once.
+ */
+internal fun followRequirements(modules: StateFlow<WidgetModules.Snapshot>, compiled: List<CompiledModule>, bringIn: BringIn, scope: CoroutineScope) {
+    val graph = moduleGraph(compiled)
+    scope.launch {
+        modules.collect { now -> now.requires.mapNotNull(graph::providerOf).distinct().forEach { val _ = bringIn.bringIn(it) } }
     }
 }
 

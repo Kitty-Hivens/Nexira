@@ -25,6 +25,7 @@ import hivens.widget.api.missingNeeds
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
+import hivens.widget.model.ApiVersion
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
@@ -161,6 +162,78 @@ class BringInTest {
         }
     }
 
+    /** A module of version 1.0 that requires [requires], with no keys of its own. */
+    private class Requiring(override val id: String, vararg requires: String) : CompiledModule {
+        override val name = id
+        override val version: ApiVersion = V1
+        override val requires: Map<String, ApiVersion> = requires.associateWith { V1 }
+        override val contributions: List<ModuleContribution> = emptyList()
+    }
+
+    /** The shelf as a module another can require by its id. */
+    private inner class VersionedShelf : CompiledModule {
+        override val id = "test.shelf"
+        override val name = id
+        override val version: ApiVersion = V1
+        override val contributions: List<ModuleContribution> = listOf(shelfKeys, novel)
+    }
+
+    @Test
+    fun `what a module requires is brought in with it, however far down`() {
+        val modules = listOf(Requiring("test.top", "test.mid"), Requiring("test.mid", "test.shelf"), VersionedShelf())
+        ModuleAppLevel(dir, modules, scope, named = emptySet()).use { shell ->
+            assertNull(shell.app.find(level))
+            assertTrue(shell.bringIn.bringIn("test.top"))
+            assertEquals(1, shell.value(level))
+            assertEquals(setOf("test.top", "test.mid", "test.shelf"), shell.modulesIn.ids.value)
+        }
+    }
+
+    @Test
+    fun `what a module the document names requires is in from the start`() {
+        ModuleAppLevel(dir, listOf(Requiring("test.top", "test.shelf"), VersionedShelf()), scope, named = setOf("test.top")).use { shell ->
+            assertEquals(setOf("test.top", "test.shelf"), shell.modulesIn.ids.value)
+            assertEquals(1, shell.value(level))
+        }
+    }
+
+    @Test
+    fun `a module whose requirement is not in the build, or that requires itself in a circle, is not brought in`() {
+        val modules = listOf(Requiring("test.lost", "test.gone"), Requiring("test.a", "test.b"), Requiring("test.b", "test.a"), Requiring("test.over", "test.lost"))
+        ModuleAppLevel(dir, modules, scope, named = emptySet()).use { shell ->
+            listOf("test.lost", "test.a", "test.b", "test.over").forEach { assertFalse(shell.bringIn.bringIn(it), it) }
+            assertEquals(emptySet(), shell.modulesIn.ids.value)
+        }
+    }
+
+    @Test
+    fun `a module whose requirement is refused its keys is not brought in`() {
+        val squatter = Squatter()
+        val needsSquatter = Requiring("test.needs", "test.squatter")
+        val versioned = object : CompiledModule by squatter {
+            override val version: ApiVersion = V1
+        }
+        ModuleAppLevel(dir, listOf(Shelf(), versioned, needsSquatter), scope, named = setOf("test.shelf")).use { shell ->
+            assertFalse(shell.bringIn.bringIn("test.needs"))
+            assertFalse("test.needs" in shell.modulesIn.ids.value)
+        }
+    }
+
+    @Test
+    fun `what a jar switched on while the launcher runs requires is brought in`() {
+        val compiled = listOf(Requiring("test.top", "test.shelf"), VersionedShelf())
+        val jars = MutableStateFlow(ModuleAppLevel.noJars())
+        ModuleAppLevel(dir, compiled, scope, jars = jars, named = emptySet()).use { shell ->
+            followRequirements(jars, compiled, shell.bringIn, scope)
+            assertEquals(emptySet(), shell.modulesIn.ids.value)
+
+            jars.value = jars.value.copy(requires = setOf("test.top", "someone.else"))
+
+            eventually("the module it requires, and what that requires, are in") { shell.modulesIn.ids.value == setOf("test.top", "test.shelf") }
+            assertEquals(1, shell.value(level))
+        }
+    }
+
     @Test
     fun `a module brought in gets in what it would by being named, through the same checks`() {
         val named = ModuleAppLevel(dir, listOf(Shelf(), Squatter()), scope)
@@ -238,5 +311,9 @@ class BringInTest {
                 "every read that found the shelf's keys missing reads them again",
             )
         }
+    }
+
+    private companion object {
+        val V1 = ApiVersion(1, 0)
     }
 }

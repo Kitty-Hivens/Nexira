@@ -4,11 +4,13 @@ import hivens.look.icon.api.Icon
 import hivens.look.icon.api.IconAnswers
 import hivens.look.icon.api.IconApi
 import hivens.look.manager.api.LookAnswers
+import hivens.look.manager.api.LookApi
 import hivens.look.manager.api.LookContext
 import hivens.look.manager.api.LookProvider
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleStrings
+import hivens.widget.model.ApiVersion
 
 /**
  * The Google icon provider in the Rounded style as the application carries it: compiled in, and brought
@@ -25,6 +27,7 @@ object IconGoogleRoundedModule : CompiledModule {
     override val id: String = ID
     override val name: String = "icon.google.rounded.name"
     override val strings: ModuleStrings = ModuleStrings.resources(IconGoogleRoundedModule::class.java, ID)
+    override val requires: Map<String, ApiVersion> = mapOf(LookApi.ID to LookApi.VERSION, IconApi.ID to IconApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(GoogleRoundedProvider)
 }
 

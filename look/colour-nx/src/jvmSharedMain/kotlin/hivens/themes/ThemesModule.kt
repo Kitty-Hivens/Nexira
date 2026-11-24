@@ -6,8 +6,11 @@
 package hivens.themes
 
 import hivens.i18n.api.FixedTranslations
+import hivens.i18n.api.I18nApi
 import hivens.i18n.api.Translations
 import hivens.i18n.api.Translator
+import hivens.look.colour.api.ColourApi
+import hivens.look.manager.api.LookApi
 import hivens.themes.api.ThemeContribution
 import hivens.themes.api.ThemeInputs
 import hivens.themes.api.ThemeMode
@@ -64,6 +67,7 @@ object ThemesModule : CompiledModule {
     // The API's own object lives in the API artifact's package, so the package is read off it.
     override val apiPackages: Map<String, Set<String>> = mapOf(ThemesApi.ID to setOf(ThemesApi::class.java.name.substringBeforeLast('.')))
     override val contributionKinds: List<Class<out ModuleContribution>> = listOf(ThemeContribution::class.java)
+    override val uses: Map<String, ApiVersion> = mapOf(LookApi.ID to LookApi.VERSION, ColourApi.ID to ColourApi.VERSION, I18nApi.ID to I18nApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(ThemesKeysContribution, NxColourProvider)
     override val boot: BootAnswers = BootAnswers(::bootAnswer)
 

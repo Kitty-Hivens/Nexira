@@ -1,6 +1,7 @@
 package hivens.look.stroke.nx
 
 import hivens.look.manager.api.LookAnswers
+import hivens.look.manager.api.LookApi
 import hivens.look.manager.api.LookContext
 import hivens.look.manager.api.LookProvider
 import hivens.look.stroke.api.Stroke
@@ -10,6 +11,7 @@ import hivens.ui.theme.nxStrokeAnswers
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleStrings
+import hivens.widget.model.ApiVersion
 
 /**
  * The nx stroke provider as the application carries it: compiled in, and brought in by the look
@@ -26,6 +28,7 @@ object StrokeNxModule : CompiledModule {
     override val id: String = ID
     override val name: String = "stroke.nx.name"
     override val strings: ModuleStrings = ModuleStrings.resources(StrokeNxModule::class.java, ID)
+    override val requires: Map<String, ApiVersion> = mapOf(LookApi.ID to LookApi.VERSION, StrokeApi.ID to StrokeApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(NxStrokeProvider)
 }
 

@@ -5,6 +5,7 @@
 
 package hivens.source.modrinth
 
+import hivens.catalogue.api.CatalogueApi
 import hivens.catalogue.api.CatalogueCard
 import hivens.catalogue.api.PackListing
 import hivens.catalogue.api.PackSourceContribution
@@ -32,6 +33,7 @@ import hivens.widget.api.ModuleKeys
 import hivens.widget.api.ModuleStrings
 import hivens.widget.api.get
 import hivens.widget.api.service
+import hivens.widget.model.ApiVersion
 import hivens.widget.model.ScopeLevel
 import java.nio.file.Path
 
@@ -46,6 +48,7 @@ object ModrinthSourceModule : CompiledModule {
     override val id: String = ID
     override val name: String = NAME
     override val strings: ModuleStrings = ModuleStrings.resources(ModrinthSourceModule::class.java, ID)
+    override val requires: Map<String, ApiVersion> = mapOf(CatalogueApi.ID to CatalogueApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(ModrinthSourceKeys, ModrinthPackSource, ModrinthProjectSource)
 
     private const val NAME = "modrinth.name"

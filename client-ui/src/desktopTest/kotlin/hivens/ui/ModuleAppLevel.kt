@@ -6,6 +6,7 @@ import hivens.ui.host.LauncherHostAccess
 import hivens.ui.layout.LayoutReconcile
 import hivens.ui.settings.SettingsDomainFiles
 import hivens.ui.widgets.modules.WidgetModules
+import hivens.ui.widgets.modules.broughtIn
 import hivens.ui.widgets.modules.hostTakenContributions
 import hivens.ui.widgets.modules.hostTakenWords
 import hivens.widget.api.BringIn
@@ -61,7 +62,7 @@ internal class ModuleAppLevel(
     val settings = SettingsDomainFiles(dataDir.resolve(Storage.SETTINGS_DIR), dataDir.resolve(Storage.SETTINGS_FILE))
 
     private val keys = HostKeys(WidgetDataRegistry(), WidgetCommandRegistry(), ContributedServices()).also { keys ->
-        moduleKeys(keys, named, compiled, jars = emptyList())
+        moduleKeys(keys, broughtIn(named, compiled), compiled, jars = emptyList())
     }
 
     /** The app's source registry, which the host provides at its composition root. */
@@ -70,8 +71,8 @@ internal class ModuleAppLevel(
     /** The app's command registry, which the host provides at its composition root. */
     val commands: WidgetCommandRegistry get() = keys.commands
 
-    /** The compiled modules in: the ones [named] names, and the ones brought in since. */
-    val modulesIn = ModulesIn(named)
+    /** The compiled modules in: the ones [named] names, what those require, and the ones brought in since. */
+    val modulesIn = ModulesIn(broughtIn(named, compiled))
 
     /** How a trusted module brings in one of [compiled] that [named] leaves out, as the launcher's Koin makes it. */
     val bringIn = HostBringIn(keys, compiled, modulesIn, app = { app })

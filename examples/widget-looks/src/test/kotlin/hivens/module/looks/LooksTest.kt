@@ -7,6 +7,7 @@ import hivens.widget.api.ParticleContribution
 import hivens.widget.api.ParticlePalette
 import hivens.widget.loader.WidgetModuleLoader
 import androidx.compose.ui.graphics.Color
+import hivens.widget.model.ModuleWait
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Properties
@@ -48,14 +49,14 @@ class LooksTest {
     }
 
     @Test
-    fun `the jar names the themes API it brings its themes through, and is refused where the launcher carries none`() {
+    fun `the jar names the themes API it brings its themes through, and waits where the launcher carries none`() {
         val jar = Path.of(requireNotNull(System.getProperty("nexira.test.moduleJar")))
         val dir = Files.createTempDirectory("looks-")
         Files.copy(jar, dir.resolve("looks.jar"))
         val scan = WidgetModuleLoader(dir, parent = WithoutThisModule(javaClass.classLoader)).scan()
         try {
             assertEquals(emptyList(), scan.loaded)
-            assertTrue(ThemesApi.ID in scan.rejected.single().reason, scan.rejected.single().reason)
+            assertEquals(listOf<ModuleWait>(ModuleWait.Missing(ThemesApi.ID, ThemesApi.VERSION)), scan.waiting.single().reasons)
         } finally {
             scan.loaded.forEach { it.loader.close() }
             Files.walk(dir).use { walk -> walk.sorted(Comparator.reverseOrder()).forEach { Files.deleteIfExists(it) } }

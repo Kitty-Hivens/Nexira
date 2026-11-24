@@ -5,6 +5,7 @@
 package hivens.look.motion.nx
 
 import hivens.look.manager.api.LookAnswers
+import hivens.look.manager.api.LookApi
 import hivens.look.manager.api.LookContext
 import hivens.look.manager.api.LookProvider
 import hivens.look.motion.api.Motion
@@ -28,6 +29,7 @@ import hivens.widget.api.command
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
 import hivens.widget.api.service
+import hivens.widget.model.ApiVersion
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
@@ -64,6 +66,8 @@ object MotionNxModule : CompiledModule {
     override val id: String = ID
     override val name: String = "motion.nx.name"
     override val strings: ModuleStrings = ModuleStrings.resources(MotionNxModule::class.java, ID)
+    override val version: ApiVersion = ApiVersion(1, 0)
+    override val uses: Map<String, ApiVersion> = mapOf(LookApi.ID to LookApi.VERSION, MotionApi.ID to MotionApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(MotionNxKeysContribution, NxMotionProvider)
 }
 

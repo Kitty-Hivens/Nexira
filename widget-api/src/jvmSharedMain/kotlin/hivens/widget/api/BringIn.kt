@@ -9,15 +9,16 @@ package hivens.widget.api
  *
  * One of the host's own services: the host and the modules it trusts reach it through their host view,
  * and no jar does. Nothing is brought in before the host is up. A module brought in stays in for as long
- * as the app level lives. Safe to call from any thread, and quick for a module already in. A compiled
- * module declares no APIs it requires, so none are checked here: that check is the jar loader's.
+ * as the app level lives. Safe to call from any thread, and quick for a module already in. What the
+ * module requires ([CompiledModule.requires]) is brought in before it.
  */
 @HostApi
 fun interface BringIn {
     /**
-     * Brings in the compiled module [moduleId]. True where it is in afterwards: the document names it, it
-     * was brought in before, or it is now. False where the build carries no compiled module of that id, or
-     * the host refused its keys, which the log says. A module refused once is not tried again.
+     * Brings in the compiled module [moduleId], and what it requires before it. True where it is in
+     * afterwards: the document names it, it was brought in before, or it is now. False where the build
+     * carries no compiled module of that id, something it requires is not in, or the host refused its keys,
+     * which the log says. A module refused once is not tried again.
      */
     fun bringIn(moduleId: String): Boolean
 }

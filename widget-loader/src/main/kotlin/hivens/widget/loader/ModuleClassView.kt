@@ -18,23 +18,32 @@ import java.util.Enumeration
  * does not share is either the jar's own copy or missing. Resources follow the same
  * rule by the package their path names, so a service file or a class file of the
  * launcher is not read through the jar either.
+ *
+ * What another module publishes comes last, from that module's own loader ([others]): the
+ * packages of an API the jar names. A name the launcher shares is always the launcher's.
  */
 internal class ModuleClassView(
     name: String,
     private val host: ClassLoader,
     private val packages: Set<String>,
     private val classes: Set<String> = emptySet(),
+    private val others: List<Published> = emptyList(),
 ) : ClassLoader(name, getPlatformClassLoader()) {
 
     override fun findClass(name: String): Class<*> {
-        if (!sharesClass(name)) throw ClassNotFoundException(name)
-        return host.loadClass(name)
+        if (sharesClass(name)) return host.loadClass(name)
+        val pkg = name.substringBeforeLast('.', missingDelimiterValue = "")
+        return others.firstOrNull { it.holds(pkg) }?.loader?.loadClass(name) ?: throw ClassNotFoundException(name)
     }
 
-    override fun findResource(name: String): URL? = if (sharesResource(name)) host.getResource(name) else null
+    override fun findResource(name: String): URL? =
+        if (sharesResource(name)) host.getResource(name) else publisherOf(name)?.loader?.getResource(name)
 
     override fun findResources(name: String): Enumeration<URL> =
-        if (sharesResource(name)) host.getResources(name) else Collections.emptyEnumeration()
+        if (sharesResource(name)) host.getResources(name) else publisherOf(name)?.loader?.getResources(name) ?: Collections.emptyEnumeration()
+
+    private fun publisherOf(path: String): Published? =
+        path.trimStart('/').substringBeforeLast('/', missingDelimiterValue = "").replace('/', '.').let { pkg -> others.firstOrNull { it.holds(pkg) } }
 
     private fun sharesClass(name: String): Boolean =
         name in classes || shares(name.substringBeforeLast('.', missingDelimiterValue = ""))
@@ -46,5 +55,13 @@ internal class ModuleClassView(
     }
 
     /** Whether [pkg] is one of [packages] or lies below one. */
-    fun shares(pkg: String): Boolean = packages.any { pkg == it || pkg.startsWith("$it.") }
+    fun shares(pkg: String): Boolean = packages.any { it.covers(pkg) }
 }
+
+/** What another module publishes: its [packages] and everything below them, read through its own [loader]. */
+internal class Published(private val packages: Set<String>, val loader: ClassLoader) {
+    fun holds(pkg: String): Boolean = packages.any { it.covers(pkg) }
+}
+
+/** Whether [pkg] is this package or lies below it. */
+internal fun String.covers(pkg: String): Boolean = pkg == this || pkg.startsWith("$this.")

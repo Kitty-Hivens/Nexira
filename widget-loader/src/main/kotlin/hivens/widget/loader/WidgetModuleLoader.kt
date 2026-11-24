@@ -8,6 +8,9 @@ import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.widgetPropsJson
 import hivens.widget.model.ApiVersion
+import hivens.widget.model.ModuleGraph
+import hivens.widget.model.ModuleNode
+import hivens.widget.model.ModuleWait
 import hivens.widget.model.WidgetKind
 import org.slf4j.LoggerFactory
 import java.net.URLClassLoader
@@ -16,6 +19,7 @@ import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.security.MessageDigest
 import java.util.ServiceLoader
+import java.util.jar.Attributes
 import java.util.jar.JarFile
 
 /** What one jar in the directory turned out to be. */
@@ -40,6 +44,10 @@ data class LoadedWidgetModule(
     val contributions: List<ModuleContribution> = emptyList(),
     /** The words it brought, per language, for what it declares for a person to read. */
     val strings: ModuleStrings = ModuleStrings.EMPTY,
+    /** What it does not run without, as its manifest names it. */
+    val requires: Map<String, ApiVersion> = emptyMap(),
+    /** The packages of each API it publishes, by API id. */
+    val published: Map<String, Set<String>> = emptyMap(),
 ) : WidgetModuleResult {
     /** The screen effects among [contributions]. */
     val effects: List<ScreenEffect> get() = contributions.filterIsInstance<ScreenEffect>()
@@ -53,6 +61,20 @@ data class DisabledWidgetModule(
     val id: String,
     val name: String,
     val file: Path,
+    /** What another module could require it by, if it were on. */
+    val offers: Map<String, ApiVersion> = emptyMap(),
+) : WidgetModuleResult
+
+/**
+ * A module that is as it should be and waits, with every reason: something it requires is not
+ * there, is switched off, is in another version or does not run itself. No class loader was
+ * opened for it.
+ */
+data class WaitingWidgetModule(
+    val id: String,
+    val name: String,
+    val file: Path,
+    val reasons: List<ModuleWait>,
 ) : WidgetModuleResult
 
 /** A jar in the directory that did not become a module, and why. */
@@ -66,6 +88,9 @@ data class WidgetModuleScan(
     val loaded: List<LoadedWidgetModule> = emptyList(),
     val rejected: List<RejectedWidgetModule> = emptyList(),
     val disabled: List<DisabledWidgetModule> = emptyList(),
+    val waiting: List<WaitingWidgetModule> = emptyList(),
+    /** The jars of the directory and what the launcher offers, by what they require of each other. */
+    val graph: ModuleGraph = ModuleGraph.EMPTY,
 )
 
 /**
@@ -89,10 +114,11 @@ data class WidgetModuleScan(
  *
  * - the widget kernel, `hivens.widget.api` and `hivens.widget.model`;
  * - the API artifact of each module API the jar names in its manifest's
- *   `Nexira-Module-Requires`, by the packages [apiPackages] gives for that API id
- *   (`hivens.packs.api` for `nexira.packs`, `hivens.accounts.api` for
- *   `nexira.accounts`). An API the jar does not name is not visible to it, so what
- *   it compiles against is what the version check below has checked;
+ *   `Nexira-Module-Requires` or `Nexira-Module-Uses`, by the packages [apiPackages] gives
+ *   for that API id (`hivens.packs.api` for `nexira.packs`, `hivens.accounts.api` for
+ *   `nexira.accounts`), or from the jar that publishes it. An API the jar does not name is
+ *   not visible to it, so what it compiles against is what the version check below has
+ *   checked, and one it only uses is visible only in a version that serves;
  * - Compose: `androidx` (Compose and the Jetpack libraries it is built on),
  *   `org.jetbrains.compose`, and Skiko, `org.jetbrains.skia` and `org.jetbrains.skiko`;
  * - the Kotlin standard library, `kotlin`, kotlinx coroutines and serialization, and slf4j;
@@ -114,8 +140,8 @@ data class WidgetModuleScan(
  * API a module compiles against names, this loader, and Koin, so a jar can neither name
  * the launcher's services nor reach its dependency graph. Resources follow the same
  * rule by the package of their path. One loader per module also keeps modules from
- * seeing each other, so a name collision between two of them is not a way to hijack a
- * third.
+ * seeing each other beyond what one publishes as an API and the other names, so a name
+ * collision between two of them is not a way to hijack a third.
  *
  * While this loader runs a module's code, its constructors and the reads of what it
  * declares, the thread's context class loader is the module's own loader, so a
@@ -142,16 +168,24 @@ data class WidgetModuleScan(
  * [disabled] names modules to leave closed. Their manifest is read so they can be
  * listed and switched back on, and nothing else is.
  *
- * [offered] is every module API this launcher carries, by API id, at the version it
- * carries. A jar that says in its manifest it was compiled against one of them is
- * refused when the API is not here, or is here in a version that does not serve the
- * one it was built against: another major, or an older minor than the jar's. An API
- * a jar names is offered by a module compiled into the application, so a jar that
- * only another jar could serve is refused too.
+ * What a jar requires is resolved before any is opened (see [ModuleGraph]), over the jars
+ * and what the launcher offers: [offered] is every module API this launcher carries and
+ * every module of its own that can be required by its id, at the version it carries. A jar
+ * that requires something nothing offers, or that is offered in a version that does not
+ * serve the one it names, another major or an older minor, waits with that reason, and so
+ * does one whose requirement is switched off or waits itself. The jars are opened in the
+ * order the graph gives, so a jar finds what it requires already there.
  *
- * [apiPackages] is the packages each offered API's artifact lives in, by API id,
- * which a jar that names the API is shown. A jar that names an offered API with no
- * packages here is refused, since it would load and fail on the first class it names.
+ * A jar publishes APIs of its own too (`Nexira-Module-Provides`): the jars that name one are
+ * shown its packages, read through the loader of the jar that publishes it. An API the
+ * launcher or an earlier jar already offers is not published twice, and the later jar is
+ * refused, as is one that publishes packages the launcher shares, since a jar would be shown
+ * the launcher's.
+ *
+ * [apiPackages] is the packages each offered API's artifact lives in, by API id, which a jar
+ * that names the API is shown, and none for a module offered by its id alone. A jar that
+ * requires something offered here that is not in it is refused, since it would load and fail
+ * on the first class it names.
  *
  * [sharedArtifacts] is the artifacts shared class by class, read off [parent].
  *
@@ -206,66 +240,205 @@ class WidgetModuleLoader(
             return WidgetModuleScan()
         }
 
-        val loaded = mutableListOf<LoadedWidgetModule>()
+        if (jars.isEmpty()) {
+            report(emptyList(), emptyList())
+            return WidgetModuleScan()
+        }
         val rejected = mutableListOf<RejectedWidgetModule>()
         val off = mutableListOf<DisabledWidgetModule>()
+        val found = mutableListOf<Candidate>()
         jars.forEach { jar ->
-            when (val result = load(jar)) {
-                is LoadedWidgetModule -> {
-                    val first = loaded.firstOrNull { it.id == result.id }
-                    if (first == null) {
-                        loaded += result
-                    } else {
-                        // Settings, the on and off switch and the crash record are all kept by id, so
-                        // two jars sharing one would be switched and set as a single module.
-                        result.loader.release()
-                        rejected += RejectedWidgetModule(jar, "its id '${result.id}' is already carried by ${first.file.fileName}")
+            val read = read(jar)
+            read.candidate?.let { found += it }
+            read.off?.let { off += it }
+            read.fault?.let { rejected += RejectedWidgetModule(jar, it) }
+        }
+        val offering = publishersAmong(found, rejected)
+        val graph = ModuleGraph.of(
+            offered.map { (name, version) -> ModuleNode(name, mapOf(name to version)) } +
+                offering.distinctBy { it.id }.map { it.node } +
+                off.map { ModuleNode(it.id, it.offers, off = true) },
+        )
+
+        val loaded = LinkedHashMap<String, LoadedWidgetModule>()
+        val waiting = mutableListOf<WaitingWidgetModule>()
+        val byId = offering.groupBy { it.id }
+        // The order is of modules that could run. One that then does not load leaves what requires it waiting.
+        val failed = HashSet<String>()
+        graph.order.forEach { id ->
+            val candidates = byId[id] ?: return@forEach
+            val first = candidates.first()
+            val stopped = first.requires.keys.mapNotNull { name -> graph.providerOf(name)?.takeIf { it in failed }?.let { ModuleWait.Stopped(name, it) } }
+            if (stopped.isNotEmpty()) {
+                waiting += WaitingWidgetModule(id, first.name, first.jar, stopped)
+                failed += id
+            } else {
+                // A second jar of the same id that asks and offers the same stands in for a first that does not load.
+                candidates.forEach { candidate ->
+                    if (id in loaded || candidate !== first && !candidate.declaresLike(first)) return@forEach
+                    when (val result = load(candidate, graph, loaded)) {
+                        is LoadedWidgetModule -> loaded[id] = result
+                        is RejectedWidgetModule -> rejected += result
+                        else -> Unit
                     }
                 }
-                is RejectedWidgetModule -> rejected += result
-                is DisabledWidgetModule -> off += result
+                if (id !in loaded) failed += id
             }
+            rejected += repeats(candidates, loaded[id]?.file ?: first.jar, rejected)
+        }
+        graph.waiting.forEach { (id, reasons) ->
+            val candidates = byId[id] ?: return@forEach
+            val first = candidates.first()
+            waiting += WaitingWidgetModule(id, first.name, first.jar, reasons)
+            rejected += repeats(candidates, first.jar, rejected)
         }
 
-        report(loaded, rejected)
+        val modules = loaded.values.toList()
+        report(modules, rejected)
+        waiting.forEach { log.warn("Widget module '{}' ({}) waits: {}", it.id, it.file.fileName, it.reasons.joinToString("; ", transform = ::said)) }
         off.forEach { log.info("Widget module '{}' ({}) is switched off and was not loaded", it.id, it.file.fileName) }
-        return WidgetModuleScan(loaded, rejected, off)
+        return WidgetModuleScan(modules, rejected, off, waiting, graph)
     }
 
-    private fun load(jar: Path): WidgetModuleResult {
+    /** [candidates] of one id that are not [kept] and have no reason of their own in [rejected] yet. */
+    private fun repeats(candidates: List<Candidate>, kept: Path, rejected: List<RejectedWidgetModule>): List<RejectedWidgetModule> =
+        candidates.filter { candidate -> candidate.jar != kept && rejected.none { it.file == candidate.jar } }.map {
+            // Settings, the on and off switch and the crash record are all kept by id, so
+            // two jars sharing one would be switched and set as a single module.
+            RejectedWidgetModule(it.jar, "its id '${it.id}' is already carried by ${kept.fileName}")
+        }
+
+    /**
+     * Those of [found] whose APIs are theirs to publish, in their order. Of two jars that offer one name
+     * the first does, and one that offers what the launcher does, or shares its packages, goes to [rejected].
+     */
+    private fun publishersAmong(found: List<Candidate>, rejected: MutableList<RejectedWidgetModule>): List<Candidate> {
+        val taken = HashMap<String, Candidate>()
+        return found.filter { candidate ->
+            val fault = candidate.node.offers.keys.firstNotNullOfOrNull { name ->
+                val other = taken[name]
+                when {
+                    name in offered -> "offers '$name', which this launcher offers"
+                    other != null && other.id != candidate.id -> "offers '$name', which ${other.jar.fileName} already offers"
+                    else -> null
+                }
+            } ?: candidate.apiPackages.values.flatten().firstNotNullOfOrNull { pkg ->
+                val shared = (SHARED_PACKAGES + apiPackages.values.flatten()).firstOrNull { it.covers(pkg) || pkg.covers(it) }
+                shared?.let { "publishes the package '$pkg', and the launcher shares '$it' with every module" }
+            }
+            if (fault != null) {
+                rejected += RejectedWidgetModule(candidate.jar, fault)
+                false
+            } else {
+                candidate.node.offers.keys.forEach { name -> if (name !in taken) taken[name] = candidate }
+                true
+            }
+        }
+    }
+
+    /** A jar whose manifest is a module's, before anything of it is opened. */
+    private class Candidate(
+        val jar: Path,
+        val id: String,
+        val name: String,
+        val node: ModuleNode,
+        /** The packages of each API the jar publishes. */
+        val apiPackages: Map<String, Set<String>>,
+    ) {
+        val requires: Map<String, ApiVersion> get() = node.requires
+        val uses: Map<String, ApiVersion> get() = node.uses
+
+        /** Whether [other] asks for and offers the same. */
+        fun declaresLike(other: Candidate): Boolean =
+            node.offers == other.node.offers && requires == other.requires && uses == other.uses && apiPackages == other.apiPackages
+    }
+
+    /** What a jar's manifest makes of it: a module to load, one switched off, or neither and why. */
+    private class Read(val candidate: Candidate? = null, val off: DisabledWidgetModule? = null, val fault: String? = null)
+
+    private fun read(jar: Path): Read {
         val manifest = runCatching {
             JarFile(jar.toFile()).use { it.manifest }
-        }.getOrElse { return RejectedWidgetModule(jar, "not a readable jar: ${it.message}") }
-            ?: return RejectedWidgetModule(jar, "no manifest")
+        }.getOrElse { return Read(fault = "not a readable jar: ${it.message}") }
+            ?: return Read(fault = "no manifest")
 
         val attributes = manifest.mainAttributes
         val declared = attributes.getValue(WidgetApi.MANIFEST_VERSION)
-            ?: return RejectedWidgetModule(jar, "no ${WidgetApi.MANIFEST_VERSION} in the manifest -- not a widget module")
+            ?: return Read(fault = "no ${WidgetApi.MANIFEST_VERSION} in the manifest -- not a widget module")
         val version = declared.trim().toIntOrNull()
-            ?: return RejectedWidgetModule(jar, "${WidgetApi.MANIFEST_VERSION} is '$declared', which is not a version number")
+            ?: return Read(fault = "${WidgetApi.MANIFEST_VERSION} is '$declared', which is not a version number")
         if (version != WidgetApi.VERSION) {
             // Refusing is the feature. A module built against another ABI may
             // link and then misbehave, and a widget that draws the wrong thing
             // is harder to diagnose than one that never appears with a reason.
-            return RejectedWidgetModule(
-                jar,
-                "built for widget API $version, this launcher speaks ${WidgetApi.VERSION}",
-            )
+            return Read(fault = "built for widget API $version, this launcher speaks ${WidgetApi.VERSION}")
         }
 
         val id = attributes.getValue(WidgetApi.MANIFEST_ID)?.trim()?.takeIf { it.isNotEmpty() }
-            ?: return RejectedWidgetModule(jar, "no ${WidgetApi.MANIFEST_ID} in the manifest")
+            ?: return Read(fault = "no ${WidgetApi.MANIFEST_ID} in the manifest")
         val name = attributes.getValue(WidgetApi.MANIFEST_NAME)?.trim()?.takeIf { it.isNotEmpty() } ?: id
 
-        if (id in disabled) return DisabledWidgetModule(id, name, jar)
+        val declarations = declarationsOf(id, attributes)
+        // What it offers is read all the same, so what requires it is told it is off and not that it is missing.
+        if (id in disabled) return Read(off = DisabledWidgetModule(id, name, jar, declarations.node?.offers.orEmpty()))
+        // Its words, its settings and what is required by its id would be taken for the launcher's own module's.
+        if (id in offered) return Read(fault = "its id '$id' is one of the launcher's own modules'")
+        val node = declarations.node ?: return Read(fault = declarations.fault)
+        (unsharedApi(node) ?: unnamedApiFault(jar, node.requires.keys + node.uses.keys))?.let { return Read(fault = it) }
+        return Read(Candidate(jar, id, name, node, declarations.apiPackages))
+    }
 
-        val requiresText = attributes.getValue(WidgetApi.MANIFEST_REQUIRES)
-        requirementFault(requiresText)?.let { return RejectedWidgetModule(jar, it) }
-        val requires = requiresText?.let { ApiVersion.parseAll(it) }.orEmpty()
-        unnamedApiFault(jar, requires.keys)?.let { return RejectedWidgetModule(jar, it) }
+    /** What a manifest says of other modules, or why it cannot be read. */
+    private class Declarations(val node: ModuleNode?, val fault: String = "", val apiPackages: Map<String, Set<String>> = emptyMap())
 
+    private fun declarationsOf(id: String, attributes: Attributes): Declarations {
+        fun fault(reason: String) = Declarations(null, reason)
+        fun versions(attribute: String): Map<String, ApiVersion>? = attributes.getValue(attribute).let { if (it == null) emptyMap() else ApiVersion.parseAll(it) }
+        fun notAList(attribute: String) = fault("$attribute is '${attributes.getValue(attribute)}', which is not a list of id=major.minor")
+
+        val requires = versions(WidgetApi.MANIFEST_REQUIRES) ?: return notAList(WidgetApi.MANIFEST_REQUIRES)
+        val uses = versions(WidgetApi.MANIFEST_USES) ?: return notAList(WidgetApi.MANIFEST_USES)
+        (requires.keys intersect uses.keys).firstOrNull()?.let {
+            return fault("names '$it' both in ${WidgetApi.MANIFEST_REQUIRES} and in ${WidgetApi.MANIFEST_USES}")
+        }
+        val provides = versions(WidgetApi.MANIFEST_PROVIDES) ?: return notAList(WidgetApi.MANIFEST_PROVIDES)
+        val ownText = attributes.getValue(WidgetApi.MANIFEST_MODULE_VERSION)
+        val own = ownText?.let { ApiVersion.parse(it) ?: return fault("${WidgetApi.MANIFEST_MODULE_VERSION} is '$it', which is not major.minor") }
+        if (own != null && provides[id] != null && provides[id] != own) {
+            return fault("is at $own by ${WidgetApi.MANIFEST_MODULE_VERSION} and offers its own id at ${provides[id]}")
+        }
+        val packages = LinkedHashMap<String, MutableSet<String>>()
+        attributes.getValue(WidgetApi.MANIFEST_API_PACKAGES)?.split(',')?.filter { it.isNotBlank() }?.forEach { entry ->
+            val api = entry.substringBefore('=', missingDelimiterValue = "").trim()
+            val pkg = entry.substringAfter('=').trim()
+            if (api.isEmpty() || pkg.isEmpty()) return fault("${WidgetApi.MANIFEST_API_PACKAGES} has '${entry.trim()}', which is not id=package")
+            if (api !in provides) return fault("gives a package for '$api', which is not in ${WidgetApi.MANIFEST_PROVIDES}")
+            packages.getOrPut(api) { LinkedHashSet() } += pkg
+        }
+        (provides.keys - packages.keys).firstOrNull()?.let { return fault("offers the API '$it' and names no package for it in ${WidgetApi.MANIFEST_API_PACKAGES}") }
+        val offers = if (own == null) provides else provides + (id to own)
+        return Declarations(ModuleNode(id, offers, requires, uses), apiPackages = packages)
+    }
+
+    /** Why [node] cannot be shown an API it requires of the launcher, or null when it can be shown every one. */
+    private fun unsharedApi(node: ModuleNode): String? =
+        node.requires.keys.firstOrNull { it in offered && it !in apiPackages }
+            ?.let { "built against the module API '$it', which this launcher carries without sharing its classes" }
+
+    /** Opens [candidate]'s jar, which [graph] lets run, over the modules in [running] it names. */
+    private fun load(candidate: Candidate, graph: ModuleGraph, running: Map<String, LoadedWidgetModule>): WidgetModuleResult {
+        val jar = candidate.jar
+        val id = candidate.id
         val opened = runCatching { shadowCopy(jar) }.getOrElse {
             return RejectedWidgetModule(jar, "could not be copied aside to load: ${it.message}")
+        }
+
+        // What it is shown of the APIs it names: those it requires, which are there, and those it uses
+        // where they are there in a version that serves.
+        val shown = candidate.requires.keys + candidate.uses.filter { (name, builtAgainst) -> graph.serves(name, builtAgainst) }.keys
+        val published = shown.mapNotNull { name ->
+            val publisher = graph.providerOf(name)?.let(running::get) ?: return@mapNotNull null
+            publisher.published[name]?.let { Published(it, publisher.loader) }
         }
 
         // From here the jar is held open by the loader. Every path that does not
@@ -276,7 +449,7 @@ class WidgetModuleLoader(
         // Named after the module, which is what lets a crash be traced back to it:
         // every frame of a stack trace carries the name of the loader its class came
         // from. See [moduleIdIn].
-        val view = ModuleClassView(VIEW_PREFIX + id, parent, visiblePackages(requires.keys), sharedClasses)
+        val view = ModuleClassView(VIEW_PREFIX + id, parent, visiblePackages(shown), sharedClasses, published)
         val loader = URLClassLoader(LOADER_PREFIX + id, arrayOf(opened.toUri().toURL()), view)
         // Module code runs from here, its constructors and the reads of what it declares, so
         // the thread's context class loader is the module's own: a library the jar bundles
@@ -295,7 +468,8 @@ class WidgetModuleLoader(
 
             val contributions = mutableListOf<ModuleContribution>()
             val byKind = mutableListOf<List<ModuleContribution>>()
-            contributionKinds.forEach { kind ->
+            // A kind of an API the jar only uses, which is not there for it, is one it does without.
+            contributionKinds.filter { kind -> apiOwning(kind).let { it == null || it !in candidate.uses || it in shown } }.forEach { kind ->
                 val found = runCatching {
                     ServiceLoader.load(kind, loader).filter { it.javaClass.classLoader === loader }
                 }.getOrElse {
@@ -308,7 +482,8 @@ class WidgetModuleLoader(
 
             when {
                 // A module may carry nothing but effects: it is a module all the same, with no widgets.
-                registries.isEmpty() && contributions.isEmpty() -> {
+                // So is one that only publishes an API for others to compile against.
+                registries.isEmpty() && contributions.isEmpty() && candidate.apiPackages.isEmpty() -> {
                     loader.release()
                     RejectedWidgetModule(jar, "declares the widget API but carries neither a registry nor a contribution service")
                 }
@@ -340,7 +515,7 @@ class WidgetModuleLoader(
                         loader.release()
                         return RejectedWidgetModule(jar, fault)
                     }
-                    LoadedWidgetModule(id, name, jar, registry, loader, contributions, readStrings(opened, id))
+                    LoadedWidgetModule(id, candidate.name, jar, registry, loader, contributions, readStrings(opened, id), candidate.requires, candidate.apiPackages)
                 }
             }
         }
@@ -382,35 +557,13 @@ class WidgetModuleLoader(
     }
 
     /**
-     * Why a jar whose manifest names [declared] as the APIs it was built against cannot
-     * run here, or null when every one is offered in a version that serves it.
-     */
-    private fun requirementFault(declared: String?): String? {
-        if (declared == null) return null
-        val required = ApiVersion.parseAll(declared)
-            ?: return "${WidgetApi.MANIFEST_REQUIRES} is '$declared', which is not a list of id=major.minor"
-        required.forEach { (api, builtAgainst) ->
-            val here = offered[api] ?: return "built against the module API '$api' $builtAgainst, which this launcher does not carry"
-            if (!here.serves(builtAgainst)) {
-                return "built against the module API '$api' $builtAgainst, this launcher carries $here"
-            }
-            // An API the version check lets through has to be one the jar can see, or it
-            // would load and then fail on the first class it names.
-            if (apiPackages[api].isNullOrEmpty()) {
-                return "built against the module API '$api', which this launcher carries without sharing its classes"
-            }
-        }
-        return null
-    }
-
-    /**
      * Why a jar that carries services of a kind of contribution a module API declares, without
-     * naming that API in [required], cannot work, or null when it names every such API. Read off
+     * naming that API in [named], cannot work, or null when it names every such API. Read off
      * the jar's service files before any of its classes is loaded, so the reason says what to
      * change in the manifest rather than which class could not be linked. A jar that cannot be
      * listed is left to the reads that follow, which refuse it with their own reason.
      */
-    private fun unnamedApiFault(jar: Path, required: Set<String>): String? {
+    private fun unnamedApiFault(jar: Path, named: Set<String>): String? {
         val owners = contributionKinds.mapNotNull { kind -> apiOwning(kind)?.let { kind to it } }
         if (owners.isEmpty()) return null
         val services = runCatching {
@@ -418,14 +571,14 @@ class WidgetModuleLoader(
                 file.entries().asSequence().map { it.name }.filter { it.startsWith(SERVICES_DIR) }.map { it.removePrefix(SERVICES_DIR) }.toSet()
             }
         }.getOrElse { return null }
-        val (kind, api) = owners.firstOrNull { (kind, api) -> kind.name in services && api !in required } ?: return null
+        val (kind, api) = owners.firstOrNull { (kind, api) -> kind.name in services && api !in named } ?: return null
         return "carries ${kind.simpleName} services, which come from the module API '$api': name $api in ${WidgetApi.MANIFEST_REQUIRES}"
     }
 
     /** The module API whose packages hold [kind], or null for a kind of the kernel's own. */
     private fun apiOwning(kind: Class<*>): String? {
         val pkg = kind.packageName
-        return apiPackages.entries.firstOrNull { (_, packages) -> packages.any { pkg == it || pkg.startsWith("$it.") } }?.key
+        return apiPackages.entries.firstOrNull { (_, packages) -> packages.any { it.covers(pkg) } }?.key
     }
 
     /** Runs [block] with [loader] as this thread's context class loader, and puts the one before back. */
@@ -440,9 +593,18 @@ class WidgetModuleLoader(
         }
     }
 
-    /** The packages a jar that names the APIs [required] is shown, see the class KDoc. */
-    private fun visiblePackages(required: Set<String>): Set<String> =
-        SHARED_PACKAGES + required.flatMap { apiPackages[it].orEmpty() }
+    /** The packages of the launcher a jar that is shown the APIs [shown] sees, see the class KDoc. */
+    private fun visiblePackages(shown: Set<String>): Set<String> =
+        SHARED_PACKAGES + shown.flatMap { apiPackages[it].orEmpty() }
+
+    /** [reason] for the log. */
+    private fun said(reason: ModuleWait): String = when (reason) {
+        is ModuleWait.Missing -> "it requires '${reason.name}' ${reason.needed}, which nothing here offers"
+        is ModuleWait.OtherVersion -> "it requires '${reason.name}' ${reason.needed}, and what is here is ${reason.here}"
+        is ModuleWait.Off -> "it requires '${reason.name}', and the module '${reason.module}' is switched off"
+        is ModuleWait.Stopped -> "it requires '${reason.name}', and the module '${reason.module}' does not run"
+        is ModuleWait.Cycle -> "it requires itself: ${reason.modules.joinToString(" -> ")} -> ${reason.modules.first()}"
+    }
 
     /** What a module with no widgets contributes to the registry. */
     private object NoWidgets : WidgetRegistry {

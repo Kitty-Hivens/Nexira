@@ -5,6 +5,7 @@
 
 package hivens.source.mirror
 
+import hivens.catalogue.api.CatalogueApi
 import hivens.catalogue.api.PackListing
 import hivens.catalogue.api.PackSourceContribution
 import hivens.catalogue.api.SourceFilter
@@ -27,6 +28,7 @@ import hivens.widget.api.ModuleStrings
 import hivens.widget.api.find
 import hivens.widget.api.get
 import hivens.widget.api.service
+import hivens.widget.model.ApiVersion
 import hivens.widget.model.ScopeLevel
 
 /**
@@ -39,6 +41,7 @@ object MirrorSourceModule : CompiledModule {
     override val id: String = ID
     override val name: String = NAME
     override val strings: ModuleStrings = ModuleStrings.resources(MirrorSourceModule::class.java, ID)
+    override val requires: Map<String, ApiVersion> = mapOf(CatalogueApi.ID to CatalogueApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(MirrorSourceKeys, MirrorPackSource)
 
     private const val NAME = "mirror.name"

@@ -31,6 +31,8 @@ import hivens.themes.ThemesModule
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.model.ApiVersion
+import hivens.widget.model.ModuleGraph
+import hivens.widget.model.ModuleNode
 
 /**
  * The modules compiled into this build. Carrying one is not using it: the host brings
@@ -57,14 +59,32 @@ val CompiledModules: List<CompiledModule> =
 fun offeredContributionKinds(modules: List<CompiledModule> = CompiledModules): List<Class<out ModuleContribution>> =
     (ModuleContribution.kinds + modules.flatMap { it.contributionKinds }).distinct()
 
-/** The module APIs [modules] publish, which a jar may have been compiled against. */
+/** What [modules] can be required by: the APIs they publish, which a jar may have been compiled against, and their ids where they state a version. */
 fun offeredApis(modules: List<CompiledModule> = CompiledModules): Map<String, ApiVersion> =
-    modules.fold(emptyMap()) { all, module -> all + module.provides }
+    modules.fold(emptyMap()) { all, module -> all + offersOf(module) }
+
+/** [modules] by what they require of each other. */
+fun moduleGraph(modules: List<CompiledModule> = CompiledModules): ModuleGraph =
+    ModuleGraph.of(modules.map { ModuleNode(it.id, offersOf(it), it.requires, it.uses) })
+
+private fun offersOf(module: CompiledModule): Map<String, ApiVersion> =
+    module.version?.let { mapOf(module.id to it) }.orEmpty() + module.provides
+
+/**
+ * The modules the host brings in where the document names [named] and the jars switched on do not run
+ * without [jarsRequire]: those named, and of [compiled] what either requires, and what that requires.
+ */
+internal fun broughtIn(named: Set<String>, compiled: List<CompiledModule>, jarsRequire: Set<String> = emptySet()): Set<String> {
+    val graph = moduleGraph(compiled)
+    val asked = named + jarsRequire.mapNotNull(graph::providerOf)
+    return asked + graph.requiredBy(asked)
+}
 
 /**
  * The packages each module API [modules] publish lives in, by API id: what a jar that
  * names the API in its manifest is shown of the application, beside the widget kernel.
  * Each module declares them beside the API itself (see [CompiledModule.apiPackages]).
+ * A module that offers itself by its id shares no classes for it.
  */
 fun offeredApiPackages(modules: List<CompiledModule> = CompiledModules): Map<String, Set<String>> =
-    modules.fold(emptyMap()) { all, module -> all + module.apiPackages }
+    modules.fold(emptyMap()) { all, module -> all + (if (module.version == null) emptyMap() else mapOf(module.id to emptySet())) + module.apiPackages }

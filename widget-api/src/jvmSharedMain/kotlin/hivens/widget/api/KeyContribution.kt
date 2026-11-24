@@ -156,13 +156,29 @@ interface CompiledModule {
     /** The module's words, per language, for what it shows a person, its [name] among them. */
     val strings: ModuleStrings get() = ModuleStrings.EMPTY
 
+    /**
+     * Its own version, with which it offers itself by its [id], so another module can require it
+     * without an API of its own. Null where nothing requires it by its id.
+     */
+    val version: ApiVersion? get() = null
+
     /** The APIs it publishes for other modules to compile against, by API id. */
     val provides: Map<String, ApiVersion> get() = emptyMap()
 
     /**
+     * What it does not run without, each at the version it is built against: the APIs of other
+     * modules, and modules by their id. The host brings each in with it, named by the document or
+     * not, and a module whose requirements are not there waits (see [hivens.widget.model.ModuleGraph]).
+     */
+    val requires: Map<String, ApiVersion> get() = emptyMap()
+
+    /** What it makes use of where it is there and runs without, in the form of [requires]. Nothing is brought in for it. */
+    val uses: Map<String, ApiVersion> get() = emptyMap()
+
+    /**
      * The packages each API in [provides] lives in, by the same API id: what of the
      * application a jar that names the API is shown. An API in [provides] with no
-     * packages here is one no jar could use, and the loader refuses a jar that names it.
+     * packages here is one no jar could use, and the loader refuses a jar that requires it.
      */
     val apiPackages: Map<String, Set<String>> get() = emptyMap()
 

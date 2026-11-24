@@ -4,6 +4,7 @@ import hivens.packs.api.PacksApi
 import hivens.widget.api.KeyContribution
 import hivens.widget.loader.WidgetModuleLoader
 import hivens.widget.model.ApiVersion
+import hivens.widget.model.ModuleWait
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -16,7 +17,7 @@ import kotlin.test.assertTrue
 
 /**
  * This module's own jar, as the launcher opens it: loaded where the launcher carries a
- * packs API that serves the one it was built against, and refused where it does not.
+ * packs API that serves the one it was built against, and waiting where it does not.
  */
 class PackagingTest {
 
@@ -56,12 +57,14 @@ class PackagingTest {
     }
 
     @Test
-    fun `it is refused where the launcher carries another major of the packs API, or none`() {
-        val otherMajor = scan(mapOf(PacksApi.ID to ApiVersion(PacksApi.VERSION.major + 1, 0)))
+    fun `it waits where the launcher carries another major of the packs API, or none`() {
+        val major = ApiVersion(PacksApi.VERSION.major + 1, 0)
+        val otherMajor = scan(mapOf(PacksApi.ID to major))
         assertEquals(emptyList(), otherMajor.loaded)
-        assertTrue(PacksApi.ID in otherMajor.rejected.single().reason, otherMajor.rejected.single().reason)
+        assertEquals(listOf<ModuleWait>(ModuleWait.OtherVersion(PacksApi.ID, PacksApi.VERSION, major, PacksApi.ID)), otherMajor.waiting.single().reasons)
         val none = scan(emptyMap())
         assertEquals(emptyList(), none.loaded)
+        assertEquals(listOf<ModuleWait>(ModuleWait.Missing(PacksApi.ID, PacksApi.VERSION)), none.waiting.single().reasons)
     }
 }
 

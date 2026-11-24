@@ -7,6 +7,7 @@ package hivens.packs
 import hivens.accounts.LaunchIdentity
 import hivens.accounts.LaunchSessions
 import hivens.auth.OfflineAuthProvider
+import hivens.catalogue.api.CatalogueApi
 import hivens.catalogue.api.PackDetails
 import hivens.catalogue.api.PackSources
 import hivens.catalogue.api.ProjectBuild
@@ -64,6 +65,7 @@ object PacksModule : CompiledModule {
 
     // The API's own object lives in the API artifact's package, so the package is read off it.
     override val apiPackages: Map<String, Set<String>> = mapOf(PacksApi.ID to setOf(PacksApi::class.java.name.substringBeforeLast('.')))
+    override val uses: Map<String, ApiVersion> = mapOf(CatalogueApi.ID to CatalogueApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(PackKeysContribution)
 
     private const val NAME = "packs.name"

@@ -126,7 +126,10 @@ public final class hivens/look/surface/api/SurfaceModule : hivens/widget/api/Com
 	public fun getId ()Ljava/lang/String;
 	public fun getName ()Ljava/lang/String;
 	public fun getProvides ()Ljava/util/Map;
+	public fun getRequires ()Ljava/util/Map;
 	public fun getStrings ()Lhivens/widget/api/ModuleStrings;
+	public fun getUses ()Ljava/util/Map;
+	public fun getVersion ()Lhivens/widget/model/ApiVersion;
 	public fun getWidgets ()Lhivens/widget/api/WidgetRegistry;
 }
 
