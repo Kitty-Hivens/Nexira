@@ -58,20 +58,3 @@ data class Theme(
     /** The scheme for [dark] mode, or the only one this theme has. */
     fun scheme(dark: Boolean): Scheme = if (dark) this.dark else light ?: this.dark
 }
-
-/**
- * The few meanings colour carries by convention, the ones a reader knows without a
- * label. Closed on purpose: a new status is a design decision in this library, not a
- * line a feature adds. Everything else that needs telling apart is a [ColorCategory].
- */
-enum class Status { Error, Warning, Success, Info }
-
-/**
- * A feature's own set of things that must look different from each other: the states
- * of a launch, the kinds of a change, the channels of a release.
- *
- * Implemented by the feature's enum, next to the feature's code. Members get distinct
- * colours of the active theme in declaration order, so one member always gets one
- * colour, and adding a member hands it the next one.
- */
-interface ColorCategory

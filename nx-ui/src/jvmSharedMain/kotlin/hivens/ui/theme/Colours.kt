@@ -60,7 +60,7 @@ object NxColor {
         get() = answers().paintThird
 
     @Composable @ReadOnlyComposable
-    fun status(status: Status): Color = answers().paintStatus(status.inLook())
+    fun status(status: Status): Color = answers().paintStatus(status)
 
     @Composable @ReadOnlyComposable
     fun <E> of(member: E): Color where E : Enum<E>, E : ColorCategory {
