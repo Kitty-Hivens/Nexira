@@ -1,5 +1,7 @@
 plugins {
     id("nexira.look")
+    // For the bundled faces, which are Compose resources.
+    alias(libs.plugins.compose)
 }
 
 // The nx type provider: it answers the type axis of :look:type-api with nx's faces, which nx-ui
@@ -12,7 +14,23 @@ kotlin.sourceSets.named("jvmSharedMain") {
         implementation(project(":look:type-api"))
         implementation(project(":nx-ui"))
         implementation(libs.compose.runtime)
+        implementation(libs.compose.components.resources)
     }
+}
+
+kotlin {
+    android {
+        // Compose resources travel as assets of the Android library, which are only packaged when the
+        // library takes part in resource processing.
+        androidResources {
+            enable = true
+        }
+    }
+}
+
+compose.resources {
+    packageOfResClass = "hivens.look.type.nx.generated.resources"
+    generateResClass = always
 }
 
 kotlin.sourceSets.named("jvmTest") {

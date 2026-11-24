@@ -12,6 +12,9 @@ kotlin.sourceSets.named("jvmSharedMain") {
         implementation(project(":look:feedback-api"))
         implementation(project(":nx-ui"))
         implementation(libs.compose.runtime)
+        // The content colour a state layer takes where the widget names none.
+        implementation(libs.compose.material3)
+        implementation(libs.kotlinx.coroutines.core)
     }
 }
 
