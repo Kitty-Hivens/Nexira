@@ -41,10 +41,9 @@ import hivens.look.stroke.api.StrokeState
 import hivens.look.stroke.api.drawStroke
 import hivens.ui.press.clickable
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 
 /**
  * Sections of one thing, as words with a mark under the current one.
@@ -183,7 +182,7 @@ private fun NxTabRowLightPreview() = TabRows(dark = false)
 @Composable
 private fun TabRows(dark: Boolean) {
     val tabs = listOf("Overview", "Content", "Versions", "Settings", "Logs")
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(480.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

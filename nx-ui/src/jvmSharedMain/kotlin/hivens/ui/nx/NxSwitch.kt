@@ -24,10 +24,9 @@ import androidx.compose.ui.semantics.Role
 import hivens.look.shape.api.Shape
 import hivens.ui.press.toggleable
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 import hivens.ui.theme.Status
 
 /**
@@ -107,7 +106,7 @@ private fun NxSwitchLightPreview() = SwitchStates(dark = false)
 
 @Composable
 private fun SwitchStates(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(280.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

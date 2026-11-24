@@ -22,12 +22,11 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
 import hivens.ui.press.clickable
-import hivens.ui.theme.NeutralTheme
 import hivens.look.feedback.api.Feedback
 import hivens.look.feedback.api.FeedbackTarget
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 import hivens.ui.theme.Status
 
 /**
@@ -104,7 +103,7 @@ private fun NxIconButtonLightPreview() = IconButtonStates(dark = false)
 
 @Composable
 private fun IconButtonStates(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Row(
             modifier              = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

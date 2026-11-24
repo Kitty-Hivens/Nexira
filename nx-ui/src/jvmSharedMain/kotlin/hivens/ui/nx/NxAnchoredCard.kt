@@ -25,10 +25,9 @@ import androidx.compose.ui.unit.dp
 import hivens.look.shape.api.Shape
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 import kotlin.math.roundToInt
 
 /**
@@ -110,7 +109,7 @@ private fun NxAnchoredCardLightPreview() = OpenCard(dark = false)
 /** The card as it stands once open, drawn through its own surface, for the reason the menu's preview gives. */
 @Composable
 private fun OpenCard(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(Modifier.width(420.dp).background(NxColor.page).padding(16.dp)) {
             CardSurface(Modifier, CARD_WIDTH) {
                 Text("Shared folder", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = NxInk.main)

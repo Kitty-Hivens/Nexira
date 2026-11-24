@@ -29,10 +29,9 @@ import hivens.look.shape.api.Shape
 import hivens.look.stroke.api.Stroke
 import hivens.look.stroke.api.stroke
 import hivens.ui.press.clickable
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 
 /**
  * Parse a hex string into a [Color] or null. Accepts `#RRGGBB` / `#AARRGGBB`
@@ -120,7 +119,7 @@ private fun NxColorFieldLightPreview() = ColorFields(dark = false)
 
 @Composable
 private fun ColorFields(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(320.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),

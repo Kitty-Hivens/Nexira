@@ -40,9 +40,7 @@ import hivens.ui.press.clickable
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.NxThemed
 import hivens.look.colour.api.Fill
 import hivens.look.colour.api.Ink
 import hivens.look.stroke.api.Stroke
@@ -51,6 +49,7 @@ import hivens.look.stroke.api.stroke
 import kotlinx.serialization.Serializable
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.Previewed
 import hivens.ui.theme.Status
 
 /** What a launch control is doing, which decides how it is drawn. */
@@ -347,7 +346,7 @@ private fun PlayButtonLightPreview() = PlayButtonGrounds(dark = false)
 
 @Composable
 private fun PlayButtonGrounds(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(760.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

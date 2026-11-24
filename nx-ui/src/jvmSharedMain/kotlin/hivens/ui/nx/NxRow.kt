@@ -43,10 +43,9 @@ import hivens.ui.press.clickable
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 
 /**
  * A generic in-plane settings row: optional [icon] + [title] (+ [subtitle]) on the
@@ -207,7 +206,7 @@ private fun NxRowLightPreview() = RowForms(dark = false)
 
 @Composable
 private fun RowForms(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(Modifier.width(440.dp).background(NxColor.page).padding(16.dp)) {
             NxSurface(SurfaceKind.Panel, Modifier.fillMaxWidth()) {
                 Column(Modifier.fillMaxWidth().padding(16.dp)) {

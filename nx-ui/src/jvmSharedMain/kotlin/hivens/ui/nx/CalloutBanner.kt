@@ -22,11 +22,10 @@ import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
 import hivens.ui.theme.OnFill
+import hivens.ui.theme.Previewed
 import hivens.ui.theme.Status
 
 /** Severity of a [CalloutBanner]; drives its accent colour and default glyph. */
@@ -113,7 +112,7 @@ private fun CalloutBannerLightPreview() = CalloutBannerTones(dark = false)
 
 @Composable
 private fun CalloutBannerTones(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

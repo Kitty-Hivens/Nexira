@@ -22,10 +22,9 @@ import hivens.look.shape.api.Shape
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 
 /**
  * Leading icon + label for one vertical-nav entry, selected styling
@@ -61,7 +60,7 @@ private fun NxNavRowContentLightPreview() = NavRowContents(dark = false)
 
 @Composable
 private fun NavRowContents(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(Modifier.width(240.dp).background(NxColor.page).padding(8.dp)) {
             for ((icon, label) in listOf(NxIcon.Home to "Home", NxIcon.Inventory2 to "Library", NxIcon.Settings to "Settings")) {
                 val selected = label == "Library"

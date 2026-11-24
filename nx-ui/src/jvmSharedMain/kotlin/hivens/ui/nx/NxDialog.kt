@@ -51,11 +51,10 @@ import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
 import hivens.look.shape.api.Shape as ShapeAxis
+import hivens.ui.theme.Previewed
 
 /**
  * A modal dialog in the window: [content] centred over a scrim that blocks
@@ -255,7 +254,7 @@ private fun NxDialogLightPreview() = Dialogs(dark = false)
  */
 @Composable
 private fun Dialogs(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Row(
             modifier              = Modifier.width(1000.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),

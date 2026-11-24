@@ -44,11 +44,10 @@ import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
 import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.Previewed
 
 /**
  * A titled panel that hangs off a control, for choices that do not fit a menu.
@@ -248,7 +247,7 @@ private fun NxPopoverPanelLightPreview() = OpenPopover(dark = false)
  */
 @Composable
 private fun OpenPopover(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         LayerHost(rememberWindowLayers(), Modifier.size(360.dp, 400.dp).background(NxColor.page)) {
             Box(Modifier.align(Alignment.TopEnd).padding(12.dp)) {
                 NxIconButton(NxIcon.Tune, "View options", onClick = {})

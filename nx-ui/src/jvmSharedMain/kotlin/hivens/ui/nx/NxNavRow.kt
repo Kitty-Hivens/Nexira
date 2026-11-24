@@ -29,10 +29,9 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.press.clickable
 import hivens.ui.surface.NxSurface
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 import hivens.ui.theme.Status
 import hivens.ui.surface.SurfaceKind
 
@@ -102,7 +101,7 @@ private fun NxNavRowLightPreview() = NavRows(dark = false)
 
 @Composable
 private fun NavRows(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

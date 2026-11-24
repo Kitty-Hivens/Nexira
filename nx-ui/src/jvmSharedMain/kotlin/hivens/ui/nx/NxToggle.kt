@@ -21,10 +21,9 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 import hivens.ui.theme.Status
 
 /**
@@ -104,7 +103,7 @@ private fun NxToggleLightPreview() = ToggleRows(dark = false)
 
 @Composable
 private fun ToggleRows(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),

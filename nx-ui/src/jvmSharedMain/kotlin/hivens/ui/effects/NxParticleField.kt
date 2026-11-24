@@ -31,10 +31,9 @@ import hivens.ui.surface.SurfaceKind
 import hivens.look.colour.api.Paint
 import hivens.look.shape.api.Shape
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.floor
@@ -247,7 +246,7 @@ private fun NxParticleFieldLightPreview() = ParticleFields(dark = false)
 
 @Composable
 private fun ParticleFields(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Row(
             modifier              = Modifier.width(680.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),

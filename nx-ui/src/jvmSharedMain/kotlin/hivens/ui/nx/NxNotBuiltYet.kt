@@ -15,10 +15,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 
 /**
  * A place that exists and has nothing behind it yet.
@@ -75,7 +74,7 @@ private fun NxNotBuiltYetLightPreview() = NotBuiltYetSamples(dark = false)
 
 @Composable
 private fun NotBuiltYetSamples(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(32.dp),

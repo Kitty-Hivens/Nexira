@@ -27,10 +27,9 @@ import hivens.look.shape.api.Shape
 import hivens.look.stroke.api.Stroke
 import hivens.look.stroke.api.StrokeState
 import hivens.look.stroke.api.stroke
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 
 /**
  * A text field for the screens that draw their own frame around it: [value] in, [onValueChange]
@@ -81,7 +80,7 @@ private fun NxBasicTextFieldLightPreview() = BasicTextFields(dark = false)
 
 @Composable
 private fun BasicTextFields(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(320.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),

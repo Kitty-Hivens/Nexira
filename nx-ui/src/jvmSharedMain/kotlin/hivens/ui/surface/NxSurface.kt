@@ -32,10 +32,8 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.theme.Backdrop
 import hivens.ui.theme.LocalPlane
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
 import hivens.ui.theme.Plane
 import hivens.look.colour.api.Colour
 import hivens.look.colour.api.LocalGround
@@ -44,6 +42,7 @@ import hivens.look.feedback.api.FeedbackTarget
 import hivens.look.surface.api.Surface
 import hivens.look.surface.api.drawPlaneBody
 import hivens.look.shape.api.Shape as ShapeAxis
+import hivens.ui.theme.Previewed
 
 /**
  * A library-owned surface: [kind] is asked of the surface axis, which answers its step,
@@ -195,7 +194,7 @@ private fun NxSurfaceLightPreview() = SurfaceKinds(dark = false)
 
 @Composable
 private fun SurfaceKinds(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(640.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

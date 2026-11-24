@@ -44,10 +44,9 @@ import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 import kotlinx.coroutines.launch
 
 /**
@@ -154,7 +153,7 @@ private fun NxSideSheetLightPreview() = OpenSideSheet(dark = false)
  */
 @Composable
 private fun OpenSideSheet(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark, reduceMotion = true) {
+    Previewed(dark = dark, reduceMotion = true) {
         LayerHost(rememberWindowLayers(), Modifier.size(640.dp, 400.dp).background(NxColor.page)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 NxSectionHeader("Page behind")

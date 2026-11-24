@@ -20,10 +20,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.ui.icons.NxIcon
 import hivens.ui.surface.NxSurface
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.NxThemed
 import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.Previewed
 
 /**
  * A settings/config section: a header in the theme's lead colour over one
@@ -74,7 +73,7 @@ private fun NxSectionLightPreview() = Sections(dark = false)
 
 @Composable
 private fun Sections(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),

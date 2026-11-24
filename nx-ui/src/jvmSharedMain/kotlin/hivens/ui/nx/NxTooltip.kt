@@ -56,9 +56,7 @@ import hivens.ui.icons.Symbol
 import hivens.ui.layers.AnchoredLayer
 import hivens.ui.surface.NxSurface
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.NxThemed
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
@@ -67,6 +65,7 @@ import hivens.ui.surface.SurfaceKind
 import hivens.look.timing.api.Timing
 import hivens.look.timing.api.TooltipKind
 import hivens.look.shape.api.Shape as ShapeAxis
+import hivens.ui.theme.Previewed
 
 /**
  * Where a tooltip sits relative to what raised it.
@@ -450,7 +449,7 @@ private fun NxTooltipLightPreview() = TooltipContents(dark = false)
  */
 @Composable
 private fun TooltipContents(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

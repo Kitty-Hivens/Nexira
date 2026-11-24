@@ -23,10 +23,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import hivens.look.icon.api.Icon
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 
 /**
  * Draws [icon] the way the look's icon library draws it. Drop-in for Material's `Icon`: the same argument
@@ -83,7 +82,7 @@ private fun SymbolCatalogue(dark: Boolean) {
             .map { it.name to it.get(null) as IconKey }
             .sortedBy { it.first }
     }
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(760.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

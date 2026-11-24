@@ -19,11 +19,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.look.shape.api.Shape
 import hivens.ui.press.clickable
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
 import hivens.ui.theme.OnFill
+import hivens.ui.theme.Previewed
 
 /**
  * A small selectable chip (e.g. regex / bold). Selected = a wash of the theme's lead
@@ -80,7 +79,7 @@ private fun NxChoiceChipLightPreview() = ChoiceChipStates(dark = false)
 
 @Composable
 private fun ChoiceChipStates(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Row(
             modifier              = Modifier.width(420.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),

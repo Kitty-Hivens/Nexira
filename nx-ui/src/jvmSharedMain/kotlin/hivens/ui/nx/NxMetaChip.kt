@@ -17,11 +17,10 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
 import hivens.ui.theme.OnFill
+import hivens.ui.theme.Previewed
 import hivens.ui.theme.Status
 
 /**
@@ -109,7 +108,7 @@ private fun NxMetaChipLightPreview() = MetaChipTones(dark = false)
 
 @Composable
 private fun MetaChipTones(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(480.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),

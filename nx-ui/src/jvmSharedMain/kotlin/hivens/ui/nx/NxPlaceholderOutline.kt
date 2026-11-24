@@ -18,9 +18,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import hivens.look.stroke.api.Stroke
 import hivens.look.stroke.api.drawStroke
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 
 /**
  * The outline of a place that is empty or can take something, an empty slot or a drop target, drawn
@@ -46,7 +45,7 @@ private fun NxPlaceholderOutlineLightPreview() = PlaceholderOutlines(dark = fals
 
 @Composable
 private fun PlaceholderOutlines(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Row(
             modifier              = Modifier.background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp),

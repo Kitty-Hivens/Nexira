@@ -23,10 +23,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 
 /**
  * A label whose box does not change size with the state it is drawn in.
@@ -98,7 +97,7 @@ private fun NxSteadyTextLightPreview() = SteadyTexts(dark = false)
 
 @Composable
 private fun SteadyTexts(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(
             modifier            = Modifier.width(320.dp).background(NxColor.page).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),

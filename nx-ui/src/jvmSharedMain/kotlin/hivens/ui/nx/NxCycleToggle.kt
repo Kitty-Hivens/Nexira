@@ -26,10 +26,9 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.press.clickable
 import hivens.ui.theme.Motion
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
+import hivens.ui.theme.Previewed
 
 /**
  * One state of an [NxCycleToggle]: the glyph that stands for it and the name it
@@ -141,7 +140,7 @@ private fun CycleToggleStates(dark: Boolean) {
         NxCycleState(NxIcon.Repeat, "Repeat all"),
         NxCycleState(NxIcon.RepeatOne, "Repeat one"),
     )
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Row(
             modifier              = Modifier.width(360.dp).background(NxColor.page).padding(16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),

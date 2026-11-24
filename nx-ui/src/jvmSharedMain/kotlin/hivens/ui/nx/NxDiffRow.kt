@@ -20,11 +20,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import hivens.ui.theme.NeutralTheme
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxThemed
 import hivens.ui.theme.OnFill
+import hivens.ui.theme.Previewed
 import hivens.ui.theme.Status
 
 /** What happened to the entry a [NxDiffRow] describes. */
@@ -103,7 +102,7 @@ private fun NxDiffRowLightPreview() = DiffRowKinds(dark = false)
 
 @Composable
 private fun DiffRowKinds(dark: Boolean) {
-    NxThemed(NeutralTheme, dark = dark) {
+    Previewed(dark = dark) {
         Column(Modifier.width(420.dp).background(NxColor.page).padding(16.dp)) {
             NxDiffRow(NxDiffRowKind.Added, "Sodium", subtitle = "0.6.0 for Fabric", trailing = "1.2 MB")
             NxDiffRow(NxDiffRowKind.Removed, "OptiFine", subtitle = "Replaced by Sodium", trailing = "-4.8 MB")
