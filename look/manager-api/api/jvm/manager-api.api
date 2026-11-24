@@ -7,6 +7,7 @@ public abstract interface class hivens/look/manager/api/LookAnswers : java/lang/
 public final class hivens/look/manager/api/LookAnswers$Companion {
 	public final fun following (Lkotlinx/coroutines/flow/StateFlow;)Lhivens/look/manager/api/LookAnswers;
 	public final fun of (Ljava/lang/Object;)Lhivens/look/manager/api/LookAnswers;
+	public final fun over (Lhivens/look/manager/api/LookContext;Lhivens/look/manager/api/LookAxis;Lkotlin/jvm/functions/Function1;)Lhivens/look/manager/api/LookAnswers;
 }
 
 public final class hivens/look/manager/api/LookAnswers$DefaultImpls {
@@ -86,6 +87,15 @@ public abstract interface class hivens/look/manager/api/LookContext {
 	public abstract fun getBoot ()Lhivens/widget/api/BootContext;
 	public abstract fun getCoroutineScope ()Lkotlinx/coroutines/CoroutineScope;
 	public abstract fun getServices ()Lhivens/widget/api/LevelServices;
+	public fun getUnder ()Lkotlinx/coroutines/flow/StateFlow;
+}
+
+public final class hivens/look/manager/api/LookContext$DefaultImpls {
+	public static fun getUnder (Lhivens/look/manager/api/LookContext;)Lkotlinx/coroutines/flow/StateFlow;
+}
+
+public final class hivens/look/manager/api/LookContributionsKt {
+	public static final fun under (Lhivens/look/manager/api/LookContext;Lhivens/look/manager/api/LookAxis;)Lkotlinx/coroutines/flow/StateFlow;
 }
 
 public final class hivens/look/manager/api/LookKeys {
@@ -125,6 +135,7 @@ public final class hivens/look/manager/api/LookPackEntry {
 
 public abstract interface class hivens/look/manager/api/LookProvider : hivens/widget/api/ModuleContribution {
 	public abstract fun getAxis ()Ljava/lang/String;
+	public fun getBasedOn ()Ljava/lang/String;
 	public abstract fun getContract ()Lhivens/widget/model/ApiVersion;
 	public abstract fun getFamily ()Ljava/lang/String;
 	public fun getId ()Ljava/lang/String;
@@ -132,6 +143,7 @@ public abstract interface class hivens/look/manager/api/LookProvider : hivens/wi
 }
 
 public final class hivens/look/manager/api/LookProvider$DefaultImpls {
+	public static fun getBasedOn (Lhivens/look/manager/api/LookProvider;)Ljava/lang/String;
 	public static fun getId (Lhivens/look/manager/api/LookProvider;)Ljava/lang/String;
 	public static fun getSettings (Lhivens/look/manager/api/LookProvider;)Ljava/util/List;
 }

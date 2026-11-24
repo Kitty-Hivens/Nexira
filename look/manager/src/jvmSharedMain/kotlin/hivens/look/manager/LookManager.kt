@@ -57,6 +57,10 @@ import kotlin.coroutines.cancellation.CancellationException
  * over for as long as the same contribution is brought, and the axis goes on down the choice. A
  * cancellation a provider throws is such a failure too. Only the cancellation of [scope] ends the work.
  *
+ * A provider may stand on another of its axis ([LookProvider.basedOn]): that one is opened before it and
+ * closed after it, whether it answers anything itself or not, and the one on top is opened again where what
+ * it stands on is another now.
+ *
  * A subtree may ask for another look ([lease]): every axis is answered there as the person's choice with
  * the subtree's laid over it resolves, by providers opened while the subtree is drawn.
  */
@@ -80,7 +84,7 @@ internal class LookManager(
     private val leases = LinkedHashSet<Lease>()
     private var open = IdentityHashMap<LookProvider<Any>, Opened>()
     private val failed: MutableSet<LookProvider<Any>> = Collections.newSetFromMap(IdentityHashMap())
-    private var watched: Set<LookProvider<Any>> = emptySet()
+    private var watched: Set<Opened> = emptySet()
     private var watch: Job? = null
     private var closed = false
 
@@ -169,7 +173,7 @@ internal class LookManager(
             open.values.toList().also { open = IdentityHashMap() }
         }
         wake.close()
-        all.forEach(Opened::close)
+        closeAll(all)
     }
 
     private fun release(lease: Lease) {
@@ -196,18 +200,23 @@ internal class LookManager(
             Input(registry, chosen, leases.toList(), IdentityHashMap(open), Collections.newSetFromMap<LookProvider<Any>>(IdentityHashMap()).also { it += failed })
         }
         val opening = IdentityHashMap<LookProvider<Any>, Opened>()
+        // Opened in this pass over a provider that then failed, so opened again over what is there instead.
+        val superseded = ArrayList<Opened>()
         val failedNow: MutableSet<LookProvider<Any>> = Collections.newSetFromMap(IdentityHashMap())
         var installed = false
         try {
+            fun fail(entry: ProviderEntry) {
+                failedNow += entry.provider
+            }
             fun obtain(entry: ProviderEntry, axis: AxisEntry): Opened? {
                 val provider = entry.provider
                 if (provider in input.failed || provider in failedNow) return null
-                input.open[provider]?.let { return it }
-                opening[provider]?.let { return it }
-                return openOf(entry)?.also { opening[provider] = it } ?: null.also { failedNow += provider }
-            }
-            fun fail(entry: ProviderEntry) {
-                failedNow += entry.provider
+                val on = entry.basedOn?.let { input.registry.provider(entry.axis, it) }?.let { below ->
+                    obtain(below, axis)?.also { if (it.current(axis) == null) fail(below) }?.takeIf { below.provider !in failedNow }
+                }
+                input.open[provider]?.takeIf { it.on === on }?.let { return it }
+                opening[provider]?.let { if (it.on === on) return it else superseded += it }
+                return openOf(entry, axis, on)?.also { opening[provider] = it } ?: null.also { opening.remove(provider); failedNow += provider }
             }
             var top: List<Resolution>
             var nested: Map<Lease, List<Resolution>>
@@ -224,12 +233,14 @@ internal class LookManager(
                 if (closed) return
                 failed += failedNow
                 failed.retainAll(input.registry.providers.mapTo(Collections.newSetFromMap(IdentityHashMap())) { it.provider })
-                val used: MutableSet<LookProvider<Any>> = Collections.newSetFromMap(IdentityHashMap())
-                top.forEach { it.opened?.let { opened -> used += opened.entry.provider } }
-                nested.values.forEach { list -> list.forEach { it.opened?.let { opened -> used += opened.entry.provider } } }
+                // What answers something, and what that stands on.
+                val used: MutableSet<Opened> = Collections.newSetFromMap(IdentityHashMap())
+                (top + nested.values.flatten()).forEach { resolution -> generateSequence(resolution.opened) { it.on }.forEach { used += it } }
                 val next = IdentityHashMap<LookProvider<Any>, Opened>()
-                (input.open + opening).forEach { (provider, opened) -> if (provider in used) next[provider] = opened else unused += opened }
+                (input.open.values + opening.values + superseded).forEach { opened -> if (opened in used) next[opened.entry.provider] = opened else unused += opened }
                 open = next
+                val answering: Set<Opened> = (top + nested.values.flatten()).mapNotNullTo(Collections.newSetFromMap(IdentityHashMap())) { it.opened }
+                next.values.forEach { it.answering = it in answering }
                 installed = true
                 val answered = top.map { AxisAnswer(it.axis, it.value) }
                 _answers.value = answered
@@ -241,17 +252,19 @@ internal class LookManager(
                     packs     = input.registry.packs,
                 )
                 nested.forEach { (lease, list) -> if (lease in leases) lease.publish(list.map { AxisAnswer(it.axis, it.value) }) }
-                val keys: Set<LookProvider<Any>> = Collections.newSetFromMap<LookProvider<Any>>(IdentityHashMap()).also { it += next.keys }
-                val changed = keys != watched
-                watched = keys
+                val changed = used != watched
+                watched = used
                 changed
             }
-            unused.forEach(Opened::close)
+            closeAll(unused)
             if (rewatching) rewatch()
         } finally {
-            if (!installed) opening.values.forEach(Opened::close)
+            if (!installed) closeAll(opening.values + superseded)
         }
     }
+
+    /** Closes [opened], each before what it stands on. */
+    private fun closeAll(opened: Collection<Opened>) = opened.sortedByDescending { it.depth }.forEach(Opened::close)
 
     /** [answers] as one value, by axis id. */
     private fun snapshotOf(answers: List<AxisAnswer>): LookSnapshot = LookSnapshot(answers.associate { it.axis.id to it.value })
@@ -276,15 +289,19 @@ internal class LookManager(
         return Resolution(axis, null, axis.base, LookSource.Base)
     }
 
-    // The provider opened, or null where opening it failed. Whether it answers in its axis's type is
-    // [resolve]'s to find, which reads the answers.
-    private fun openOf(entry: ProviderEntry): Opened? {
+    // The provider opened over [on], or null where opening it failed. Whether it answers in its axis's type
+    // is [resolve]'s to find, which reads the answers.
+    private fun openOf(entry: ProviderEntry, axis: AxisEntry, on: Opened?): Opened? {
+        if (entry.basedOn != null && on == null) {
+            log.info("Look provider '{}' of module '{}' stands on '{}', which is not there for axis '{}', and stands on its base answers", entry.family, entry.moduleId, entry.basedOn, entry.axis)
+        }
         val job = SupervisorJob(scope.coroutineContext[Job])
         val answers = guarded(alive) {
             val context = object : LookContext {
                 override val coroutineScope = CoroutineScope(scope.coroutineContext + providerDispatcher + job)
                 override val services = servicesOf(entry.moduleId)
                 override val boot = bootOf(entry.moduleId)
+                override val under: StateFlow<Any>? = if (entry.basedOn == null) null else on?.answers?.answers ?: MutableStateFlow(axis.base)
             }
             entry.provider.open(context)
         }.getOrElse {
@@ -292,10 +309,12 @@ internal class LookManager(
             log.warn("Look provider '{}' of module '{}' could not open, and axis '{}' goes on without it", entry.family, entry.moduleId, entry.axis, it)
             return null
         }
-        return Opened(entry, answers, job)
+        return Opened(entry, axis, answers, job, on)
     }
 
-    // Starts a pass whenever an open provider's answers change from what was last published.
+    // Starts a pass whenever an open provider's answers change from what was last published. One that only
+    // has another standing on it answers through that one, so it asks for a pass only where its answers are
+    // not its axis's type any more.
     private fun rewatch() {
         val flows = synchronized(lock) {
             watch?.cancel()
@@ -305,19 +324,30 @@ internal class LookManager(
         if (flows.isEmpty()) return
         val job = scope.launch {
             flows.merge().collect { (opened, value) ->
-                val published = synchronized(lock) { _answers.value.any { it.value === value } || leases.any { lease -> lease.answers.value.any { it.value === value } } }
+                val published = synchronized(lock) {
+                    _answers.value.any { it.value === value } || leases.any { lease -> lease.answers.value.any { it.value === value } } ||
+                        opened.axis.accepts(value) && !opened.answering
+                }
                 if (!published && opened.entry.provider !in synchronized(lock) { failed }) wake.trySend(Unit)
             }
         }
         synchronized(lock) { watch = job }
     }
 
-    /** A provider while it is open, and the job its work runs under. */
+    /** A provider while it is open, the job its work runs under, and what it stands on. */
     private inner class Opened(
         val entry: ProviderEntry,
+        val axis: AxisEntry,
         val answers: LookAnswers<Any>,
         private val job: Job,
+        val on: Opened?,
     ) {
+        /** How many it stands on, one on another. */
+        val depth: Int = if (on == null) 0 else on.depth + 1
+
+        /** Whether it answers its axis, here or in a subtree, and is not only stood on. Written and read under the lock. */
+        var answering: Boolean = false
+
         // Its answers now, or null where they cannot be read or are not of [axis]'s type, which fails it.
         fun current(axis: AxisEntry): Any? {
             val value = guarded(alive) { answers.answers.value }.getOrNull()

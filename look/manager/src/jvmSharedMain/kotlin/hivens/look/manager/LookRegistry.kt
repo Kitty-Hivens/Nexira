@@ -49,6 +49,8 @@ internal class ProviderEntry(
     val family: String,
     val contract: ApiVersion,
     val label: String,
+    /** The family of the same axis it stands on, see [LookProvider.basedOn]. */
+    val basedOn: String?,
 ) {
     fun view() = LookProviderEntry(moduleId, axis, family, label)
 }
@@ -60,8 +62,9 @@ internal class Candidate(val provider: ProviderEntry, val source: LookSource)
  * The axes, providers and packs the modules brought in, in the order they came. The first of an axis id,
  * of a family for one axis and of a pack id is kept, and a later one is refused with a line in the log.
  * So is a pack of the default pack's id from a module not in [compiled], a provider built against a
- * contract its axis's version does not serve, and a contribution whose declarations cannot be read or
- * whose base answers are not of its own type, so it costs only itself.
+ * contract its axis's version does not serve, providers that stand on each other in a circle, and a
+ * contribution whose declarations cannot be read or whose base answers are not of its own type, so it
+ * costs only itself.
  */
 internal class LookRegistry private constructor(
     val axes: List<AxisEntry>,
@@ -129,7 +132,29 @@ internal class LookRegistry private constructor(
                     }
                 }
             }
-            return LookRegistry(axes.values.toList(), served, packs.values.toList())
+            return LookRegistry(axes.values.toList(), withoutCircles(served), packs.values.toList())
+        }
+
+        /** [providers] but for those that stand on each other in a circle, each circle said once. */
+        private fun withoutCircles(providers: List<ProviderEntry>): List<ProviderEntry> {
+            val byFamily = providers.associateBy { it.axis to it.family }
+            fun circleFrom(entry: ProviderEntry): List<ProviderEntry>? {
+                val path = arrayListOf(entry)
+                while (true) {
+                    val next = path.last().basedOn?.let { byFamily[entry.axis to it] } ?: return null
+                    // A path that runs into a circle it is not part of stands on nothing that is there once the circle is gone.
+                    if (next in path) return path.takeIf { next === entry }
+                    path += next
+                }
+            }
+            val refused = LinkedHashSet<ProviderEntry>()
+            providers.forEach { entry ->
+                if (entry in refused) return@forEach
+                val circle = circleFrom(entry) ?: return@forEach
+                refused += circle
+                log.warn("The look providers of axis '{}' in {} stand on each other in a circle, and are refused", entry.axis, circle.joinToString { "'${it.family}'" })
+            }
+            return providers - refused
         }
 
         private fun axisEntry(moduleId: String, axis: LookAxis<Any>): AxisEntry {
@@ -144,7 +169,7 @@ internal class LookRegistry private constructor(
             val axis = provider.axis
             val family = provider.family
             require(axis.isNotBlank() && family.isNotBlank()) { "provider '${provider.id}' names no axis or no family" }
-            return ProviderEntry(moduleId, provider, axis, family, provider.contract, provider.label)
+            return ProviderEntry(moduleId, provider, axis, family, provider.contract, provider.label, provider.basedOn)
         }
 
         private fun <K, V> keepFirst(into: MutableMap<K, V>, key: K, entry: V, moduleId: String, what: String) {

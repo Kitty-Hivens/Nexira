@@ -9,6 +9,7 @@ import hivens.widget.model.ApiVersion
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import kotlin.reflect.KClass
 
 /**
@@ -88,6 +89,18 @@ interface LookProvider<A : Any> : ModuleContribution {
     val contract: ApiVersion
 
     /**
+     * The family of the same axis this one stands on, or null where it stands on nothing: it takes that
+     * provider's answers and changes what it has another answer to. The manager opens that provider first
+     * and hands its answers to [open] ([LookContext.under]), and opens this one again where it goes or
+     * comes back. Where no provider of the family is there, or it fails, this one stands on the axis's base
+     * answers. Families that stand on each other in a circle are refused, all of them.
+     *
+     * A family is named and never compiled against, so either module can be taken away. A module that does
+     * not run without the other says so as well, in what it requires.
+     */
+    val basedOn: String? get() = null
+
+    /**
      * Its answers, ready at once and as they change, until they are closed. Called only when the choice
      * needs it, and never on the thread that draws. Whatever it throws, a cancellation of its own
      * included, or answers that are not of the axis's type, cost only this provider: the axis goes on
@@ -113,7 +126,19 @@ interface LookContext {
      * the same from either, so the window the launcher boots in opens in the look the shell then draws.
      */
     val boot: BootContext?
+
+    /**
+     * The answers the provider stands on as they change, see [LookProvider.basedOn]: the other provider's, or
+     * the axis's base answers where it is not there. Null for a provider that stands on nothing. Read through
+     * [under] in the axis's own type.
+     */
+    val under: StateFlow<Any>? get() = null
 }
+
+/** The answers the provider stands on, in the type of [axis], which it answers itself: the axis's base answers where it stands on nothing. */
+@Suppress("UNCHECKED_CAST")
+// The manager hands over answers of the axis's own type only, see [LookContext.under].
+fun <A : Any> LookContext.under(axis: LookAxis<A>): StateFlow<A> = under as StateFlow<A>? ?: MutableStateFlow(axis.base)
 
 /** A provider's answers while it is open. */
 interface LookAnswers<out A> : AutoCloseable {
@@ -126,6 +151,17 @@ interface LookAnswers<out A> : AutoCloseable {
     companion object {
         /** Answers that are [value] for as long as they are open. */
         fun <A> of(value: A): LookAnswers<A> = following(MutableStateFlow(value))
+
+        /**
+         * Answers made of those the provider stands on ([LookProvider.basedOn]): [answer] of them, now and
+         * every time they change.
+         */
+        fun <A : Any> over(context: LookContext, axis: LookAxis<A>, answer: (under: A) -> A): LookAnswers<A> {
+            val under = context.under(axis)
+            val answers = MutableStateFlow(answer(under.value))
+            context.coroutineScope.launch { under.collect { answers.value = answer(it) } }
+            return following(answers)
+        }
 
         /** Answers that are what [flow] holds. */
         fun <A> following(flow: StateFlow<A>): LookAnswers<A> = object : LookAnswers<A> {

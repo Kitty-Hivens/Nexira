@@ -25,7 +25,7 @@ object LookApi {
      * A module build stamps its manifest from the `nexira.lookManagerApi` Gradle property, which a test
      * holds equal to this.
      */
-    val VERSION: ApiVersion = ApiVersion(1, 0)
+    val VERSION: ApiVersion = ApiVersion(1, 1)
 
     /**
      * The pack an axis falls back on where the chosen pack names no provider for it. Only a module
