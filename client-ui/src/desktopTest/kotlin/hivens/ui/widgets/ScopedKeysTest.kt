@@ -11,18 +11,18 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import hivens.themes.Themes
-import hivens.ui.Screen
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.layout.LayoutGraphRepository
-import hivens.ui.navigation.NavState
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.profile.ProfileSelection
 import hivens.ui.widgets.profile.ProfileSelectionSource
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.LocalScope
@@ -45,8 +45,10 @@ import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
+import hivens.widget.model.History
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
+import hivens.widget.model.Show
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SourceKey
@@ -81,13 +83,13 @@ class ScopedKeysTest {
     private val data = WidgetDataRegistry().apply {
         register(SourceKey<String>("test.app"), flowSource(MutableStateFlow("app")))
         registerFactory(ProfileSelectionSource) { flowSource(MutableStateFlow(ProfileSelection())) }
-        declare(Sources.Navigation)
+        declare(CompositionKeys.History)
         declare(SourceKey<String>("test.page.owned", ScopeLevel.Page))
     }
 
     private val commands = WidgetCommandRegistry().apply {
-        declare(Commands.Back)
-        declare(Commands.Navigate)
+        declare(CompositionKeys.Back)
+        declare(CompositionKeys.Show)
     }
 
     private val app: WidgetScope = koinApplication {
@@ -147,19 +149,19 @@ class ScopedKeysTest {
 
     @Test
     fun `two windows keep their own history and fire their own commands`() {
-        val read = HashMap<String, NavState?>()
+        val read = HashMap<String, History?>()
         val fire = HashMap<String, (() -> Unit)?>()
         val fired = ArrayList<String>()
         draw {
-            listOf("a" to Screen.Home, "b" to Screen.Library).forEach { (name, screen) ->
+            listOf("a" to LauncherConfigs.Home, "b" to LauncherConfigs.Library).forEach { (name, config) ->
                 ChildLevel(ScopeLevel.Window) {
                     ChildLevel(ScopeLevel.Composition) {
                         val back = rememberLatestCommand<Unit> { fired += name }
-                        ProvideScoped(Sources.Navigation, NavState(screen, listOf(screen), canGoBack = false, canGoForward = false)) {
-                            ProvideScopedCommand(Commands.Back, back) {
+                        ProvideScoped(CompositionKeys.History, History(config)) {
+                            ProvideScopedCommand(CompositionKeys.Back, back) {
                                 ChildLevel(ScopeLevel.Page) {
-                                    read[name] = rememberScopedSource(Sources.Navigation).valueOrNull()
-                                    fire[name] = rememberScopedAction(Commands.Back)
+                                    read[name] = rememberScopedSource(CompositionKeys.History).valueOrNull()
+                                    fire[name] = rememberScopedAction(CompositionKeys.Back)
                                 }
                             }
                         }
@@ -167,8 +169,8 @@ class ScopedKeysTest {
                 }
             }
         }
-        assertEquals(Screen.Home, read["a"]?.current)
-        assertEquals(Screen.Library, read["b"]?.current)
+        assertEquals(LauncherConfigs.Home, read["a"]?.current?.config)
+        assertEquals(LauncherConfigs.Library, read["b"]?.current?.config)
         assertNotNull(fire["a"]).invoke()
         assertEquals(listOf("a"), fired, "the other window's history was left alone")
         assertNotNull(fire["b"]).invoke()
@@ -177,18 +179,18 @@ class ScopedKeysTest {
 
     @Test
     fun `a composition key is missing outside the composition that provides it`() {
-        var outside: NavState? = NavState(Screen.Home, emptyList(), canGoBack = false, canGoForward = false)
-        var navigate: ((Screen) -> Unit)? = {}
+        var outside: History? = History(LauncherConfigs.Home)
+        var show: ((Show) -> Unit)? = {}
         draw {
             ChildLevel(ScopeLevel.Window) {
                 ChildLevel(ScopeLevel.Composition) {
-                    outside = rememberScopedSource(Sources.Navigation).valueOrNull()
-                    navigate = rememberScopedCommand(Commands.Navigate)
+                    outside = rememberScopedSource(CompositionKeys.History).valueOrNull()
+                    show = rememberScopedCommand(CompositionKeys.Show)
                 }
             }
         }
         assertNull(outside, "a composition level with nothing put over it has no history to show")
-        assertNull(navigate, "and no command to move one")
+        assertNull(show, "and no command to move one")
     }
 
     @Test
@@ -214,11 +216,11 @@ class ScopedKeysTest {
         draw {
             ChildLevel(ScopeLevel.Composition) {
                 answers["composition"] = missingNeeds(needs)
-                ProvideScoped(Sources.Navigation, NavState(Screen.Home, emptyList(), canGoBack = false, canGoForward = false)) {
+                ProvideScoped(CompositionKeys.History, History(LauncherConfigs.Home)) {
                     ChildLevel(ScopeLevel.Page) {
                         answers["page"] = missingNeeds(needs)
                         ProvideScoped(SourceKey<String>("test.page.owned", ScopeLevel.Page), "here") {
-                            ProvideScopedCommand(Commands.Back, command<Unit> { }) {
+                            ProvideScopedCommand(CompositionKeys.Back, command<Unit> { }) {
                                 answers["provided"] = missingNeeds(needs)
                             }
                         }

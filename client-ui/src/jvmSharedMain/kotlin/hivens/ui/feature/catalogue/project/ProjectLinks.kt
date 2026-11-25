@@ -8,9 +8,10 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import hivens.catalogue.api.ProjectTarget
 import hivens.launcher.sources.EngineSources
-import hivens.ui.Screen
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.NavRequests
 import hivens.ui.render.openInBrowser
+import hivens.widget.model.Show
 import org.koin.compose.koinInject
 
 /**
@@ -102,12 +103,12 @@ fun rememberLinkFollower(intoInstanceId: String? = null): (String) -> Unit {
  * than into [intoInstanceId]. Telling a Modrinth address apart is still the shell's,
  * until a source can claim the addresses it serves.
  */
-fun linkScreen(url: String, intoInstanceId: String?): Screen? {
+fun linkTarget(url: String, intoInstanceId: String?): Show? {
     val link = modrinthProjectLink(url) ?: return null
     return if (link.modpack) {
-        Screen.CataloguePackDetail(EngineSources.Modrinth.id, link.slug)
+        LauncherConfigs.cataloguePack(EngineSources.Modrinth.id, link.slug)
     } else {
-        Screen.ModDetail(ProjectTarget.Catalogue(link.slug, intoInstanceId))
+        LauncherConfigs.project(ProjectTarget.Catalogue(link.slug, intoInstanceId))
     }
 }
 
@@ -121,7 +122,7 @@ fun rememberNavigatingLinkFollower(): (url: String, intoInstanceId: String?) -> 
     val nav: NavRequests = koinInject()
     return remember(uriHandler, nav) {
         { url: String, intoInstanceId: String? ->
-            linkScreen(url, intoInstanceId)?.let(nav::open) ?: uriHandler.openUri(url)
+            linkTarget(url, intoInstanceId)?.let(nav::open) ?: uriHandler.openUri(url)
         }
     }
 }

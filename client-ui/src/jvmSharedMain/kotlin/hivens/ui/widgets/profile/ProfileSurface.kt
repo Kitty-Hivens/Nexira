@@ -38,7 +38,7 @@ private const val SURFACE = "profile"
 /** Under this width the category list stacks above the section instead of standing beside it. */
 private val STACK_BELOW = 560.dp
 
-// profile surface composable. AppLayout routes Screen.Profile here.
+// profile surface composable. What the profile config holds.
 // Slots: `nav` (left rail, fixed width), `signin` (right pane, the login
 // form when signed out / credential management when signed in), `account`
 // (right pane, the skin-forward identity hero when signed in). The `skin`

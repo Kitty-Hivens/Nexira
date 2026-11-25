@@ -1,6 +1,6 @@
 package hivens.ui.navigation
 
-import hivens.ui.Screen
+import hivens.widget.model.Show
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -20,14 +20,14 @@ import java.util.concurrent.atomic.AtomicReference
  * window navigates that window and not the first.
  */
 class NavRequests {
-    private val flow = MutableSharedFlow<Screen>(extraBufferCapacity = 16)
-    val requests: SharedFlow<Screen> = flow
+    private val flow = MutableSharedFlow<Show>(extraBufferCapacity = 16)
+    val requests: SharedFlow<Show> = flow
 
     /** How many back stacks are listening. A request with nobody listening goes nowhere. */
     val readers: StateFlow<Int> get() = flow.subscriptionCount
 
-    fun open(screen: Screen) {
-        flow.tryEmit(screen)
+    fun open(show: Show) {
+        flow.tryEmit(show)
     }
 }
 
@@ -42,14 +42,14 @@ class NavRequests {
  * made while it had none. The newest [PENDING] are kept and older ones dropped.
  */
 class MainWindowRequests {
-    private val pending = Channel<Screen>(PENDING, BufferOverflow.DROP_OLDEST)
+    private val pending = Channel<Show>(PENDING, BufferOverflow.DROP_OLDEST)
 
     // Taken off the queue and not handed over yet: the next taker starts with it, so
     // a shell that went away in between does not lose it.
-    private val inHand = AtomicReference<Screen?>(null)
+    private val inHand = AtomicReference<Show?>(null)
 
-    fun open(screen: Screen) {
-        val _ = pending.trySend(screen)
+    fun open(show: Show) {
+        val _ = pending.trySend(show)
     }
 
     /**
@@ -59,10 +59,10 @@ class MainWindowRequests {
      */
     suspend fun deliverTo(window: NavRequests, raise: () -> Unit): Nothing {
         while (true) {
-            val screen = inHand.get() ?: pending.receive().also { inHand.set(it) }
+            val show = inHand.get() ?: pending.receive().also { inHand.set(it) }
             val _ = window.readers.first { it > 0 }
-            window.open(screen)
-            inHand.compareAndSet(screen, null)
+            window.open(show)
+            inHand.compareAndSet(show, null)
             raise()
         }
     }

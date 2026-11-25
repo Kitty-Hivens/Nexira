@@ -46,9 +46,10 @@ import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
 import hivens.ui.layout.LayoutGraphFlushHook
 import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.navigation.NavRequests
-import hivens.ui.navigation.NavState
+import hivens.ui.navigation.PackSettingsPage
 import hivens.ui.notifications.CorePart
 import hivens.ui.notifications.CoreProblem
 import hivens.ui.notifications.CoreProblems
@@ -100,6 +101,7 @@ import hivens.widget.api.HostFiles
 import hivens.widget.api.KeyContribution
 import hivens.widget.api.LevelServicesHost
 import hivens.widget.api.ModuleKeysResult
+import hivens.widget.api.PageKeys
 import hivens.widget.api.SettingsStores
 import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.TakenContributions
@@ -113,8 +115,11 @@ import hivens.widget.api.command
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
 import hivens.widget.api.hostServices
+import hivens.widget.api.read
 import hivens.widget.api.registerModuleKeys
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.History
+import hivens.widget.model.HistoryEntry
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.WidgetDataSource
@@ -677,7 +682,10 @@ internal fun uiDataRegistry(
     }
     // What the composition's owner provides around every surface it draws, with the
     // sample in the sense above.
-    declare(Sources.Navigation) { NavState(Screen.Home, listOf(Screen.Home), canGoBack = false, canGoForward = false) }
+    declare(CompositionKeys.History) { History(LauncherConfigs.Home) }
+    // What the router provides for the entry each page is drawn for, and the launcher's own value of one.
+    declare(PageKeys.Entry) { HistoryEntry(LauncherConfigs.Home) }
+    registerFactory(PackSettingsPage.key) { page -> page.read(PackSettingsPage) }
     // What a page provides for its own widgets, on that page and nowhere else.
     declare(ProjectPageSource, ::sampleProjectPage)
     declare(CataloguePackPageSource, ::sampleCataloguePackPage)
@@ -701,12 +709,11 @@ internal fun uiCommandRegistry(
         command { visible -> if (visible) console.show() else console.hide() }
     }
     // What the composition's owner provides: its history.
-    declare(Commands.Navigate)
-    declare(Commands.SwitchTab)
-    declare(Commands.Back)
-    declare(Commands.Forward)
-    declare(Commands.PopTo)
     declare(CompositionKeys.Show)
+    declare(CompositionKeys.Back)
+    declare(CompositionKeys.Forward)
+    declare(CompositionKeys.BackTo)
+    declare(CompositionKeys.Rewrite)
     // What the About page provides for its update panel.
     declare(OpenUpdateDialog)
     // What each window provides of the commands it takes.

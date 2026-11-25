@@ -23,8 +23,8 @@ import androidx.compose.ui.unit.dp
 import hivens.launcher.platform.PlatformPaths
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
-import hivens.ui.Screen
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.nx.NxButton
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.platform.SystemActions
@@ -32,12 +32,13 @@ import hivens.ui.screens.library.PackCard
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import androidx.compose.foundation.layout.padding
-import hivens.ui.widgets.Commands
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
+import hivens.widget.model.Show
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import java.nio.file.Path
@@ -65,12 +66,12 @@ data class LibraryBodyProps(
     propsClass = LibraryBodyProps::class,
     minWidth = 320, minHeight = 200,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["nav.open", "packs.library", "pack.delete"],
+    needs = ["nav.show", "packs.library", "pack.delete"],
 )
 @Composable
 fun LibraryBody(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryBodyProps>()
-    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
+    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
     val instances = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     // Runs on the app's level, not this composition: leaving the Library mid-delete
     // cancelled it halfway through the tree.
@@ -83,12 +84,12 @@ fun LibraryBody(instance: WidgetInstance) {
         LibraryEmpty(
             title    = p.emptyTitle.ifBlank { s.text("libraryEmptyTitle") },
             body     = p.emptyText.ifBlank { s.text("libraryEmptyBody") },
-            onBrowse = { navigate(Screen.Browse) },
+            onBrowse = { show(Show(LauncherConfigs.Browse)) },
         )
     } else {
         LibraryList(
             instances    = instances,
-            onOpenDetail = { navigate(Screen.PackDetail(it.id)) },
+            onOpenDetail = { show(LauncherConfigs.pack(it.id)) },
             onOpenFolder = { SystemActions.openFolder(instanceDirOf(paths, it).toString()) },
             onDelete     = { pendingDelete = it },
         )

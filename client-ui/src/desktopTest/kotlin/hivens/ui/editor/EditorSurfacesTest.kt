@@ -1,6 +1,6 @@
 package hivens.ui.editor
 
-import hivens.ui.Screen
+import hivens.ui.navigation.LauncherConfigs
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotId
@@ -48,26 +48,25 @@ class EditorSurfacesTest {
 
     @Test
     fun `the screen's own surface leads, the shell follows`() {
-        val home = EditorSurfaces.availableFor(Screen.Home, bundled)
+        val home = EditorSurfaces.availableFor(LauncherConfigs.Home, bundled)
         assertEquals(SurfaceId("home.new"), home.first(), "the centre surface is the default selection")
         assertTrue(SurfaceId("appshell.root") in home, "the shell is editable from every screen")
 
-        val library = EditorSurfaces.availableFor(Screen.Library, bundled)
+        val library = EditorSurfaces.availableFor(LauncherConfigs.Library, bundled)
         assertEquals(SurfaceId("library"), library.first())
         assertTrue(SurfaceId("home.new") !in library, "another screen's centre surface is not mounted here")
     }
 
     @Test
-    fun `both entrances to the catalogue edit the same surface`() {
-        // One screen with two ways in. A surface mounted on only one of them would
-        // leave the other with nothing to arrange, though the same widgets draw it.
-        assertEquals(SurfaceId("browse"), EditorSurfaces.availableFor(Screen.Browse, bundled).first())
-        assertEquals(SurfaceId("browse"), EditorSurfaces.availableFor(Screen.BrowseInto("pack"), bundled).first())
+    fun `a surface is mounted by a config the composition has`() {
+        val unknown = EditorSurfaces.all.mapNotNull { it.mountedOn }.filterNot { it in LauncherConfigs.all }
+        assertEquals(emptyList(), unknown)
+        assertEquals(SurfaceId("browse"), EditorSurfaces.availableFor(LauncherConfigs.Browse, bundled).first())
     }
 
     @Test
     fun `a screen with no widget surface still offers the shell`() {
-        val settings = EditorSurfaces.availableFor(Screen.Settings, bundled)
+        val settings = EditorSurfaces.availableFor(LauncherConfigs.Settings, bundled)
         assertTrue(settings.isNotEmpty(), "the shell frames every screen")
         assertTrue(settings.none { it.value.startsWith("home.") }, "no centre surface is mounted on Settings")
     }
@@ -76,15 +75,15 @@ class EditorSurfacesTest {
     fun `a surface the graph does not carry is not offered`() {
         assertEquals(
             emptyList(),
-            EditorSurfaces.availableFor(Screen.Home, LayoutGraph.EMPTY),
+            EditorSurfaces.availableFor(LauncherConfigs.Home, LayoutGraph.EMPTY),
             "selecting a surface with no slots would open an editor over nothing",
         )
     }
 
     @Test
     fun `a screen's surface is on a page and a shell surface is not`() {
-        assertEquals(emptySet(), EditorSurfaces.pageProvides(SurfaceId("home.new"), bundled))
-        assertEquals(setOf("project.page"), EditorSurfaces.pageProvides(SurfaceId("project"), bundled))
+        assertEquals(EditorSurfaces.everyPage, EditorSurfaces.pageProvides(SurfaceId("home.new"), bundled))
+        assertEquals(EditorSurfaces.everyPage + "project.page", EditorSurfaces.pageProvides(SurfaceId("project"), bundled))
         assertNull(EditorSurfaces.pageProvides(SurfaceId("appshell.topbar"), bundled), "the shell is drawn outside any page")
         assertNull(EditorSurfaces.pageProvides(SurfaceId("nowhere.known"), bundled), "a surface nobody describes is not assumed to be on one")
     }
@@ -134,10 +133,10 @@ class EditorSurfacesTest {
         // the screen. The editor keys its whole state on this list, so a fold that
         // changed it dropped the reader out of edit mode mid-edit.
         assertEquals(
-            EditorSurfaces.availableFor(Screen.Home, bundled),
-            EditorSurfaces.availableFor(Screen.Home, collapsed("right")),
+            EditorSurfaces.availableFor(LauncherConfigs.Home, bundled),
+            EditorSurfaces.availableFor(LauncherConfigs.Home, collapsed("right")),
         )
-        assertTrue(SurfaceId("appshell.leftrail") in EditorSurfaces.availableFor(Screen.Home, collapsed("left")))
+        assertTrue(SurfaceId("appshell.leftrail") in EditorSurfaces.availableFor(LauncherConfigs.Home, collapsed("left")))
     }
 
     // ── A region's own settings, from the region's own tab ───────────

@@ -1,15 +1,15 @@
 package hivens.ui.widgets.shell
 
 import androidx.compose.runtime.Composable
-import hivens.ui.Screen
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.screens.custom.ScreenIcons
-import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
+import hivens.widget.model.ConfigId
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.screen
@@ -32,18 +32,18 @@ data class ScreenLinkProps(
  * so a link dropped anywhere still opens its screen. A link to a screen that is
  * gone draws nothing, and deleting a screen clears its links.
  */
-@Widget(id = "nav.screen", displayName = "widget.nav.screen", propsClass = ScreenLinkProps::class, needs = ["nav.state", "nav.switch"])
+@Widget(id = "nav.screen", displayName = "widget.nav.screen", propsClass = ScreenLinkProps::class, needs = ["nav.state", "nav.show"])
 @Composable
 fun NavScreenLink(instance: WidgetInstance) {
     val p = instance.rememberProps<ScreenLinkProps>()
     val spec = LocalLayoutGraph.current.screen(p.screen) ?: return
-    val nav = rememberScopedSource(Sources.Navigation).valueOrNull() ?: return
-    val switchTab = rememberScopedCommand(Commands.SwitchTab) ?: return
-    val current = nav.current
+    val nav = rememberScopedSource(CompositionKeys.History).valueOrNull() ?: return
+    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val config = ConfigId(spec.id)
     NavSlot(
         icon        = ScreenIcons.of(spec.icon),
         outlineSwap = true,
-        active      = current is Screen.Custom && current.id == spec.id,
-        onClick     = { switchTab(Screen.Custom(spec.id)) },
+        active      = nav.current.config == config,
+        onClick     = { show(LauncherConfigs.section(config)) },
     )
 }

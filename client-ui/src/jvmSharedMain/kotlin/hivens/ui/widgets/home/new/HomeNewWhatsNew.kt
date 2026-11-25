@@ -16,15 +16,15 @@ import hivens.config.Branding
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackUpdateView
 import hivens.packs.api.PackView
-import hivens.ui.Screen
 import hivens.ui.components.LauncherUpdateState
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.nx.NxRow
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.widgets.Commands
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -47,12 +47,12 @@ import org.koin.compose.koinInject
     surface = """{"fill":"panel"}""",
     minWidth = 240, minHeight = 60,
     maxWidth = 2400, maxHeight = 800,
-    needs = ["nav.open", "packs.library", "packs.updates"],
+    needs = ["nav.show", "packs.library", "packs.updates"],
 )
 @Composable
 @Suppress("UNUSED_PARAMETER")
 fun HomeNewWhatsNew(instance: WidgetInstance) {
-    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
+    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
     val packs = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     val s = nexiraStrings()
     val updateState: LauncherUpdateState = koinInject()
@@ -97,7 +97,7 @@ fun HomeNewWhatsNew(instance: WidgetInstance) {
                     else -> NxIcon.Update
                 },
                 iconTint = NxColor.lead(),
-                onClick  = { navigate(Screen.PackVersions(pack.id)) },
+                onClick  = { show(LauncherConfigs.packVersions(pack.id)) },
                 trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxInk.quiet) },
             )
         }

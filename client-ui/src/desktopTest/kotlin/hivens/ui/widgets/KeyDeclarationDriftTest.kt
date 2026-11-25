@@ -119,7 +119,7 @@ class KeyDeclarationDriftTest {
     fun `every key a page hands its widgets is listed on the surface of that page, and only those`() {
         val handedOver = declared.filter { it.level == ScopeLevel.Page && it.origin == KeyOrigin.Owner }.map { it.id }.toSet()
         val listed = EditorSurfaces.all.flatMap { it.provides }
-        assertEquals(handedOver, listed.toSet(), "a key a page provides that no surface lists keeps its widgets off that page too")
+        assertEquals(handedOver, listed.toSet() + EditorSurfaces.everyPage, "a key a page provides that no surface lists keeps its widgets off that page too")
         assertEquals(listed.size, listed.toSet().size, "a key is handed over by one page")
     }
 

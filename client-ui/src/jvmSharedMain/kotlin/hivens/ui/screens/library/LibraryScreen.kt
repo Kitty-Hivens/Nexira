@@ -34,7 +34,6 @@ import hivens.launcher.PackImportService
 import hivens.launcher.PackInstallService
 import hivens.launcher.imports.LocalPackCreator
 import hivens.launcher.runtime.RuntimeProvisioner
-import hivens.ui.Screen
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -85,7 +84,7 @@ import hivens.ui.theme.Status
  */
 @Composable
 fun LibraryScreen(
-    onScreenChange: (Screen) -> Unit,
+    onOpenPack: (id: String) -> Unit,
 ) {
     PuppetScreen("Library")
 
@@ -116,7 +115,7 @@ fun LibraryScreen(
             is InstallPhase.Succeeded -> {
                 installService.dismiss(key)
                 createKey = null
-                onScreenChange(Screen.PackDetail(phase.instanceId))
+                onOpenPack(phase.instanceId)
             }
             // The user stopped it; there is nothing left to say about it.
             InstallPhase.Cancelled -> {
@@ -134,7 +133,7 @@ fun LibraryScreen(
             is InstallPhase.Succeeded -> {
                 installService.dismiss(key)
                 importKey = null
-                onScreenChange(Screen.PackDetail(phase.instanceId))
+                onOpenPack(phase.instanceId)
             }
             InstallPhase.Cancelled -> {
                 installService.dismiss(key)

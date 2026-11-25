@@ -44,10 +44,10 @@ import hivens.packs.api.PackUpdateView
 import hivens.packs.api.PackView
 import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.SessionState
-import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
 import hivens.ui.press.clickable
@@ -59,7 +59,7 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxMedia
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
-import hivens.ui.widgets.Commands
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -80,12 +80,12 @@ import hivens.widget.model.Widget
     displayName = "widget.home.new.spines",
     minWidth = 480, minHeight = 240,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["nav.open", "packs.library", "pack.launch"],
+    needs = ["nav.show", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewSpines() {
     val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
-    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
+    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     val packs = remember(all) {
         all.sortedWith(RecentFirst)
@@ -110,7 +110,7 @@ fun HomeNewSpines() {
                     pack     = pack,
                     open     = isOpen,
                     appState = appState,
-                    onOpenPage = { navigate(Screen.PackDetail(pack.id)) },
+                    onOpenPage = { show(LauncherConfigs.pack(pack.id)) },
                     onChoose = { chosen = pack.id },
                     modifier = Modifier.width(width).fillMaxHeight(),
                 )

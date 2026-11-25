@@ -19,7 +19,7 @@ import hivens.widget.model.SurfaceId
 
 private const val SURFACE = "theme.picker"
 
-// theme.picker surface composable. AppLayout routes Screen.ThemePicker here. A frame
+// theme.picker surface composable. What the theme.picker config holds. A frame
 // of slots and nothing else: the header (the title and Apply) on top, and the grid and
 // the preview under it, side by side or stacked by the width. What fills them, the
 // themes on offer, the pending choice and applying it, is the colour provider's

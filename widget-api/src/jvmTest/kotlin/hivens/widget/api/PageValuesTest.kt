@@ -4,6 +4,9 @@ import hivens.widget.model.ConfigId
 import hivens.widget.model.HistoryEntry
 import hivens.widget.model.PageValue
 import hivens.widget.model.ScopeLevel
+import kotlin.test.assertNotSame
+import kotlin.test.assertSame
+import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.builtins.serializer
@@ -19,14 +22,18 @@ class PageValuesTest {
 
     private val sources = WidgetDataRegistry()
 
-    private fun page(entry: MutableStateFlow<HistoryEntry>?): WidgetScope {
-        val commands = WidgetCommandRegistry()
+    private fun registerTitle(commands: WidgetCommandRegistry = WidgetCommandRegistry()) {
         val contribution = object : KeyContribution {
             override val id = "test.keys"
             override val label = "Test keys"
             override fun declare(keys: ModuleKeys) = keys.pageValue(title) { "sample" }
         }
         assertIs<ModuleKeysResult.Registered>(registerModuleKeys("test", contribution, sources, commands, ContributedServices()))
+    }
+
+    private fun page(entry: MutableStateFlow<HistoryEntry>?): WidgetScope {
+        val commands = WidgetCommandRegistry()
+        registerTitle(commands)
         val composition = WidgetScope.app(sources, MemoryLevelServices.app(), Dispatchers.Unconfined, commands).child(ScopeLevel.Composition)
         return composition.pages.levelFor("page") { if (entry != null) provideSource(PageKeys.Entry, flowSource(entry)) }
     }
@@ -66,5 +73,34 @@ class PageValuesTest {
     fun `the palette has its sample`() {
         page(entry = null)
         assertEquals("sample", sources.sampleOf(title.id)?.invoke())
+    }
+
+    @Test
+    fun `a page level answers the entry it was last asked for with, and reads its values at once`() {
+        registerTitle()
+        val pages = WidgetScope.app(sources, MemoryLevelServices.app(), Dispatchers.Default).child(ScopeLevel.Composition).pages
+        val entry = opened("Sodium")
+        val level = pages.levelFor(entry)
+        assertEquals(entry, level.current(PageKeys.Entry))
+        assertEquals("Sodium", level.current(title.key))
+
+        val noted = entry.copy(values = mapOf(title.of("Lithium")))
+        assertSame(level, pages.levelFor(noted), "the page it was opened as is the page it stays")
+        assertEquals(noted, level.current(PageKeys.Entry))
+        assertEquals("Lithium", level.current(title.key), "on the thread that moved it, with nothing waited for")
+        assertNotSame(level, pages.levelFor(opened("Lithium")))
+    }
+
+    @Test
+    fun `a page that left and is opened again answers its new entry`() {
+        registerTitle()
+        val pages = WidgetScope.app(sources, MemoryLevelServices.app(), Dispatchers.Default).child(ScopeLevel.Composition).pages
+        val entry = opened("Sodium")
+        val first = pages.levelFor(entry.copy(values = mapOf(title.of("noted"))))
+        pages.keep(emptySet())
+        assertTrue(first.closed)
+        val again = pages.levelFor(entry)
+        assertNotSame(first, again)
+        assertEquals("Sodium", again.current(title.key))
     }
 }

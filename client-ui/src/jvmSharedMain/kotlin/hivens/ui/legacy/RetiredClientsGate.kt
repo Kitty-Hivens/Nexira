@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * composition and has no screen to navigate. The shell renders the host; anything
  * that can reach this can ask for it.
  *
- * Deliberately not a [hivens.ui.Screen]. This is a chore with an end -- once the
+ * Deliberately not a screen of the composition. This is a chore with an end -- once the
  * player has dealt with what the retired path left, there is nothing to come back
  * to -- and a route in the back stack would outlive the reason it exists.
  */

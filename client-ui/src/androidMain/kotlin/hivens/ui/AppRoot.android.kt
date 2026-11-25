@@ -8,6 +8,7 @@ import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.CustomBackground
 import hivens.ui.background.rememberDeviceTilt
 import hivens.themes.api.WallpaperTone
+import hivens.ui.navigation.CompositionHistory
 
 /**
  * The system's back, for as long as the composition draws: one step back in the
@@ -17,8 +18,8 @@ import hivens.themes.api.WallpaperTone
  * dismiss stack registers after this one and is asked first.
  */
 @Composable
-internal actual fun NavigationInputs(backStack: NavBackStack) {
-    BackHandler(enabled = true) { backStack.back() }
+internal actual fun NavigationInputs(history: CompositionHistory) {
+    BackHandler(enabled = true) { history.back() }
 }
 
 @Composable

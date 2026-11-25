@@ -11,15 +11,15 @@ import androidx.compose.ui.unit.Density
 import hivens.themes.Themes
 import hivens.themes.api.ThemesKeys
 import hivens.ui.FRAME_NANOS
-import hivens.ui.Screen
 import hivens.ui.ScreenRouter
 import hivens.ui.i18n.ShippedLanguageProvider
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.onEventThread
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.ChildLevel
-import hivens.ui.widgets.Commands
 import hivens.ui.widgets.KoinLevelServicesHost
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSurfaceFamilies
@@ -35,7 +35,9 @@ import hivens.widget.api.command
 import hivens.widget.api.flowSource
 import hivens.widget.api.rememberLatestCommand
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.History
 import hivens.widget.model.ScopeLevel
+import hivens.widget.model.Show
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.dsl.koinApplication
@@ -69,7 +71,7 @@ class ThemePickerApplyTest {
         }
         val commands = WidgetCommandRegistry().apply {
             if (answerApply) register(ThemesKeys.Choose, command { id: String -> fired += "apply $id" })
-            declare(Commands.Back)
+            declare(CompositionKeys.Back)
         }
         val app: WidgetScope
 
@@ -94,7 +96,7 @@ class ThemePickerApplyTest {
                     ) {
                         ChildLevel(ScopeLevel.Composition) {
                             val back = rememberLatestCommand<Unit> { fired += "back" }
-                            ProvideScopedCommand(Commands.Back, back) { content() }
+                            ProvideScopedCommand(CompositionKeys.Back, back) { content() }
                         }
                     }
                 }
@@ -130,17 +132,16 @@ class ThemePickerApplyTest {
     }
 
     /**
-     * Picks [other] on the picker, goes to another screen with the history [away] holds, comes back to
-     * the picker with the history [returning] holds, and says what Apply fired then.
+     * Picks [other] on the picker, goes [away] from it and comes back by [returning], and says
+     * what Apply fired then.
      */
-    private fun pickLeaveAndReturn(away: List<Screen>, returning: List<Screen>): List<String> {
+    private fun pickLeaveAndReturn(away: History.() -> History, returning: History.() -> History): List<String> {
         val world = World(answerApply = true)
-        var current: Screen by mutableStateOf(Screen.ThemePicker)
-        var history: List<Screen> by mutableStateOf(listOf(Screen.ThemePicker))
+        var history by mutableStateOf(History(LauncherConfigs.Home).show(Show(LauncherConfigs.Themes)))
         onEventThread {
             val scene = ImageComposeScene(900, 700, density = Density(1f)) {
                 world.Draw {
-                    ScreenRouter(current, history) { screen -> if (screen == Screen.ThemePicker) ThemePickerSurface() }
+                    ScreenRouter(history) { if (it.config == LauncherConfigs.Themes) ThemePickerSurface() }
                 }
             }
             var t = 0L
@@ -152,11 +153,9 @@ class ThemePickerApplyTest {
                 frames(8)
                 PuppetRegistry.click("themePicker.select.${other.id}").getOrThrow()
                 frames(4)
-                current = Screen.About
-                history = away
+                history = history.away()
                 frames(90)
-                current = Screen.ThemePicker
-                history = returning
+                history = history.returning()
                 frames(90)
                 PuppetRegistry.click("themePicker.apply").getOrThrow()
             } finally {
@@ -171,7 +170,7 @@ class ThemePickerApplyTest {
         // On to another screen and back: the picker never left the history, so its page did not.
         assertEquals(
             listOf("apply ${other.id}", "back"),
-            pickLeaveAndReturn(away = listOf(Screen.ThemePicker, Screen.About), returning = listOf(Screen.ThemePicker, Screen.About)),
+            pickLeaveAndReturn(away = { show(Show(LauncherConfigs.About)) }, returning = { back() }),
         )
     }
 
@@ -180,7 +179,7 @@ class ThemePickerApplyTest {
         // The picker left the history, as a switch of tab leaves it, and was opened again: a new page.
         assertEquals(
             listOf("apply ${Themes.default.id}", "back"),
-            pickLeaveAndReturn(away = listOf(Screen.About), returning = listOf(Screen.About, Screen.ThemePicker)),
+            pickLeaveAndReturn(away = { show(LauncherConfigs.section(LauncherConfigs.About)) }, returning = { show(Show(LauncherConfigs.Themes)) }),
         )
     }
 }

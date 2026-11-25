@@ -1,8 +1,6 @@
 package hivens.ui.widgets
 
-import hivens.ui.Screen
 import hivens.ui.background.BackgroundSettings
-import hivens.widget.api.CompositionKeys
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 
@@ -21,8 +19,8 @@ import hivens.widget.model.ScopeLevel
  *
  * A command below the app level is fired through `rememberScopedCommand(...)`. Most
  * are made by each level of their kind from the registry's factory, so they are there
- * wherever such a level is, whoever draws it. The history's are provided by the
- * composition's owner, so a window moves its own history.
+ * wherever such a level is, whoever draws it. The ones that move a composition's history
+ * are the kernel's, in `hivens.widget.api.CompositionKeys`.
  *
  * The pack commands are the packs module's, in `hivens.packs.api.PackKeys`, the
  * sign-in and sign-out commands the accounts module's, in `hivens.accounts.api.AccountKeys`,
@@ -41,26 +39,6 @@ object Commands {
     val CheckUpdate = CommandKey<Unit>("update.check")
     // Sets the "do not disturb" popup mute; paired with [Sources.DoNotDisturb].
     val SetDoNotDisturb = CommandKey<Boolean>("notifications.dnd.set")
-
-    /** Goes to a screen, keeping the way back. */
-    val Navigate = CommandKey<Screen>("nav.open", ScopeLevel.Composition)
-
-    /**
-     * Goes to a screen as a fresh start, the way a rail entry does: the history
-     * becomes the composition's home and that screen, so back from it comes home.
-     */
-    val SwitchTab = CommandKey<Screen>("nav.switch", ScopeLevel.Composition)
-
-    /**
-     * Steps back one screen. At the root it moves nothing and is counted in
-     * [Sources.Navigation], for a composition that answers a back with nowhere to go.
-     * The kernel's own key, so a module's widget steps back without naming the host.
-     */
-    val Back: CommandKey<Unit> = CompositionKeys.Back
-    val Forward = CommandKey<Unit>("nav.forward", ScopeLevel.Composition)
-
-    /** Steps back to a screen already in the trail. */
-    val PopTo = CommandKey<Screen>("nav.popTo", ScopeLevel.Composition)
 
     /** Changes the wallpaper settings by one change applied to what they are when it lands. */
     val UpdateBackground = CommandKey<BackgroundSettings.() -> BackgroundSettings>("background.update")

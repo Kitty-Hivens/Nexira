@@ -61,7 +61,6 @@ import hivens.catalogue.api.SourceIcon
 import hivens.catalogue.api.SourceView
 import hivens.catalogue.api.catalogueTypeOf
 import hivens.i18n.api.Strings
-import hivens.ui.Screen
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.hasLoaderGlyph
 import hivens.ui.i18n.nexiraStrings
@@ -69,6 +68,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.nx.NxChoiceItem
 import hivens.ui.nx.NxChoiceMenu
 import hivens.ui.nx.NxIconButton
@@ -86,8 +86,8 @@ import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
 import hivens.ui.widgets.RailBlock
 import hivens.ui.widgets.RailGroup
-import hivens.ui.widgets.Commands
 import hivens.ui.widgets.RailLabel
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
@@ -203,19 +203,19 @@ private fun SortPicker(current: BrowseSort, wordless: Boolean) {
     displayName = "widget.browse.results",
     minWidth = 320, minHeight = 200,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["nav.open", CatalogueKeys.RESULTS_ID],
+    needs = ["nav.show", CatalogueKeys.RESULTS_ID],
 )
 @Composable
 fun BrowseResultsWidget(instance: WidgetInstance) {
     val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
     val results = rememberScopedSource(CatalogueKeys.Results).valueOrNull() ?: return
-    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
+    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
     // A result leaves Browse for its page: a catalogue pack's, or a project's, which
     // carries the target pack so the page can install into it.
-    val openPack: (CatalogueCard) -> Unit = remember(navigate) {
-        { pack -> navigate(Screen.CataloguePackDetail(pack.origin, pack.id)) }
+    val openPack: (CatalogueCard) -> Unit = remember(show) {
+        { pack -> show(LauncherConfigs.cataloguePack(pack.origin, pack.id)) }
     }
-    val openProject: (ProjectTarget) -> Unit = remember(navigate) { { navigate(Screen.ModDetail(it)) } }
+    val openProject: (ProjectTarget) -> Unit = remember(show) { { show(LauncherConfigs.project(it)) } }
     val fade = Motion.fade
     // Each kind is its own list, so a change of kind crossfades one list into the
     // next instead of swapping the cards under the reader's eye. The list fading out
@@ -252,7 +252,7 @@ fun BrowseResultsWidget(instance: WidgetInstance) {
 fun BrowseInstallingWidget(instance: WidgetInstance) {
     val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
     val setTarget = rememberScopedCommand(CatalogueKeys.SetTarget)
-    val navigate = rememberScopedCommand(Commands.Navigate)
+    val show = rememberScopedCommand(CompositionKeys.Show)
     val s = nexiraStrings()
     val target = browse.target
     PuppetClick("browse.target.none") { setTarget?.invoke(null) }
@@ -266,7 +266,7 @@ fun BrowseInstallingWidget(instance: WidgetInstance) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     NxTooltip(text = s.text("browseBackToPack")) {
-                        NxIconButton(icon = NxIcon.ArrowBack, contentDescription = s.text("browseBackToPack"), onClick = { navigate?.invoke(Screen.PackDetail(t.packId)) })
+                        NxIconButton(icon = NxIcon.ArrowBack, contentDescription = s.text("browseBackToPack"), onClick = { show?.invoke(LauncherConfigs.pack(t.packId)) })
                     }
                     PackMark(t.packId, t.name, 48.dp)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {

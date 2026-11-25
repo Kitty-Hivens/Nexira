@@ -471,6 +471,7 @@ public final class hivens/widget/api/PageLevels {
 	public final fun getAlive ()Ljava/util/Set;
 	public final fun hold (Ljava/lang/String;)Lhivens/widget/api/PageLevels$Hold;
 	public final fun keep (Ljava/util/Set;)V
+	public final fun levelFor (Lhivens/widget/model/HistoryEntry;)Lhivens/widget/api/WidgetScope;
 	public final fun levelFor (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lhivens/widget/api/WidgetScope;
 	public static synthetic fun levelFor$default (Lhivens/widget/api/PageLevels;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lhivens/widget/api/WidgetScope;
 }

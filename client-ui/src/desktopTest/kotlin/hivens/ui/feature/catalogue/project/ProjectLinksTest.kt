@@ -1,7 +1,7 @@
 package hivens.ui.feature.catalogue.project
 
 import hivens.catalogue.api.ProjectTarget
-import hivens.ui.Screen
+import hivens.ui.navigation.LauncherConfigs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
@@ -33,18 +33,18 @@ class ProjectLinksTest {
     @Test
     fun `a project link opens a page that installs into the pack it was followed from`() {
         assertEquals(
-            Screen.ModDetail(ProjectTarget.Catalogue("sodium", intoInstanceId = "pack-1")),
-            linkScreen("https://modrinth.com/mod/sodium", "pack-1"),
+            LauncherConfigs.project(ProjectTarget.Catalogue("sodium", intoInstanceId = "pack-1")),
+            linkTarget("https://modrinth.com/mod/sodium", "pack-1"),
         )
-        assertEquals(Screen.ModDetail(ProjectTarget.Catalogue("sodium")), linkScreen("https://modrinth.com/mod/sodium", null))
+        assertEquals(LauncherConfigs.project(ProjectTarget.Catalogue("sodium")), linkTarget("https://modrinth.com/mod/sodium", null))
     }
 
     @Test
     fun `a modpack link opens its own page, never one aimed at a pack`() {
         assertEquals(
-            Screen.CataloguePackDetail("Modrinth", "fabulously-optimized"),
-            linkScreen("https://modrinth.com/modpack/fabulously-optimized", "pack-1"),
+            LauncherConfigs.cataloguePack("Modrinth", "fabulously-optimized"),
+            linkTarget("https://modrinth.com/modpack/fabulously-optimized", "pack-1"),
         )
-        assertNull(linkScreen("https://example.com/mod/sodium", "pack-1"))
+        assertNull(linkTarget("https://example.com/mod/sodium", "pack-1"))
     }
 }

@@ -15,11 +15,11 @@ import hivens.catalogue.api.CatalogueKeys
 import hivens.catalogue.api.OpenProject
 import hivens.catalogue.api.ProjectSource
 import hivens.ui.HostKeys
-import hivens.ui.Screen
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.chrome.WindowCapabilities
 import hivens.ui.levelServicesModule
 import hivens.ui.moduleKeys
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.navigation.NavRequests
 import hivens.ui.onEventThread
@@ -42,6 +42,7 @@ import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.FamilyId
 import hivens.widget.model.ScopeLevel
+import hivens.widget.model.Show
 import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -234,8 +235,8 @@ class HostedWindowTest {
         val inConsole = Seen()
         var raised = 0
         val collected = CoroutineScope(Dispatchers.Unconfined)
-        val toMain = ArrayList<Screen>()
-        val toConsole = ArrayList<Screen>()
+        val toMain = ArrayList<Show>()
+        val toConsole = ArrayList<Show>()
         onEventThread {
             val scene = draw(koin) {
                 HostedWindow(WindowId.Main, WindowOwner.Launcher, main, registry) {
@@ -248,15 +249,15 @@ class HostedWindowTest {
                 collected.launch { assertNotNull(inMain.nav).requests.collect { toMain += it } }
                 collected.launch { assertNotNull(inConsole.nav).requests.collect { toConsole += it } }
 
-                koin.get<MainWindowRequests>().open(Screen.PackVersions("industrial"))
+                koin.get<MainWindowRequests>().open(LauncherConfigs.packVersions("industrial"))
                 scene.settle(2)
-                assertEquals(listOf<Screen>(Screen.PackVersions("industrial")), toMain)
+                assertEquals(listOf(LauncherConfigs.packVersions("industrial")), toMain)
                 assertTrue(toConsole.isEmpty(), "the console never takes what was meant for the main window")
                 assertEquals(1, raised)
 
                 main.live.value = main.live.value.copy(focused = true)
                 scene.settle(2)
-                koin.get<MainWindowRequests>().open(Screen.Home)
+                koin.get<MainWindowRequests>().open(Show(LauncherConfigs.Home))
                 scene.settle(2)
                 assertEquals(2, toMain.size)
                 assertEquals(1, raised, "a window already in front is not raised again")
@@ -273,11 +274,11 @@ class HostedWindowTest {
         val registry = WindowRegistry()
         val requests = koin.get<MainWindowRequests>()
         // Made before any shell is up, as a notification action during a restart is.
-        requests.open(Screen.PackVersions("industrial"))
+        requests.open(LauncherConfigs.packVersions("industrial"))
         val inMain = Seen()
         var raised = 0
         val collected = CoroutineScope(Dispatchers.Unconfined)
-        val toMain = ArrayList<Screen>()
+        val toMain = ArrayList<Show>()
         onEventThread {
             val scene = draw(koin) {
                 HostedWindow(WindowId.Main, WindowOwner.Launcher, FakeWindow(1000), registry) {
@@ -290,7 +291,7 @@ class HostedWindowTest {
                 // The back stack starts listening, the way AppRoot does once it is drawn.
                 collected.launch { assertNotNull(inMain.nav).requests.collect { toMain += it } }
                 scene.settle(2)
-                assertEquals(listOf<Screen>(Screen.PackVersions("industrial")), toMain)
+                assertEquals(listOf(LauncherConfigs.packVersions("industrial")), toMain)
                 assertEquals(1, raised)
             } finally {
                 scene.close()

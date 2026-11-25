@@ -12,6 +12,9 @@ import androidx.compose.ui.unit.Density
 import hivens.ui.layers.Layer
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.WindowLayers
+import hivens.ui.navigation.CompositionHistory
+import hivens.ui.navigation.LauncherConfigs
+import hivens.widget.model.HistoryEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -23,7 +26,9 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalComposeUiApi::class)
 class ThumbButtonsTest {
 
-    private fun history() = NavBackStack(Screen.Library).also { it.navigate(Screen.PackDetail("abc")) }
+    private fun history() = CompositionHistory(LauncherConfigs.Library).also { it.show(LauncherConfigs.pack("abc")) }
+
+    private val pack = LauncherConfigs.pack("abc").let { HistoryEntry(it.config, it.values) }
 
     @Test
     fun `back closes what the window has open before it moves the history`() {
@@ -34,11 +39,11 @@ class ThumbButtonsTest {
 
         thumbBack(layers, nav)
         assertEquals(1, closed)
-        assertEquals(Screen.PackDetail("abc"), nav.current, "the page stays under what was open")
+        assertEquals(pack, nav.now.current, "the page stays under what was open")
 
         sheet.close()
         thumbBack(layers, nav)
-        assertEquals(Screen.Library, nav.current, "with nothing open it is history back")
+        assertEquals(HistoryEntry(LauncherConfigs.Library), nav.now.current, "with nothing open it is history back")
     }
 
     // Nothing a thumb press does reaches the window itself: at the root the history
@@ -46,15 +51,15 @@ class ThumbButtonsTest {
     @Test
     fun `back at the root moves nothing and is counted as a back at the root`() {
         val layers = WindowLayers()
-        val nav = NavBackStack(Screen.Home)
+        val nav = CompositionHistory(LauncherConfigs.Home)
         thumbBack(layers, nav)
-        assertEquals(listOf<Screen>(Screen.Home), nav.trail)
-        assertEquals(1, nav.backsAtRoot)
+        assertEquals(listOf(HistoryEntry(LauncherConfigs.Home)), nav.now.entries)
+        assertEquals(1, nav.now.backsAtRoot)
 
-        nav.switchTo(Screen.Library)
+        nav.show(LauncherConfigs.section(LauncherConfigs.Library))
         thumbBack(layers, nav)
-        assertEquals(Screen.Home, nav.current, "back from a rail section comes home")
-        assertEquals(1, nav.backsAtRoot)
+        assertEquals(HistoryEntry(LauncherConfigs.Home), nav.now.current, "back from a rail section comes home")
+        assertEquals(1, nav.now.backsAtRoot)
     }
 
     @Test
@@ -70,17 +75,17 @@ class ThumbButtonsTest {
         try {
             scene.settle(4)
             thumbBack(layers, nav)
-            assertEquals(Screen.PackDetail("abc"), nav.current, "back does not move the page behind the modal")
+            assertEquals(pack, nav.now.current, "back does not move the page behind the modal")
 
             nav.back()
             thumbForward(layers, nav)
-            assertEquals(Screen.Library, nav.current, "nor does forward")
+            assertEquals(HistoryEntry(LauncherConfigs.Library), nav.now.current, "nor does forward")
 
             modal = false
             Snapshot.sendApplyNotifications()
             scene.settle(4)
             thumbForward(layers, nav)
-            assertEquals(Screen.PackDetail("abc"), nav.current)
+            assertEquals(pack, nav.now.current)
         } finally {
             scene.close()
         }

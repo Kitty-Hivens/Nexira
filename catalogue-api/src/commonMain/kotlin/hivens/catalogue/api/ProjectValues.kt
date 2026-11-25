@@ -1,5 +1,8 @@
 package hivens.catalogue.api
 
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
 /**
  * What a project page was opened on.
  *
@@ -8,15 +11,20 @@ package hivens.catalogue.api
  * anything is installed. A file in a pack is addressed by the file, and the catalogue
  * may never have indexed it.
  */
+@Serializable
 sealed interface ProjectTarget {
     /**
      * A catalogue entry, installed or not. [intoInstanceId] is the pack the person was
      * browsing from, which is what lets the page install: a project id says what to
      * install and nothing about where.
      */
+    @Serializable
+    @SerialName("catalogue")
     data class Catalogue(val projectId: String, val intoInstanceId: String? = null) : ProjectTarget
 
     /** A file inside a pack, which the catalogue may or may not know. */
+    @Serializable
+    @SerialName("installed")
     data class Installed(val instanceId: String, val kind: ProjectKind, val fileName: String) : ProjectTarget
 
     /** Identity for a history entry and for state kept per page. */

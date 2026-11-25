@@ -22,16 +22,17 @@ import hivens.launcher.launch.LauncherController
 import hivens.launcher.platform.PlatformPaths
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
-import hivens.ui.Screen
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.nx.PlayTone
 import hivens.widget.api.rememberScopedCommand
+import hivens.widget.model.Show
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -199,7 +200,7 @@ fun rememberLaunchControl(
             },
             progress = if (block is LaunchBlock.Busy) workProgress else null,
             onClick = if (block == LaunchBlock.NoIdentity && appState != null) {
-                { navRequests.open(Screen.Profile) }
+                { navRequests.open(Show(LauncherConfigs.Profile)) }
             } else {
                 {}
             },

@@ -1,14 +1,16 @@
 package hivens.ui.editor
 
 import hivens.i18n.api.Strings
-import hivens.ui.Screen
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.feature.catalogue.browse.CataloguePackPageSource
 import hivens.ui.feature.catalogue.project.ProjectPageSource
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.screens.custom.ScreenIcons
 import hivens.ui.widgets.about.AboutUpdateSource
 import hivens.ui.widgets.about.OpenUpdateDialog
+import hivens.widget.api.PageKeys
+import hivens.widget.model.ConfigId
 import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScreenSpec
@@ -42,10 +44,10 @@ internal class EditorSurfaceSpec(
      */
     val provides: Set<String> = emptySet(),
     /**
-     * Whether this screen mounts the surface as its centre pane. Null for the
-     * shell surfaces, which are present on every screen.
+     * The config that mounts the surface as its centre pane. Null for the shell
+     * surfaces, which are present in every one.
      */
-    val mountedOn: ((Screen) -> Boolean)? = null,
+    val mountedOn: ConfigId? = null,
     /**
      * The region widget this surface is the inside of, by kind.
      *
@@ -78,7 +80,7 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.text("editorSurfHomeNew") },
             shortName = { it.text("editorSurfShortHome") },
-            mountedOn = { screen -> screen == Screen.Home },
+            mountedOn = LauncherConfigs.Home,
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
@@ -86,7 +88,7 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.text("editorSurfLibrary") },
             shortName = { it.text("editorSurfShortLibrary") },
-            mountedOn = { screen -> screen == Screen.Library },
+            mountedOn = LauncherConfigs.Library,
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
@@ -94,7 +96,7 @@ internal object EditorSurfaces {
             icon      = NxIcon.Search,
             name      = { it.text("editorSurfBrowse") },
             shortName = { it.text("editorSurfShortBrowse") },
-            mountedOn = { screen -> screen == Screen.Browse || screen is Screen.BrowseInto },
+            mountedOn = LauncherConfigs.Browse,
             ownerRegion = "appshell.region.center",
         ),
         // Both pages give their widgets the page they are drawn for, per visit and
@@ -105,7 +107,7 @@ internal object EditorSurfaces {
             name      = { it.text("editorSurfProject") },
             shortName = { it.text("editorSurfShortProject") },
             provides  = setOf(ProjectPageSource.id),
-            mountedOn = { screen -> screen is Screen.ModDetail },
+            mountedOn = LauncherConfigs.Project,
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
@@ -114,7 +116,7 @@ internal object EditorSurfaces {
             name      = { it.text("editorSurfCataloguePack") },
             shortName = { it.text("editorSurfShortCataloguePack") },
             provides  = setOf(CataloguePackPageSource.id),
-            mountedOn = { screen -> screen is Screen.CataloguePackDetail },
+            mountedOn = LauncherConfigs.CataloguePack,
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
@@ -123,7 +125,7 @@ internal object EditorSurfaces {
             name      = { it.text("editorSurfAbout") },
             shortName = { it.text("editorSurfShortAbout") },
             provides  = setOf(AboutUpdateSource.id, OpenUpdateDialog.id),
-            mountedOn = { screen -> screen == Screen.About },
+            mountedOn = LauncherConfigs.About,
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
@@ -131,7 +133,7 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.text("editorSurfBg") },
             shortName = { it.text("editorSurfShortBg") },
-            mountedOn = { screen -> screen == Screen.BackgroundSettings },
+            mountedOn = LauncherConfigs.Background,
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
@@ -139,7 +141,7 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.text("editorSurfProfile") },
             shortName = { it.text("editorSurfShortProfile") },
-            mountedOn = { screen -> screen == Screen.Profile },
+            mountedOn = LauncherConfigs.Profile,
             ownerRegion = "appshell.region.center",
         ),
         EditorSurfaceSpec(
@@ -147,7 +149,7 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.text("editorSurfTheme") },
             shortName = { it.text("editorSurfShortTheme") },
-            mountedOn = { screen -> screen == Screen.ThemePicker },
+            mountedOn = LauncherConfigs.Themes,
             ownerRegion = "appshell.region.center",
         ),
         // The slots the settings screen leaves in its Appearance section, for the colour
@@ -157,7 +159,7 @@ internal object EditorSurfaces {
             icon      = NxIcon.Home,
             name      = { it.text("editorSurfSettingsAppearance") },
             shortName = { it.text("editorSurfShortSettingsAppearance") },
-            mountedOn = { screen -> screen == Screen.Settings },
+            mountedOn = LauncherConfigs.Settings,
             ownerRegion = "appshell.region.center",
         ),
     )
@@ -245,16 +247,20 @@ internal object EditorSurfaces {
         name        = { s -> spec.title.ifBlank { s.text("screenUntitled") } },
         shortName   = { s -> spec.title.ifBlank { s.text("screenUntitled") } },
         hasSettings = true,
-        mountedOn   = { screen -> screen == Screen.Custom(spec.id) },
+        mountedOn   = ConfigId(spec.id),
         ownerRegion = "appshell.region.center",
     )
+
+    /** What the owner of a history hands every page it draws, whatever the screen. */
+    val everyPage: Set<String> = setOf(PageKeys.Entry.id)
 
     /**
      * The page-level keys a widget finds on [surface], or null where the surface is
      * not drawn on a page at all.
      *
      * A screen's own surface sits in the page the router made for the screen, so it
-     * has every key a page makes for itself and the ones its screen hands it. A shell
+     * has every key a page makes for itself, the ones its screen hands it, and what
+     * every page is handed ([everyPage]). A shell
      * surface is drawn once for the whole composition, outside any page, and so is a
      * surface this build does not know: refusing there is the answer that never puts
      * a widget where it then draws the placeholder.
@@ -262,11 +268,11 @@ internal object EditorSurfaces {
     fun pageProvides(surface: SurfaceId, graph: LayoutGraph): Set<String>? {
         if (isShell(surface)) return null
         val spec = specIn(surface, graph) ?: return null
-        return if (spec.mountedOn == null) null else spec.provides
+        return if (spec.mountedOn == null) null else spec.provides + everyPage
     }
 
     /**
-     * The surfaces editable on this screen: the centre one this screen mounts,
+     * The surfaces editable while [config] is shown: the centre one it mounts,
      * then the shell.
      *
      * Intersected with [graph] because a surface with no entry there has no
@@ -275,13 +281,10 @@ internal object EditorSurfaces {
      * is missing, so in practice this only filters a surface that genuinely is
      * not part of this build's layout.
      */
-    fun availableFor(screen: Screen, graph: LayoutGraph): List<SurfaceId> {
+    fun availableFor(config: ConfigId, graph: LayoutGraph): List<SurfaceId> {
         val known = graph.surfaces.keys
-        val main = when (screen) {
-            // A made screen's surface is named by its record, which is in the graph.
-            is Screen.Custom -> graph.screen(screen.id)?.let(::madeScreen)
-            else -> centre.firstOrNull { it.mountedOn?.invoke(screen) == true }
-        }
+        // A made screen's surface is named by its record, which is in the graph.
+        val main = centre.firstOrNull { it.mountedOn == config } ?: graph.screen(config.value)?.let(::madeScreen)
         return (listOfNotNull(main) + shell).map { it.id }.filter { it in known }
     }
 

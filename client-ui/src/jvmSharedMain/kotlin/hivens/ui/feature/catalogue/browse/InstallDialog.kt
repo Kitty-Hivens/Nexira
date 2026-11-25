@@ -58,10 +58,10 @@ import hivens.catalogue.api.NewPackState
 import hivens.catalogue.api.ProjectBuild
 import hivens.i18n.api.Strings
 import hivens.packs.api.PackKeys
-import hivens.ui.Screen
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.nx.InitialsAvatar
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -75,7 +75,7 @@ import hivens.ui.nx.NxTooltip
 import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.library.rememberPackArt
-import hivens.ui.widgets.Commands
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -251,7 +251,7 @@ private fun rememberInstallDialogModel(subject: InstallSubject): InstallDialogMo
     val newPack = rememberScopedCommand(CatalogueKeys.InstallNewPack)
     val retry = rememberScopedAction(CatalogueKeys.RetryChoice)
     // Resolved here, where the dialog is asked for, rather than on the layer it is drawn on.
-    val navigate = rememberScopedCommand(Commands.Navigate)
+    val show = rememberScopedCommand(CompositionKeys.Show)
     val choice: InstallChoiceView? = rememberScopedSource(CatalogueKeys.InstallChoice).valueOrNull()?.takeIf { it.subject == subject }
 
     LaunchedEffect(subject, choose != null) { choose?.invoke(subject) }
@@ -269,7 +269,7 @@ private fun rememberInstallDialogModel(subject: InstallSubject): InstallDialogMo
         install = { candidate -> into?.invoke(candidate.packId) },
         retry = { retry?.invoke() },
         createAndInstall = { name, mc, loader -> newPack?.invoke(NewPackRequest(name, mc, loader)) },
-        openPack = { id -> navigate?.invoke(Screen.PackDetail(id)) },
+        openPack = { id -> show?.invoke(LauncherConfigs.pack(id)) },
     )
 }
 

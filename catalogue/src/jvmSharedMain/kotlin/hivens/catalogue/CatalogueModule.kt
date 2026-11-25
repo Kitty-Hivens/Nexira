@@ -9,6 +9,7 @@ import hivens.catalogue.api.BrowseSort
 import hivens.catalogue.api.BrowseView
 import hivens.catalogue.api.CatalogueApi
 import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.CataloguePages
 import hivens.catalogue.api.CatalogueTags
 import hivens.catalogue.api.GameVersionGroup
 import hivens.catalogue.api.OpenProject
@@ -52,6 +53,7 @@ import hivens.widget.api.find
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
 import hivens.widget.api.hostService
+import hivens.widget.api.pageValue
 import hivens.widget.api.service
 import hivens.widget.model.ApiVersion
 import hivens.widget.model.ScopeLevel
@@ -192,6 +194,12 @@ object CatalogueKeysContribution : KeyContribution {
                 sourceGeneration = shelf.generation,
             )
         }
+
+        // ── Page values ─────────────────────────────────────────────────
+        keys.pageValue(CataloguePages.Project)
+        keys.pageValue(CataloguePages.Build)
+        keys.pageValue(CataloguePages.Pack)
+        keys.pageValue(CataloguePages.Into)
 
         // ── Sources ─────────────────────────────────────────────────────
         keys.source(CatalogueKeys.Tags, sample = { CatalogueTags() }) { app -> flowSource(app.services.get<CatalogueTagsService>().tags) }

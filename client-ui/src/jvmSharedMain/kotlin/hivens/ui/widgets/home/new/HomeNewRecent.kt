@@ -19,6 +19,7 @@ import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
 import hivens.ui.press.OutlinedButton
@@ -54,7 +55,6 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.SessionState
-import hivens.ui.Screen
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -62,13 +62,14 @@ import hivens.ui.screens.library.lastPlayedLabel
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
-import hivens.ui.widgets.Commands
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
+import hivens.widget.model.Show
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
@@ -108,18 +109,18 @@ data class RecentProps(
     surface = """{"fill":"panel"}""",
     minWidth = 240, minHeight = 120,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["nav.open", "packs.library", "pack.launch"],
+    needs = ["nav.show", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewRecent(instance: WidgetInstance) {
     val p = instance.rememberProps<RecentProps>()
     val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
-    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
+    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
     val s = nexiraStrings()
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
 
     if (all.isEmpty()) {
-        EmptyPacksCta(onBrowse = { navigate(Screen.Browse) })
+        EmptyPacksCta(onBrowse = { show(Show(LauncherConfigs.Browse)) })
         return
     }
 
@@ -150,7 +151,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
                             PackTile(
                                 pack     = pack,
                                 appState = appState,
-                                onClick  = { navigate(Screen.PackDetail(pack.id)) },
+                                onClick  = { show(LauncherConfigs.pack(pack.id)) },
                                 modifier = Modifier.width(tileWidth).aspectRatio(TILE_ASPECT),
                             )
                         }

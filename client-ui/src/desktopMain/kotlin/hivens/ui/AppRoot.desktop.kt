@@ -16,6 +16,7 @@ import hivens.ui.chrome.isFrom
 import hivens.ui.chrome.resendAsSidewaysWheel
 import hivens.ui.layers.LocalWindowLayers
 import hivens.ui.layers.WindowLayers
+import hivens.ui.navigation.CompositionHistory
 import hivens.ui.render.SvgImageDecoder
 import hivens.themes.api.WallpaperTone
 import java.awt.AWTEvent
@@ -24,11 +25,11 @@ import java.awt.event.AWTEventListener
 import java.awt.event.MouseEvent
 
 @Composable
-internal actual fun NavigationInputs(backStack: NavBackStack) {
+internal actual fun NavigationInputs(history: CompositionHistory) {
     // Mouse side buttons (back/forward) -> history navigation. Compose's pointer
     // layer only surfaces primary/secondary/tertiary on this platform, so listen at
     // the AWT level where the thumb buttons still arrive. The AWT event thread is
-    // the Compose UI thread in Compose Desktop, so mutating the NavBackStack here is
+    // the Compose UI thread in Compose Desktop, so moving the history here is
     // on the right thread.
     //
     // Which number is which depends on the toolkit (see extraButton): on X11 the
@@ -50,8 +51,8 @@ internal actual fun NavigationInputs(backStack: NavBackStack) {
         val listener = AWTEventListener { ev ->
             if (ev is MouseEvent && ev.id == MouseEvent.MOUSE_PRESSED) {
                 when (extraButton(ev.button, awtOnX11)) {
-                    ExtraButton.Back        -> if (ev.isFrom(mainWindow)) thumbBack(layers, backStack)
-                    ExtraButton.Forward     -> if (ev.isFrom(mainWindow)) thumbForward(layers, backStack)
+                    ExtraButton.Back        -> if (ev.isFrom(mainWindow)) thumbBack(layers, history)
+                    ExtraButton.Forward     -> if (ev.isFrom(mainWindow)) thumbForward(layers, history)
                     ExtraButton.ScrollLeft  -> resendAsSidewaysWheel(ev, toRight = false)
                     ExtraButton.ScrollRight -> resendAsSidewaysWheel(ev, toRight = true)
                     ExtraButton.None        -> Unit
@@ -63,15 +64,15 @@ internal actual fun NavigationInputs(backStack: NavBackStack) {
     }
 }
 
-/** The mouse's back button: closes the top of [layers]' dismiss stack, or moves [backStack] back when nothing is open. */
-internal fun thumbBack(layers: WindowLayers?, backStack: NavBackStack) {
+/** The mouse's back button: closes the top of [layers]' dismiss stack, or moves [history] back when nothing is open. */
+internal fun thumbBack(layers: WindowLayers?, history: CompositionHistory) {
     val stack = layers?.dismiss
-    if (stack != null && stack.handlesBack) stack.dismissTop() else backStack.back()
+    if (stack != null && stack.handlesBack) stack.dismissTop() else history.back()
 }
 
-/** The mouse's forward button: moves [backStack] forward unless a modal holds the window. */
-internal fun thumbForward(layers: WindowLayers?, backStack: NavBackStack) {
-    if (layers?.modalOpen != true) backStack.forward()
+/** The mouse's forward button: moves [history] forward unless a modal holds the window. */
+internal fun thumbForward(layers: WindowLayers?, history: CompositionHistory) {
+    if (layers?.modalOpen != true) history.forward()
 }
 
 @Composable

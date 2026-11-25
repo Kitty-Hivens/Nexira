@@ -15,6 +15,25 @@ import kotlin.test.fail
 // production -- this catches it at compile time of the test.
 class WidgetRegistryConsistencyTest {
 
+    // The launcher's own screens, each the one widget of its config. Not removable, which keeps
+    // a whole screen out of the palette.
+    private val SCREENS = setOf(
+        "screen.home",
+        "screen.library",
+        "screen.browse",
+        "screen.profile",
+        "screen.wardrobe",
+        "screen.settings",
+        "screen.theme.picker",
+        "screen.about",
+        "screen.background",
+        "screen.pack",
+        "screen.pack.versions",
+        "screen.catalogue.pack",
+        "screen.project",
+        "screen.project.build",
+    )
+
     @Test
     fun `every default-layout widget kind exists in the generated registry or a compiled module's`() {
         val graph = DefaultLayout.load()
@@ -165,7 +184,7 @@ class WidgetRegistryConsistencyTest {
             "browse.filter.environment",
             "browse.filter.license",
             "browse.filter.exclusions",
-        )
+        ) + SCREENS
         val actual = GeneratedWidgetRegistry.all().keys.map { it.value }.toSet()
         assertEquals(expected, actual, "registry drift -- expected exactly these widgets")
     }
@@ -255,7 +274,7 @@ class WidgetRegistryConsistencyTest {
                 "appshell.region.right",
                 "appshell.region.top",           // title bar: hosts window controls + breadcrumb
                 "appshell.region.body",          // carries the whole app body
-            ),
+            ) + SCREENS,
             nonRemovable,
             "non-removable set keeps the shell frame and sign-in panel intact; nav items " +
                 "are removable and restored via the editor's leftrail surface reset",

@@ -66,7 +66,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import hivens.i18n.api.Strings
-import hivens.ui.Screen
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.platform.SystemActions
 import hivens.ui.customization.CustomizationSettings
@@ -131,6 +130,7 @@ import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
 import hivens.widget.model.BundledPresets
+import hivens.widget.model.ConfigId
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.withSurfacesFrom
 import hivens.widget.model.FlowSpec
@@ -172,11 +172,11 @@ private val log = LoggerFactory.getLogger("EditorSurfaceHost")
 
 @Composable
 fun EditorSurfaceHost(
-    currentScreen: Screen,
+    config: ConfigId,
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
-    /** Opens a screen, the way the rail does. The editor uses it to show a screen it just made. */
-    onOpenScreen: (Screen) -> Unit = {},
+    /** Opens a config, the way the rail does. The editor uses it to show a screen it just made. */
+    onOpen: (ConfigId) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val graphForSurfaces = LocalLayoutGraph.current
@@ -186,8 +186,8 @@ fun EditorSurfaceHost(
     // the two constants this replaces could not be right.
     val chromeBounds = remember { ShellChromeBounds() }
     val hostRect = remember { mutableStateOf(Rect.Zero) }
-    val availableSurfaces: List<SurfaceId> = remember(currentScreen, graphForSurfaces) {
-        EditorSurfaces.availableFor(currentScreen, graphForSurfaces)
+    val availableSurfaces: List<SurfaceId> = remember(config, graphForSurfaces) {
+        EditorSurfaces.availableFor(config, graphForSurfaces)
     }
     // Which of those tabs point at something folded away. Separate from the tab
     // set on purpose: the editor's whole state is keyed on that set, and folding a
@@ -337,8 +337,8 @@ fun EditorSurfaceHost(
     var pendingSettings by remember { mutableStateOf(true) }
     LaunchedEffect(pendingScreen, graphForSurfaces) {
         val made = pendingScreen ?: return@LaunchedEffect
-        if (graphForSurfaces.screen(made.id) != null && currentScreen != Screen.Custom(made.id)) {
-            onOpenScreen(Screen.Custom(made.id))
+        if (graphForSurfaces.screen(made.id) != null && config != ConfigId(made.id)) {
+            onOpen(ConfigId(made.id))
         }
     }
     LaunchedEffect(availableSurfaces) {

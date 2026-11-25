@@ -19,6 +19,7 @@ import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMisplacedWidget
@@ -140,13 +141,13 @@ class ModuleKeysTest {
         val host = Host(named = setOf(PacksApi.ID))
         assertNull(host.app.declarationOf(AccountKeys.SESSION_ID), "the session came in unnamed")
         val missing = assertNotNull(placed(host))
-        assertEquals(listOf(Commands.Navigate.id), missing, "the packs show without anybody signed in, and only the history is wanting")
+        assertEquals(listOf(CompositionKeys.Show.id), missing, "the packs show without anybody signed in, and only the history is wanting")
     }
 
     @Test
     fun `with the packs and accounts modules named, only the history the page provides is wanting`() {
         val missing = assertNotNull(placed(Host(named = setOf(PacksApi.ID, AccountsApi.ID))))
-        assertEquals(listOf(Commands.Navigate.id), missing, "the pack and session keys answer, and nothing put the history over the composition")
+        assertEquals(listOf(CompositionKeys.Show.id), missing, "the pack and session keys answer, and nothing put the history over the composition")
     }
 
     @Test

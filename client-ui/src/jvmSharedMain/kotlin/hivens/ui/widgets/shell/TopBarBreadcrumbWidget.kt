@@ -21,8 +21,7 @@ import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.press.clickable
-import hivens.ui.widgets.Commands
-import hivens.ui.widgets.Sources
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -39,14 +38,14 @@ import hivens.ui.theme.NxInk
 @Widget(
     id = "appshell.topbar.breadcrumb",
     displayName = "widget.appshell.topbar.breadcrumb",
-    needs = ["nav.state", "nav.back", "nav.forward", "nav.popTo"],
+    needs = ["nav.state", "nav.back", "nav.forward", "nav.back.to"],
 )
 @Composable
 fun TopBarBreadcrumbWidget() {
-    val nav = rememberScopedSource(Sources.Navigation).valueOrNull() ?: return
-    val back = rememberScopedAction(Commands.Back) ?: return
-    val forward = rememberScopedAction(Commands.Forward) ?: return
-    val popTo = rememberScopedCommand(Commands.PopTo) ?: return
+    val nav = rememberScopedSource(CompositionKeys.History).valueOrNull() ?: return
+    val back = rememberScopedAction(CompositionKeys.Back) ?: return
+    val forward = rememberScopedAction(CompositionKeys.Forward) ?: return
+    val backTo = rememberScopedCommand(CompositionKeys.BackTo) ?: return
     val s = nexiraStrings()
     Row(verticalAlignment = Alignment.CenterVertically) {
         // Back / forward are always present so the breadcrumb never shifts; each
@@ -54,13 +53,13 @@ fun TopBarBreadcrumbWidget() {
         NavArrow(enabled = nav.canGoBack, mirrored = false, contentDescription = s.text("navBack"), onClick = back)
         // Forward: the back arrow mirrored, so the pair matches exactly.
         NavArrow(enabled = nav.canGoForward, mirrored = true, contentDescription = s.text("navForward"), onClick = forward)
-        val trail = nav.trail
-        trail.forEachIndexed { i, screen ->
+        val trail = nav.entries
+        trail.forEachIndexed { i, entry ->
             val isLast = i == trail.lastIndex
             CrumbSegment(
-                label = rememberCrumbLabel(screen),
+                label = rememberCrumbLabel(entry),
                 isLast = isLast,
-                onClick = { if (!isLast) popTo(screen) },
+                onClick = { if (!isLast) backTo(entry) },
                 // Where you ARE takes the remaining room and the places you came
                 // through give way first. A trail four deep ending in a build
                 // number -- Library, the pack, the project, 1.8.14-beta.1+1.21.1-neoforge

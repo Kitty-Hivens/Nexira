@@ -23,9 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import hivens.ui.Screen
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
@@ -38,7 +38,7 @@ import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
-import hivens.ui.widgets.Commands
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.model.PropLabel
@@ -70,18 +70,18 @@ data class ContinueProps(
     surface = """{"fill":"panel"}""",
     minWidth = 280, minHeight = 160,
     maxWidth = 2400, maxHeight = 640,
-    needs = ["nav.open", "packs.library", "pack.launch"],
+    needs = ["nav.show", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewContinue(instance: WidgetInstance) {
     val p = instance.rememberProps<ContinueProps>()
-    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
+    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
     val s = nexiraStrings()
     val quickLaunch = rememberQuickLaunchTarget(s.text("homeQuickButton")) ?: return
     val pack = quickLaunch.target
     val art = rememberPackArt(pack)
     val (hueA, hueB) = decorativePair(pack.id)
-    val openDetail = { navigate(Screen.PackDetail(pack.id)) }
+    val openDetail = { show(LauncherConfigs.pack(pack.id)) }
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         // The name is the picture here, so it takes its size from the room it has:

@@ -26,6 +26,7 @@ import hivens.launcher.launch.LauncherController
 import hivens.packs.api.InstallRequest
 import hivens.packs.api.LaunchView
 import hivens.packs.api.PackKeys
+import hivens.packs.api.PackPages
 import hivens.packs.api.PacksApi
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.HostApi
@@ -38,6 +39,7 @@ import hivens.widget.api.find
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
 import hivens.widget.api.hostServices
+import hivens.widget.api.pageValue
 import hivens.widget.api.service
 import hivens.widget.model.ApiVersion
 import hivens.widget.model.ScopeLevel
@@ -113,6 +115,8 @@ object PackKeysContribution : KeyContribution {
         keys.service(ScopeLevel.App) { context ->
             PackOutcomes(context.hostServices.get<PackOperationService>().operations, context.coroutineScope)
         }
+
+        keys.pageValue(PackPages.Pack)
 
         keys.source(PackKeys.Library, sample = { emptyList() }) { app ->
             mapped(app.hostServices.get<IPackRepository>().observe(), app.coroutineScope) { all -> all.map { it.toPackView() } }

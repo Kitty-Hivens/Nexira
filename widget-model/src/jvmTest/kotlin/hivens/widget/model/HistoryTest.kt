@@ -105,6 +105,10 @@ class HistoryTest {
         val history = History(home).section(library).show(pack, id("a")).back()
         assertTrue(history.canGoForward)
         assertFalse(history.section(library).canGoForward)
+
+        val root = History(home).section(library).back()
+        assertTrue(root.canGoForward)
+        assertFalse(root.section(home).canGoForward, "and back to the config it goes over")
     }
 
     @Test

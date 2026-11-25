@@ -125,9 +125,8 @@ import hivens.ui.theme.originColor
 
 /**
  * Library PackDetail. Hero header + Play bar + tabs (Content / Files /
- * Worlds). [PackDetailState] resolves the instance from the
- * [Screen.PackDetail.instanceId] in the navigation entry, so the sealed Screen
- * class stays small and the screen itself renders rather than fetches.
+ * Worlds). [PackDetailState] resolves the instance from its id, which is what the
+ * page is opened with, so the screen itself renders rather than fetches.
  *
  * Tabs are scoped to a single per-instance dir (`<dataDir>/instances/
  * <instance.instanceDirName>`) for Files / Worlds; the Content tab

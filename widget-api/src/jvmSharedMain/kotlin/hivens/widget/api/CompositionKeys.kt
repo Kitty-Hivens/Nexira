@@ -8,10 +8,12 @@ import hivens.widget.model.ScopeLevel
 import hivens.widget.model.Show
 import hivens.widget.model.SourceKey
 import hivens.widget.model.WidgetDataSource
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.plus
 import kotlinx.serialization.json.JsonElement
 
 /**
@@ -60,7 +62,8 @@ fun <T : Any> ModuleKeys.pageValue(value: PageValue<T>, sample: (() -> T)? = nul
 /** [value] as this level's page was opened with it, for a factory of the page or of the host. See [pageValue]. */
 fun <T : Any> LevelContext.read(value: PageValue<T>): WidgetDataSource<T?> {
     val entry = find(PageKeys.Entry)?.state ?: return flowSource(MutableStateFlow(null))
-    return flowSource(
-        entry.map { value.read(it.values) }.stateIn(coroutineScope, SharingStarted.Eagerly, value.read(entry.value.values)),
-    )
+    // Unconfined, so whoever moves the entry leaves the value moved: a page composed with its new entry reads the new
+    // value on that pass and not a frame later.
+    val scope = coroutineScope + Dispatchers.Unconfined
+    return flowSource(entry.map { value.read(it.values) }.stateIn(scope, SharingStarted.Eagerly, value.read(entry.value.values)))
 }

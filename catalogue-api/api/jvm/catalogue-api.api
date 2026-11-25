@@ -190,6 +190,35 @@ public final class hivens/catalogue/api/CatalogueApi {
 	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
 }
 
+public final class hivens/catalogue/api/CatalogueBuildRef {
+	public static final field Companion Lhivens/catalogue/api/CatalogueBuildRef$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lhivens/catalogue/api/CatalogueBuildRef;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/CatalogueBuildRef;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/catalogue/api/CatalogueBuildRef;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getVersionId ()Ljava/lang/String;
+	public final fun getVersionNumber ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/catalogue/api/CatalogueBuildRef$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/catalogue/api/CatalogueBuildRef$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/catalogue/api/CatalogueBuildRef;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/catalogue/api/CatalogueBuildRef;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/catalogue/api/CatalogueBuildRef$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class hivens/catalogue/api/CatalogueCard {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;Ljava/util/Map;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;Ljava/lang/String;ZLjava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
@@ -325,6 +354,47 @@ public final class hivens/catalogue/api/CatalogueKeys {
 	public final fun getToggleHideInstalled ()Lhivens/widget/model/CommandKey;
 	public final fun getToggleSourceOption ()Lhivens/widget/model/CommandKey;
 	public final fun getUnlock ()Lhivens/widget/model/CommandKey;
+}
+
+public final class hivens/catalogue/api/CataloguePackRef {
+	public static final field Companion Lhivens/catalogue/api/CataloguePackRef$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;)Lhivens/catalogue/api/CataloguePackRef;
+	public static synthetic fun copy$default (Lhivens/catalogue/api/CataloguePackRef;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/catalogue/api/CataloguePackRef;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getOrigin ()Ljava/lang/String;
+	public final fun getPackId ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/catalogue/api/CataloguePackRef$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/catalogue/api/CataloguePackRef$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/catalogue/api/CataloguePackRef;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/catalogue/api/CataloguePackRef;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/catalogue/api/CataloguePackRef$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/catalogue/api/CataloguePages {
+	public static final field BUILD_ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/catalogue/api/CataloguePages;
+	public static final field INTO_ID Ljava/lang/String;
+	public static final field PACK_ID Ljava/lang/String;
+	public static final field PROJECT_ID Ljava/lang/String;
+	public final fun getBuild ()Lhivens/widget/model/PageValue;
+	public final fun getInto ()Lhivens/widget/model/PageValue;
+	public final fun getPack ()Lhivens/widget/model/PageValue;
+	public final fun getProject ()Lhivens/widget/model/PageValue;
 }
 
 public final class hivens/catalogue/api/CatalogueTags {
@@ -1339,11 +1409,13 @@ public final class hivens/catalogue/api/ProjectSource : java/lang/Enum {
 }
 
 public abstract interface class hivens/catalogue/api/ProjectTarget {
+	public static final field Companion Lhivens/catalogue/api/ProjectTarget$Companion;
 	public fun getKey ()Ljava/lang/String;
 	public fun getPackId ()Ljava/lang/String;
 }
 
 public final class hivens/catalogue/api/ProjectTarget$Catalogue : hivens/catalogue/api/ProjectTarget {
+	public static final field Companion Lhivens/catalogue/api/ProjectTarget$Catalogue$Companion;
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public final fun component1 ()Ljava/lang/String;
@@ -1359,12 +1431,32 @@ public final class hivens/catalogue/api/ProjectTarget$Catalogue : hivens/catalog
 	public fun toString ()Ljava/lang/String;
 }
 
+public final synthetic class hivens/catalogue/api/ProjectTarget$Catalogue$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/catalogue/api/ProjectTarget$Catalogue$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/catalogue/api/ProjectTarget$Catalogue;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/catalogue/api/ProjectTarget$Catalogue;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/catalogue/api/ProjectTarget$Catalogue$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/catalogue/api/ProjectTarget$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class hivens/catalogue/api/ProjectTarget$DefaultImpls {
 	public static fun getKey (Lhivens/catalogue/api/ProjectTarget;)Ljava/lang/String;
 	public static fun getPackId (Lhivens/catalogue/api/ProjectTarget;)Ljava/lang/String;
 }
 
 public final class hivens/catalogue/api/ProjectTarget$Installed : hivens/catalogue/api/ProjectTarget {
+	public static final field Companion Lhivens/catalogue/api/ProjectTarget$Installed$Companion;
 	public fun <init> (Ljava/lang/String;Lhivens/catalogue/api/ProjectKind;Ljava/lang/String;)V
 	public final fun component1 ()Ljava/lang/String;
 	public final fun component2 ()Lhivens/catalogue/api/ProjectKind;
@@ -1379,6 +1471,21 @@ public final class hivens/catalogue/api/ProjectTarget$Installed : hivens/catalog
 	public fun getPackId ()Ljava/lang/String;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/catalogue/api/ProjectTarget$Installed$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/catalogue/api/ProjectTarget$Installed$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/catalogue/api/ProjectTarget$Installed;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/catalogue/api/ProjectTarget$Installed;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/catalogue/api/ProjectTarget$Installed$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class hivens/catalogue/api/ProjectTypes {

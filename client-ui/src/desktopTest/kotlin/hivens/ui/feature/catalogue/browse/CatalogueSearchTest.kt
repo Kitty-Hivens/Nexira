@@ -12,8 +12,10 @@ import hivens.catalogue.api.ProjectTarget
 import hivens.catalogue.api.SearchFilter
 import hivens.catalogue.api.SourceView
 import hivens.catalogue.api.TagSearch
-import hivens.ui.Screen
 import hivens.ui.feature.catalogue.project.Environment
+import hivens.ui.navigation.LauncherConfigs
+import hivens.widget.model.HistoryEntry
+import hivens.widget.model.Show
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -141,18 +143,20 @@ class CatalogueSearchTest {
         assertTrue(c.view.value.unlocked.isEmpty())
     }
 
+    private val onProject = LauncherConfigs.project(ProjectTarget.Catalogue("sodium")).let { HistoryEntry(it.config, it.values) }
+
     /** The lists can take seconds, and the search waits on the shell's scope, not the page's. */
     @Test
     fun `a tag search does not take the reader away from where they went while it waited`() = runBlocking {
-        var screen: Screen = Screen.ModDetail(ProjectTarget.Catalogue("sodium"))
-        val opened = mutableListOf<Screen>()
+        var entry = onProject
+        val opened = mutableListOf<Show>()
         val asked = mutableListOf<TagSearch>()
 
         searchFromTag(
             "mod", ProjectTag.Category("optimization"), packId = null,
-            known = { screen = Screen.Library; tags },
-            currentScreen = { screen },
-            onScreenChange = { opened += it },
+            known = { entry = HistoryEntry(LauncherConfigs.Library); tags },
+            current = { entry },
+            show = { opened += it },
             search = { asked += it },
         )
 
@@ -162,18 +166,18 @@ class CatalogueSearchTest {
 
     @Test
     fun `a tag search opens Browse when the reader is still on the page`() = runBlocking {
-        val opened = mutableListOf<Screen>()
+        val opened = mutableListOf<Show>()
         val asked = mutableListOf<TagSearch>()
 
         searchFromTag(
             "mod", ProjectTag.Category("optimization"), packId = null,
             known = { tags },
-            currentScreen = { Screen.ModDetail(ProjectTarget.Catalogue("sodium")) },
-            onScreenChange = { opened += it },
+            current = { onProject },
+            show = { opened += it },
             search = { asked += it },
         )
 
-        assertEquals(listOf<Screen>(Screen.Browse), opened)
+        assertEquals(listOf(Show(LauncherConfigs.Browse)), opened)
         assertEquals(listOf(TagSearch("mod", setOf(SearchFilter(FilterField.Category, "optimization")), null)), asked)
     }
 }

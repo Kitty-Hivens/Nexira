@@ -21,7 +21,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.SessionState
-import hivens.ui.Screen
+import hivens.catalogue.api.CataloguePages
 import hivens.ui.components.rememberSignOutRequest
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.customization.NavSelectionStyle
@@ -29,10 +29,12 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.press.selectable
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.toWidgetColorOrNull
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -61,26 +63,33 @@ data class NavEntryProps(
     val target: NavTarget = NavTarget.Home,
 )
 
+private val LIBRARY_CONFIGS = setOf(
+    LauncherConfigs.Library, LauncherConfigs.Pack, LauncherConfigs.PackVersions, LauncherConfigs.Project, LauncherConfigs.Build,
+)
+
+private val SETTINGS_CONFIGS = setOf(LauncherConfigs.Settings, LauncherConfigs.Themes, LauncherConfigs.Background)
+
 // The session is not a need of every entry: the sign-out entry draws nothing where no
 // accounts module is brought in, and the rest navigate all the same.
 @Widget(
     id = "nav.entry",
     displayName = "widget.nav.entry",
     propsClass = NavEntryProps::class,
-    needs = ["nav.state", "nav.switch", "console.visible", "console.visible.set"],
+    needs = ["nav.state", "nav.show", "console.visible", "console.visible.set"],
 )
 @Composable
 fun NavEntry(instance: WidgetInstance) {
     val p = instance.rememberProps<NavEntryProps>()
-    val screen = rememberScopedSource(Sources.Navigation).valueOrNull()?.current ?: return
-    val switchTab = rememberScopedCommand(Commands.SwitchTab) ?: return
+    val entry = rememberScopedSource(CompositionKeys.History).valueOrNull()?.current ?: return
+    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val config = entry.config
 
     when (p.target) {
         NavTarget.Home -> NavSlot(
             icon         = NxIcon.Home,
             outlineSwap  = true,
-            active       = screen is Screen.Home,
-            onClick      = { switchTab(Screen.Home) },
+            active       = config == LauncherConfigs.Home,
+            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Home)) },
         )
         NavTarget.Library -> NavSlot(
             icon         = NxIcon.Star,
@@ -88,40 +97,40 @@ fun NavEntry(instance: WidgetInstance) {
             // A project page and a build's page belong here too: both are opened
             // from a pack's content tab, so the rail went dark the moment a reader
             // followed a mod out of the pack they were standing in.
-            active       = screen is Screen.Library || screen is Screen.PackDetail ||
-                screen is Screen.PackVersions || screen is Screen.ModDetail || screen is Screen.ModVersion,
-            onClick      = { switchTab(Screen.Library) },
+            active       = config in LIBRARY_CONFIGS,
+            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Library)) },
         )
         NavTarget.Browse -> NavSlot(
             icon         = NxIcon.Search,
             outlineSwap  = true,
-            active       = screen is Screen.Browse || screen is Screen.CataloguePackDetail,
-            onClick      = { switchTab(Screen.Browse) },
+            // Not from inside a pack: that browse is the pack's, and the catalogue's own is another page.
+            active       = config == LauncherConfigs.CataloguePack ||
+                (config == LauncherConfigs.Browse && CataloguePages.Into.id !in entry.opened),
+            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Browse)) },
         )
         NavTarget.Profile -> NavSlot(
             icon         = NxIcon.Person,
             outlineSwap  = true,
-            active       = screen is Screen.Profile,
-            onClick      = { switchTab(Screen.Profile) },
+            active       = config == LauncherConfigs.Profile,
+            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Profile)) },
         )
         NavTarget.Wardrobe -> NavSlot(
             icon         = NxIcon.Palette,
             outlineSwap  = true,
-            active       = screen is Screen.Wardrobe,
-            onClick      = { switchTab(Screen.Wardrobe) },
+            active       = config == LauncherConfigs.Wardrobe,
+            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Wardrobe)) },
         )
         NavTarget.Settings -> NavSlot(
             icon         = NxIcon.Settings,
             outlineSwap  = true,
-            active       = screen is Screen.Settings || screen is Screen.ThemePicker ||
-                screen is Screen.BackgroundSettings,
-            onClick      = { switchTab(Screen.Settings) },
+            active       = config in SETTINGS_CONFIGS,
+            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Settings)) },
         )
         NavTarget.About -> NavSlot(
             icon         = NxIcon.Info,
             outlineSwap  = true,
-            active       = screen is Screen.About,
-            onClick      = { switchTab(Screen.About) },
+            active       = config == LauncherConfigs.About,
+            onClick      = { show(LauncherConfigs.section(LauncherConfigs.About)) },
         )
         NavTarget.Console -> {
             val visible = rememberScopedSource(Sources.ConsoleVisible).valueOrNull() ?: return

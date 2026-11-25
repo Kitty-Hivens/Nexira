@@ -5,45 +5,40 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import hivens.catalogue.api.CatalogueKeys
+import hivens.catalogue.api.CataloguePages
 import hivens.catalogue.api.OpenProject
 import hivens.catalogue.api.ProjectTarget
 import hivens.catalogue.api.packTargetKey
 import hivens.core.api.interfaces.IPackRepository
 import hivens.i18n.api.Strings
-import hivens.ui.Screen
+import hivens.packs.api.PackPages
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.navigation.LauncherConfigs
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
+import hivens.widget.model.HistoryEntry
 import hivens.widget.model.screen
 import org.koin.compose.koinInject
 
 /**
- * Static Screen -> breadcrumb label. Pure (no Compose, no async) so the mapping
- * is unit-testable and stays exhaustive over [Screen]. Returns null for the
- * screens whose label is a pack name resolved asynchronously (installed pack,
- * Modrinth project, mirror pack).
+ * The label of a crumb nothing has to be looked up for, or null where it has: a pack and a project are called
+ * what they are called, and a made screen what its maker named it. Pure, so the mapping is checked whole.
  */
-fun staticCrumbLabel(screen: Screen, s: Strings): String? = when (screen) {
-    Screen.Home                   -> s.text("crumbHome")
-    Screen.Library                -> s.text("libraryHeaderTitle")
-    Screen.Browse                 -> s.text("browseTitle")
-    Screen.Profile                -> s.text("profileTitle")
-    Screen.Wardrobe               -> s.text("wardrobeTitle")
-    Screen.Settings               -> s.text("settingsTitle")
-    Screen.ThemePicker            -> s.text("themePickerTitle")
-    Screen.About                  -> s.text("aboutTitle")
-    Screen.BackgroundSettings     -> s.text("backgroundTitle")
-    is Screen.PackVersions        -> s.text("packVersionsTitle")
-    is Screen.BrowseInto          -> s.text("contentFindProjects")
-    // Resolved to a human name by the catalogue / repository / roster (see below).
-    is Screen.PackDetail          -> null
-    is Screen.CataloguePackDetail -> null
-    is Screen.ModDetail           -> null
-    // The route carries the build's own number, so this one needs nothing fetched.
-    is Screen.ModVersion          -> screen.versionNumber
-    // Named in the layout graph, which a pure mapping cannot read.
-    is Screen.Custom              -> null
+fun staticCrumbLabel(entry: HistoryEntry, s: Strings): String? = when (entry.config) {
+    LauncherConfigs.Home         -> s.text("crumbHome")
+    LauncherConfigs.Library      -> s.text("libraryHeaderTitle")
+    LauncherConfigs.Browse       -> s.text(if (CataloguePages.Into.read(entry.opened) == null) "browseTitle" else "contentFindProjects")
+    LauncherConfigs.Profile      -> s.text("profileTitle")
+    LauncherConfigs.Wardrobe     -> s.text("wardrobeTitle")
+    LauncherConfigs.Settings     -> s.text("settingsTitle")
+    LauncherConfigs.Themes       -> s.text("themePickerTitle")
+    LauncherConfigs.About        -> s.text("aboutTitle")
+    LauncherConfigs.Background   -> s.text("backgroundTitle")
+    LauncherConfigs.PackVersions -> s.text("packVersionsTitle")
+    // The entry carries the build's own number, so this one needs nothing fetched.
+    LauncherConfigs.Build        -> CataloguePages.Build.read(entry.opened)?.versionNumber.orEmpty()
+    else                         -> null
 }
 
 /**
@@ -61,36 +56,37 @@ private fun modFallbackLabel(target: ProjectTarget): String = when (target) {
 }
 
 /**
- * Human label for a breadcrumb segment. Pack-detail screens resolve a real name
- * (installed pack via the repository, Browse/Modrinth via the catalogue) instead
- * of showing the raw id; the id is the placeholder until it loads, and the
- * fallback if resolution fails. Everything else is the synchronous [staticCrumbLabel].
+ * Human label for a breadcrumb segment. A pack's page is named by the pack (installed
+ * pack via the repository, a source's via the catalogue) and not by its raw id, which
+ * stands in until the name loads and where it never does. Everything else is the
+ * synchronous [staticCrumbLabel].
  */
 @Composable
-fun rememberCrumbLabel(screen: Screen): String {
+fun rememberCrumbLabel(entry: HistoryEntry): String {
     val s = nexiraStrings()
-    staticCrumbLabel(screen, s)?.let { return it }
-    return when (screen) {
-        is Screen.PackDetail -> {
-            val repo: IPackRepository = koinInject()
-            // Read once, this crumb kept the name the pack had when it was first
-            // shown: the rename happens in place, without navigating, and the top
-            // bar is chrome that is never disposed, so only visiting a different
-            // pack could ever fix it. The registry always has a value, so there is
-            // no loading state to pass through -- an id the registry does not hold
-            // is a pack that is gone, and the id itself is the honest label for it.
-            val instances by remember { repo.observe() }.collectAsState()
-            instances.firstOrNull { it.id == screen.instanceId }?.displayName
-                ?: screen.instanceId
-        }
-        is Screen.CataloguePackDetail -> catalogueCrumb(screen.origin, screen.packId)
-        is Screen.ModDetail           -> modCrumb(screen.target)
+    staticCrumbLabel(entry, s)?.let { return it }
+    return when (entry.config) {
+        LauncherConfigs.Pack -> installedCrumb(PackPages.Pack.read(entry.opened).orEmpty())
+        LauncherConfigs.CataloguePack -> CataloguePages.Pack.read(entry.opened)?.let { catalogueCrumb(it.origin, it.packId) }.orEmpty()
+        LauncherConfigs.Project -> CataloguePages.Project.read(entry.opened)?.let { modCrumb(it) }.orEmpty()
         // Read live, so a rename in the editor relabels the crumb at once. A screen
         // deleted while it was open says so rather than naming nothing.
-        is Screen.Custom              ->
-            LocalLayoutGraph.current.screen(screen.id)?.title?.ifBlank { null } ?: s.text("screenMissing")
-        else -> staticCrumbLabel(screen, s).orEmpty() // unreachable: statics returned above
+        else -> LocalLayoutGraph.current.screen(entry.config.value)?.title?.ifBlank { null } ?: s.text("screenMissing")
     }
+}
+
+/**
+ * An installed pack's name, followed: read once, this crumb kept the name the pack had
+ * when it was first shown. The rename happens in place, without navigating, and the top
+ * bar is chrome that is never disposed, so only visiting a different pack could ever fix
+ * it. The registry always has a value, so there is no loading state to pass through, and
+ * an id the registry does not hold is a pack that is gone, with the id its honest label.
+ */
+@Composable
+private fun installedCrumb(id: String): String {
+    val repo: IPackRepository = koinInject()
+    val instances by remember { repo.observe() }.collectAsState()
+    return instances.firstOrNull { it.id == id }?.displayName ?: id
 }
 
 /**

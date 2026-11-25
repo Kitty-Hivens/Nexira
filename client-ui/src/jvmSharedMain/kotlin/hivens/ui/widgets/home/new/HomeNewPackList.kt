@@ -41,10 +41,10 @@ import hivens.accounts.api.SessionState
 import hivens.core.launch.LaunchControlMode
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
-import hivens.ui.Screen
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.PlayGround
@@ -57,13 +57,14 @@ import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
-import hivens.ui.widgets.Commands
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
+import hivens.widget.model.Show
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
@@ -98,20 +99,20 @@ data class PackListProps(
     surface = """{"fill":"panel"}""",
     minWidth = 280, minHeight = 120,
     maxWidth = 2400, maxHeight = 1600,
-    needs = ["nav.open", "packs.library", "pack.launch"],
+    needs = ["nav.show", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewPackList(instance: WidgetInstance) {
     val p = instance.rememberProps<PackListProps>()
     val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
-    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
+    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
     val s = nexiraStrings()
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     val continued = rememberQuickLaunchTarget()?.target
 
     // An empty library is where somebody starts, and this is the widget that says how.
     if (all.isEmpty()) {
-        EmptyPacksCta(onBrowse = { navigate(Screen.Browse) })
+        EmptyPacksCta(onBrowse = { show(Show(LauncherConfigs.Browse)) })
         return
     }
 
@@ -135,7 +136,7 @@ fun HomeNewPackList(instance: WidgetInstance) {
             ScrollingRows(bounded = maxHeight != Dp.Infinity) {
                 rows.forEachIndexed { i, pack ->
                     if (i > 0) Box(Modifier.fillMaxWidth().height(RULE).background(NxInk.line))
-                    PackRow(pack, columns, appState, navigate)
+                    PackRow(pack, columns, appState, show)
                 }
             }
         }
@@ -195,7 +196,7 @@ internal data class PackListColumns(val runsOn: Boolean, val played: Boolean, va
 }
 
 @Composable
-private fun PackRow(pack: PackView, columns: PackListColumns, appState: SessionState?, navigate: (Screen) -> Unit) {
+private fun PackRow(pack: PackView, columns: PackListColumns, appState: SessionState?, show: (Show) -> Unit) {
     val s = nexiraStrings()
     val interaction = remember { MutableInteractionSource() }
     val hovered by interaction.collectIsHoveredAsState()
@@ -208,7 +209,7 @@ private fun PackRow(pack: PackView, columns: PackListColumns, appState: SessionS
             .clip(RoundedCornerShape(8.dp))
             .background(NxInk.main.copy(alpha = if (hovered) HOVER_ALPHA else 0f))
             .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null) { navigate(Screen.PackDetail(pack.id)) }
+            .clickable(interactionSource = interaction, indication = null) { show(LauncherConfigs.pack(pack.id)) }
             .padding(horizontal = 8.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),

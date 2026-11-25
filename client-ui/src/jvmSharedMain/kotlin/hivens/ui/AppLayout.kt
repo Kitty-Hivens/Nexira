@@ -9,47 +9,31 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import hivens.accounts.api.SessionState
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.chrome.LocalWindowClass
 import hivens.ui.chrome.rememberWindowClass
 import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.EditorSurfaceHost
-import hivens.i18n.api.I18nKeys
-import hivens.i18n.api.LocalTranslator
-import hivens.widget.api.SettingsChange
+import hivens.ui.navigation.CompositionHistory
+import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.screens.screenKind
+import hivens.widget.api.LocalWidgetRegistry
 import androidx.compose.runtime.saveable.SaveableStateHolder
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import hivens.ui.nx.NxSwap
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
-import hivens.catalogue.api.CatalogueKeys
-import hivens.ui.feature.catalogue.browse.BrowseScreen
-import hivens.ui.feature.catalogue.browse.CataloguePackDetailScreen
 import hivens.ui.feature.catalogue.browse.LocalCatalogueSearch
 import hivens.ui.feature.catalogue.browse.rememberShellCatalogueSearch
-import hivens.ui.screens.detail.PackDetailScreen
-import hivens.ui.screens.detail.settings.PackSettingsCategory
-import hivens.ui.screens.detail.versions.PackVersionsScreen
-import hivens.ui.screens.library.LibraryScreen
-import hivens.ui.screens.settings.SettingsScreen
 import hivens.ui.theme.Plane
 import hivens.ui.theme.Backdrop
 import hivens.ui.theme.LocalPlane
 import hivens.ui.utils.releaseFocusOnPress
-import hivens.ui.widgets.about.AboutSurface
-import hivens.ui.widgets.bgsettings.BgSettingsSurface
-import hivens.ui.widgets.profile.ProfileSurface
-import hivens.ui.widgets.wardrobe.WardrobeSurface
 import hivens.ui.widgets.shell.LocalCenterBody
-import hivens.ui.widgets.themepicker.ThemePickerSurface
 import hivens.ui.feature.catalogue.project.LocalLinkFollower
-import hivens.ui.feature.catalogue.project.ModDetailScreen
 import hivens.ui.feature.catalogue.project.rememberNavigatingLinkFollower
-import hivens.ui.feature.catalogue.project.ModVersionScreen
 import hivens.ui.screens.custom.CustomScreen
-import hivens.ui.navigation.NavState
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.LevelHost
 import hivens.ui.widgets.MisplacedWidget
@@ -66,8 +50,11 @@ import hivens.widget.api.rememberLatestCommand
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
-import hivens.widget.model.LayoutGraph
+import hivens.widget.model.ConfigId
+import hivens.widget.model.History
+import hivens.widget.model.HistoryEntry
 import hivens.widget.model.ScopeLevel
+import hivens.widget.model.WidgetInstance
 import hivens.widget.model.screen
 import hivens.widget.model.Show
 import hivens.widget.model.SlotId
@@ -79,42 +66,14 @@ import hivens.ui.theme.NxColor
 
 @Composable
 fun AppLayout(
-    appState: SessionState?,
-    currentScreen: Screen,
-    onScreenChange: (Screen) -> Unit,
-    onSwitchTab: (Screen) -> Unit,
-    onReplaceScreen: (Screen) -> Unit = {},
-    onBack: () -> Unit,
-    canGoBack: Boolean,
-    canGoForward: Boolean,
-    onForward: () -> Unit,
-    trail: List<Screen>,
-    history: List<Screen> = trail,
-    onPopTo: (Screen) -> Unit,
-    backsAtRoot: Int = 0,
+    history: CompositionHistory,
+    show: (Show) -> Unit,
     backgroundSettings: BackgroundSettings = BackgroundSettings(),
-    onBackgroundSettingsChanged: (BackgroundSettings.() -> BackgroundSettings) -> Unit = {},
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
 ) {
     val windowClass = rememberWindowClass()
-    // Aims the window's browse at a pack, where a catalogue module answers it.
-    val aimBrowse = rememberScopedCommand(CatalogueKeys.Aim)
-
-    // How the composition speaks, read and changed the way a widget does, for the screens
-    // that still take it as arguments. The language module's: where it is not brought in,
-    // the picker shows the one language in use. How it looks is steered by the colour
-    // provider's controls, drawn in the slots the screens leave for them.
-    val currentLanguage = rememberScopedSource(I18nKeys.Language).valueOrNull() ?: LocalTranslator.current.language
-    val languages = rememberScopedSource(I18nKeys.Languages).valueOrNull() ?: listOf(currentLanguage)
-    val updateLanguage = rememberScopedCommand(I18nKeys.UpdateSettings)
-    val onLanguageChanged: (String) -> Unit = { tag -> updateLanguage?.invoke(SettingsChange { it.copy(language = tag) }) }
-
-    // Whoever signs in reports it upward, and the shell's own state is what comes
-    // back down here -- so this is derived rather than held. It used to be a var
-    // the classic home wrote into on an SC re-auth, which meant a refresh survived
-    // exactly until the next appState change discarded it.
-    val currentSession = (appState as? SessionState.SignedIn)?.session
+    val now = history.now
 
     // Go transparent only when the wallpaper can actually be drawn: a deleted image
     // left the row transparent over a blank white window. Everything inside is told
@@ -123,115 +82,11 @@ fun AppLayout(
     val rowBackground = if (overWallpaper) Color.Transparent else NxColor.page
     val page = Plane(step = 0, color = NxColor.page, over = if (overWallpaper) Backdrop.Wallpaper else Backdrop.Page)
 
-    // The center region's screen router. Defined here (not in the layout graph)
-    // because navigation is not yet a widget surface; the center region widget
-    // invokes it. Reads currentSession live on each recompose.
+    // The centre region's router. Here and not in the layout graph because what a config
+    // holds is not in a document yet; the centre region's widget draws it.
     val centerBody: @Composable () -> Unit = {
-        ScreenRouter(currentScreen, history) { screen ->
-            when (screen) {
-                // One home. The classic dashboard WAS the SmartyCraft server
-                // list, and SmartyCraft arrives as mirror packs now, so the
-                // screen it lived on went with the path it was a front for.
-                Screen.Home -> NewHomeScreen()
-
-                Screen.Profile ->
-                    ProfileSurface(
-                        session       = currentSession,
-                        authResolving = appState is SessionState.Resolving,
-                    )
-
-                Screen.Wardrobe ->
-                    WardrobeSurface(session = currentSession, onBack = onBack)
-
-                Screen.Settings ->
-                    SettingsScreen(
-                        currentLanguage              = currentLanguage,
-                        languages                    = languages,
-                        onLanguageChanged            = onLanguageChanged,
-                        onOpenBackgroundSettings     = { onScreenChange(Screen.BackgroundSettings) },
-                        onOpenAbout                  = { onScreenChange(Screen.About) },
-                    )
-
-                Screen.ThemePicker -> ThemePickerSurface()
-
-                Screen.About ->
-                    AboutSurface(onBack = onBack)
-
-                Screen.BackgroundSettings ->
-                    BgSettingsSurface(
-                        currentSettings   = backgroundSettings,
-                        onSettingsChanged = onBackgroundSettingsChanged,
-                        onBack            = onBack,
-                    )
-
-                Screen.Library -> LibraryScreen(onScreenChange = onScreenChange)
-
-                Screen.Browse  -> BrowseScreen()
-
-                is Screen.BrowseInto -> BrowseScreen(intoInstanceId = screen.instanceId)
-
-                is Screen.CataloguePackDetail ->
-                    CataloguePackDetailScreen(
-                        origin      = screen.origin,
-                        packId      = screen.packId,
-                        onBack      = onBack,
-                        onInstalled = { instanceId -> onScreenChange(Screen.PackDetail(instanceId)) },
-                    )
-
-                is Screen.PackDetail ->
-                    PackDetailScreen(
-                        instanceId          = screen.instanceId,
-                        appState            = appState,
-                        onBack              = onBack,
-                        initialShowSettings    = screen.openSettings,
-                        initialSettingsSection = screen.settingsSection,
-                        onOpenVersions         = { fromSettings ->
-                            // Coming from the settings overlay: stamp the current
-                            // stack entry so Back restores the overlay, and the
-                            // section it was standing on. Without the section the
-                            // overlay came back on its first one, which is not
-                            // where anybody left it -- the version screen is only
-                            // reachable from Version.
-                            if (fromSettings) {
-                                onReplaceScreen(
-                                    Screen.PackDetail(
-                                        screen.instanceId,
-                                        openSettings = true,
-                                        settingsSection = PackSettingsCategory.Version,
-                                    ),
-                                )
-                            }
-                            onScreenChange(Screen.PackVersions(screen.instanceId))
-                        },
-                        onOpenProject          = { onScreenChange(Screen.ModDetail(it)) },
-                        onFindProjects         = {
-                            aimBrowse?.invoke(screen.instanceId)
-                            onScreenChange(Screen.BrowseInto(screen.instanceId))
-                        },
-                    )
-
-                is Screen.PackVersions ->
-                    PackVersionsScreen(
-                        instanceId = screen.instanceId,
-                        onBack     = onBack,
-                    )
-
-                is Screen.ModDetail -> ModDetailScreen(
-                    target = screen.target,
-                    onOpenVersion = { id, number ->
-                        onScreenChange(Screen.ModVersion(screen.target, id, number))
-                    },
-                )
-
-                is Screen.ModVersion -> ModVersionScreen(
-                    target = screen.target,
-                    versionId = screen.versionId,
-                )
-
-                is Screen.Custom -> CustomScreen(screen.id)
-            }
-        }
-    } // end centerBody
+        ScreenRouter(history.now) { entry -> ConfigBody(entry.config) }
+    }
 
     // What this composition's widgets fire to move its history and read of where it
     // stands, put over the composition's level, which AppRoot made around everything
@@ -240,23 +95,16 @@ fun AppLayout(
     // where a context provided by one screen pinned its widgets to that screen.
     // Everything else a widget reads here, the session and the appearance among it,
     // the level makes for itself.
-    ProvideComposition(
-        nav          = NavState(currentScreen, trail, canGoBack, canGoForward, backsAtRoot),
-        navigate     = onScreenChange,
-        switchTab    = onSwitchTab,
-        back         = onBack,
-        forward      = onForward,
-        popTo        = onPopTo,
-    ) {
+    ProvideComposition(history, show) {
     // The editor host wraps the WHOLE shell (rails included) so its decorators
     // reach rail widgets; it puts its own chrome back over the content pane from
     // what the centre region reports. The shell itself is a widget surface:
     // appshell.root lays its three region widgets in a Row.
     EditorSurfaceHost(
-        currentScreen          = currentScreen,
+        config                 = now.current.config,
         customization          = customization,
         onCustomizationChanged = onCustomizationChanged,
-        onOpenScreen           = onSwitchTab,
+        onOpen                 = { show(LauncherConfigs.section(it)) },
     ) {
         // Links that point at a project the launcher can draw stop going out to a
         // browser from here down, and a project's tags open the catalogue. Provided
@@ -265,7 +113,7 @@ fun AppLayout(
         CompositionLocalProvider(
             LocalCenterBody provides centerBody,
             LocalLinkFollower provides rememberNavigatingLinkFollower(),
-            LocalCatalogueSearch provides rememberShellCatalogueSearch(currentScreen, onScreenChange),
+            LocalCatalogueSearch provides rememberShellCatalogueSearch(now.current, show),
             LocalPlane provides page,
             LocalWindowClass provides windowClass,
         ) {
@@ -280,10 +128,24 @@ fun AppLayout(
 }
 
 /**
- * Puts the composition's history over its level for [content]: where it stands
- * and the commands that move it, the keys only the owner of the history can answer,
- * the kernel's [CompositionKeys.Show] among them, which shows the screen
- * [screenOfConfig] answers for the config named.
+ * What [config] holds: the one widget that is a screen of the launcher's own, or a screen
+ * somebody made, whose id the config is.
+ */
+@Composable
+private fun ConfigBody(config: ConfigId) {
+    val kind = screenKind(config)
+    val screen = LocalWidgetRegistry.current[kind]
+    if (screen == null) {
+        CustomScreen(config.value)
+    } else {
+        screen.Render(remember(kind) { WidgetInstance(kind = kind, instanceId = kind.value) })
+    }
+}
+
+/**
+ * Puts the composition's [history] over its level for [content]: where it stands and
+ * the commands that move it, the keys only the owner of a history can answer. [show] is
+ * the history's own, refusing a config the composition does not have.
  * Each command is one object for the composition's life that runs the latest
  * lambda it was handed, so a reader does not recompose because the shell did.
  *
@@ -291,29 +153,13 @@ fun AppLayout(
  * that stands where something it reads has no answer, which is also put here.
  */
 @Composable
-private fun ProvideComposition(
-    nav: NavState,
-    navigate: (Screen) -> Unit,
-    switchTab: (Screen) -> Unit,
-    back: () -> Unit,
-    forward: () -> Unit,
-    popTo: (Screen) -> Unit,
-    content: @Composable () -> Unit,
-) {
-    val navigateCommand = rememberLatestCommand(navigate)
-    val switchTabCommand = rememberLatestCommand(switchTab)
-    val backCommand = rememberLatestCommand<Unit> { back() }
-    val forwardCommand = rememberLatestCommand<Unit> { forward() }
-    val popToCommand = rememberLatestCommand(popTo)
-    val graph = LocalLayoutGraph.current
-    val showCommand = rememberLatestCommand<Show> { screenOfConfig(it.config.value, graph)?.let(navigate) }
-    ProvideScoped(Sources.Navigation, nav) {
-    ProvideScopedCommand(Commands.Navigate, navigateCommand) {
-    ProvideScopedCommand(Commands.SwitchTab, switchTabCommand) {
-    ProvideScopedCommand(Commands.Back, backCommand) {
-    ProvideScopedCommand(Commands.Forward, forwardCommand) {
-    ProvideScopedCommand(Commands.PopTo, popToCommand) {
-    ProvideScopedCommand(CompositionKeys.Show, showCommand) {
+private fun ProvideComposition(history: CompositionHistory, show: (Show) -> Unit, content: @Composable () -> Unit) {
+    ProvideScoped(CompositionKeys.History, history.now) {
+    ProvideScopedCommand(CompositionKeys.Show, rememberLatestCommand(show)) {
+    ProvideScopedCommand(CompositionKeys.Back, rememberLatestCommand<Unit> { history.back() }) {
+    ProvideScopedCommand(CompositionKeys.Forward, rememberLatestCommand<Unit> { history.forward() }) {
+    ProvideScopedCommand(CompositionKeys.BackTo, rememberLatestCommand(history::backTo)) {
+    ProvideScopedCommand(CompositionKeys.Rewrite, rememberLatestCommand(history::rewrite)) {
         CompositionLocalProvider(LocalMisplacedWidget provides MisplacedWidget, content = content)
     }
     }
@@ -321,76 +167,57 @@ private fun ProvideComposition(
     }
     }
     }
-    }
 }
 
 /**
- * The screen the config [id] stands for, until a composition shows configs itself: one of the
- * launcher's own screens by the surface it draws, or a screen somebody made by its id. Null for an id
- * that names neither, which shows nothing new.
- */
-internal fun screenOfConfig(id: String, graph: LayoutGraph): Screen? =
-    CONFIG_SCREENS[id] ?: Screen.Custom(id).takeIf { graph.screen(id) != null }
-
-/** The launcher's own screens that draw a surface, by its id. */
-private val CONFIG_SCREENS: Map<String, Screen> = mapOf(
-    "home.new" to Screen.Home,
-    "library" to Screen.Library,
-    "browse" to Screen.Browse,
-    "profile" to Screen.Profile,
-    "about" to Screen.About,
-    "bg.settings" to Screen.BackgroundSettings,
-    "theme.picker" to Screen.ThemePicker,
-)
-
-/**
- * Draws [currentScreen] with [screen], each destination in its own saveable state
+ * Draws the entry [history] shows with [content], each page in its own saveable state
  * and page level, and swaps one for the next with the swap primitive's transition.
  *
- * Screens are disposed when they are swapped out, so everything a reader had
+ * Pages are disposed when they are swapped out, so everything a reader had
  * arranged, a scroll position, an open tab, a chosen category, died with the visit
- * and came back at its default. It is held per destination here instead, and so is
- * a page level, for what a page makes and is handed. A page level lives while its
- * destination is anywhere in [history], back or forward, and goes once it has left
- * the history and stopped drawing. The composition's level keeps them, so they go
- * with it even if this router leaves first.
+ * and came back at its default. It is held per page here instead, and so is
+ * a page level, for what a page makes and is handed, its entry's values among it. A
+ * page level lives while its page is anywhere in the history, back or forward, and
+ * goes once it has left the history and stopped drawing. The composition's level keeps
+ * them, so they go with it even if this router leaves first.
  */
 @Composable
-internal fun ScreenRouter(currentScreen: Screen, history: List<Screen>, screen: @Composable (Screen) -> Unit) {
+internal fun ScreenRouter(history: History, content: @Composable (HistoryEntry) -> Unit) {
     val retention = rememberSaveableStateHolder()
     val pages = LocalScope.current?.nearest(ScopeLevel.Composition)?.pages
-    val historyKeys = history.mapTo(HashSet()) { it.retentionKey }
-    LaunchedEffect(pages, historyKeys) { pages?.keep(historyKeys) }
-    // How a screen replaces another is the swap primitive's business, not the
+    val reachable = history.reachable.mapTo(HashSet()) { it.page }
+    LaunchedEffect(pages, reachable) { pages?.keep(reachable) }
+    // How a page replaces another is the swap primitive's business, not the
     // router's. A still style collapses it without this site knowing. Two entries
-    // of one destination are one content, which the entry changes in place: drawn
+    // of one page are one content, which the entry changes in place: drawn
     // side by side during the swap they held one saved state twice, which throws.
     NxSwap(
-        target     = currentScreen,
+        target     = history.current,
         label      = "screen",
-        contentKey = { it.retentionKey },
+        contentKey = { it.page },
     ) { target ->
-        Destination(retention, pages, target.retentionKey) { screen(target) }
+        Page(retention, pages, target) { content(target) }
     }
 }
 
 /**
- * One destination of the router: its saveable state and its page level, both held
- * under [key]. The content holds its level from the moment it composes, so a
- * destination that left the history keeps its level until it has finished fading
- * out, and one that just arrived cannot be swept by another leaving in its first frame.
+ * One page of the router: its saveable state and its page level, both held under the
+ * [entry]'s page. The content holds its level from the moment it composes, so a page
+ * that left the history keeps its level until it has finished fading out, and one that
+ * just arrived cannot be swept by another leaving in its first frame.
  */
 @Composable
-private fun Destination(
+private fun Page(
     retention: SaveableStateHolder,
     pages: PageLevels?,
-    key: String,
+    entry: HistoryEntry,
     content: @Composable () -> Unit,
 ) {
+    val key = entry.page
     retention.SaveableStateProvider(key) {
         val level = pages?.let {
             val _ = remember(it, key) { it.hold(key) }
-            it.levelFor(key)
+            it.levelFor(entry)
         }
         LevelHost(level, content)
     }
@@ -401,7 +228,7 @@ private fun Destination(
 @Composable
 fun AppSidebar(
     isAuthenticated: Boolean,
-    onSwitchTab: (Screen) -> Unit,
+    onSection: (ConfigId) -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier.width(64.dp).fillMaxHeight(),
 ) {
@@ -409,20 +236,20 @@ fun AppSidebar(
     val setConsoleVisible = rememberScopedCommand(Commands.SetConsoleVisible)
 
     // Puppet: sidebar navigation.
-    PuppetClick("nav.home")     { onSwitchTab(Screen.Home) }
-    PuppetClick("nav.library")  { onSwitchTab(Screen.Library) }
-    PuppetClick("nav.browse")   { onSwitchTab(Screen.Browse) }
-    PuppetClick("nav.profile") { onSwitchTab(Screen.Profile) }
-    PuppetClick("nav.wardrobe") { onSwitchTab(Screen.Wardrobe) }
-    PuppetClick("nav.settings") { onSwitchTab(Screen.Settings) }
-    PuppetClick("nav.about")    { onSwitchTab(Screen.About) }
+    PuppetClick("nav.home")     { onSection(LauncherConfigs.Home) }
+    PuppetClick("nav.library")  { onSection(LauncherConfigs.Library) }
+    PuppetClick("nav.browse")   { onSection(LauncherConfigs.Browse) }
+    PuppetClick("nav.profile") { onSection(LauncherConfigs.Profile) }
+    PuppetClick("nav.wardrobe") { onSection(LauncherConfigs.Wardrobe) }
+    PuppetClick("nav.settings") { onSection(LauncherConfigs.Settings) }
+    PuppetClick("nav.about")    { onSection(LauncherConfigs.About) }
     PuppetClick("nav.console")  { setConsoleVisible?.invoke(!consoleVisible) }
     if (isAuthenticated) {
         PuppetClick("nav.logout") { onLogout() }
     }
     // A made screen has no fixed entry above, so it is driven by its id.
     LocalLayoutGraph.current.screens.forEach { spec ->
-        key(spec.id) { PuppetClick("nav.screen.${spec.id}") { onSwitchTab(Screen.Custom(spec.id)) } }
+        key(spec.id) { PuppetClick("nav.screen.${spec.id}") { onSection(ConfigId(spec.id)) } }
     }
 
     NavigationRail(

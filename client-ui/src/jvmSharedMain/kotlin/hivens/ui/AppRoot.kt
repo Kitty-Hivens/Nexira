@@ -14,12 +14,13 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 import coil3.ComponentRegistry
 import coil3.SingletonImageLoader
-import hivens.accounts.api.AccountKeys
 import hivens.themes.api.ThemeInputs
 import hivens.ui.background.BackgroundManager
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.components.SignOutPrompt
 import hivens.ui.customization.CustomizationSettings
+import hivens.ui.navigation.CompositionHistory
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.pictures.PictureRechecks
@@ -31,9 +32,11 @@ import hivens.ui.widgets.ChildLevel
 import hivens.ui.host.launcherServices
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
-import hivens.widget.api.rememberScopedSource
-import hivens.widget.api.valueOrNull
+import hivens.widget.model.ConfigId
+import hivens.widget.model.History
 import hivens.widget.model.ScopeLevel
+import hivens.widget.model.Show
+import hivens.widget.model.screen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -52,10 +55,10 @@ import kotlin.time.Duration.Companion.milliseconds
 /**
  * Whatever the host feeds into the history besides the screens: thumb buttons on a
  * desktop, the system back gesture on a phone. A back with nowhere to go stays in
- * the history as [NavBackStack.backsAtRoot] and never reaches the host as a way out.
+ * the history as [History.backsAtRoot] and never reaches the host as a way out.
  */
 @Composable
-internal expect fun NavigationInputs(backStack: NavBackStack)
+internal expect fun NavigationInputs(history: CompositionHistory)
 
 /** The wallpaper behind the layout, which reports its tone upward. A host with no wallpaper draws nothing and reports none. */
 @Composable
@@ -73,11 +76,10 @@ internal expect fun ComponentRegistry.Builder.addPlatformDecoders()
  * The launcher's interface inside one window: its composition level, the history,
  * the wallpaper and the layout.
  *
- * The composition's level is made here, around everything it draws. Who the
- * launcher is signed in as and how it looks are read through the sources like any
- * widget reads them, and what the wallpaper shows is told to the themes module
- * through the inputs it keeps for the host, which decides the dark scheme and the
- * wallpaper theme from it.
+ * The composition's level is made here, around everything it draws. How it looks is
+ * read through the sources like any widget reads it, and what the wallpaper shows is
+ * told to the themes module through the inputs it keeps for the host, which decides the
+ * dark scheme and the wallpaper theme from it.
  */
 @Composable
 fun AppRoot(
@@ -116,25 +118,25 @@ fun AppRoot(
 
     WarmLibrary()
 
-    // Navigation history, with Home as its home. navigate() pushes, a rail switch
-    // leaves Home and the section, and back() pops to the actual previous screen
-    // instead of a per-screen hardcoded return target. At Home back goes nowhere.
-    val backStack     = remember { NavBackStack(Screen.Home) }
+    // Where the composition has been, from Home. At Home back goes nowhere.
+    val history = remember { CompositionHistory(LauncherConfigs.Home) }
 
-    NavigationInputs(backStack)
+    NavigationInputs(history)
 
-    // A made screen deleted while it sits in the history leaves it, back and
-    // forward both, so neither arrow can open a page about nothing.
-    val screenIds = LocalLayoutGraph.current.screens.map { it.id }.toSet()
-    LaunchedEffect(screenIds) {
-        backStack.retainWhere(Screen.Home) { it !is Screen.Custom || it.id in screenIds }
-    }
+    // What the composition can show: its own configs, and the screens somebody made. One
+    // deleted while it sits in the history leaves it, back and forward both, so neither
+    // arrow can open a page about nothing.
+    val graph by rememberUpdatedState(LocalLayoutGraph.current)
+    val has: (ConfigId) -> Boolean = remember { { it in LauncherConfigs.all || graph.screen(it.value) != null } }
+    val screenIds = graph.screens.map { it.id }.toSet()
+    LaunchedEffect(screenIds) { history.retain { has(it.config) } }
+    val show: (Show) -> Unit = remember(history, has) { { if (has(it.config)) history.show(it) } }
 
     // Out-of-composition navigation requests (notification actions, drivers)
-    // land in the same back stack the buttons above drive.
+    // land in the same history the buttons above drive.
     val navRequests: NavRequests = koinInject()
-    LaunchedEffect(navRequests) {
-        navRequests.requests.collect { backStack.navigate(it) }
+    LaunchedEffect(navRequests, show) {
+        navRequests.requests.collect { show(it) }
     }
 
     // ── Background settings ───────────────────────────────────────────────
@@ -168,12 +170,8 @@ fun AppRoot(
     // Names of a module's widgets in the person's language, which the editor panels read.
     val widgetModules = modules?.state?.collectAsState()?.value?.widgetModules.orEmpty()
     val widgetLabels = remember(widgetModules) { WidgetLabels { widgetModules[it] } }
-    // The composition's level, around everything it draws, the editor included. The
-    // session is read here through the same key a widget reads. Missing, there is no
-    // session at all: the document brought no accounts module, or the one it brought
-    // could not start, which has been said out loud already.
+    // The composition's level, around everything it draws, the editor included.
     ChildLevel(ScopeLevel.Composition) {
-    val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
     CompositionLocalProvider(LocalWidgetLabels provides widgetLabels) {
     ScreenEffectHost(
         effects  = effects,
@@ -221,23 +219,11 @@ fun AppRoot(
           )
 
           AppLayout(
-              appState = appState,
-              currentScreen = backStack.current,
-              onScreenChange = backStack::navigate,
-              onSwitchTab = backStack::switchTo,
-              onReplaceScreen = backStack::replaceCurrent,
-              onBack = { backStack.back() },
-              canGoBack = backStack.canGoBack,
-              canGoForward = backStack.canGoForward,
-              onForward = { backStack.forward() },
-              trail = backStack.trail,
-              history = backStack.history,
-              onPopTo = backStack::popTo,
-              backsAtRoot = backStack.backsAtRoot,
-              backgroundSettings = backgroundSettings,
-              onBackgroundSettingsChanged = { change -> backgroundManager.update(change) },
-              customization              = customization,
-              onCustomizationChanged     = onCustomizationChanged,
+              history                = history,
+              show                   = show,
+              backgroundSettings     = backgroundSettings,
+              customization          = customization,
+              onCustomizationChanged = onCustomizationChanged,
           )
 
           NotificationStack()

@@ -1,8 +1,8 @@
 package hivens.ui.screens.custom
 
-import hivens.ui.Screen
 import hivens.ui.editor.EditorSurfaces
 import hivens.ui.i18n.NexiraStrings
+import hivens.widget.model.ConfigId
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
@@ -74,7 +74,7 @@ class MadeScreensTest {
 
     @Test
     fun `the editor offers a made screen's page while it is open, under its own name`() {
-        val surfaces = EditorSurfaces.availableFor(Screen.Custom("mine"), graph)
+        val surfaces = EditorSurfaces.availableFor(ConfigId("mine"), graph)
         assertEquals(spec.surface, surfaces.first(), "the page is the first tab, like any screen's")
         val s = EditorSurfaces.specIn(spec.surface, graph)!!
         assertEquals("Mine", s.name(NexiraStrings.shipped("en")))

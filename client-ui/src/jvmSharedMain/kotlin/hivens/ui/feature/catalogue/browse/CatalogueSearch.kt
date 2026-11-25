@@ -15,10 +15,12 @@ import hivens.catalogue.api.ProjectKind
 import hivens.catalogue.api.ProjectTypes
 import hivens.catalogue.api.SearchFilter
 import hivens.catalogue.api.TagSearch
-import hivens.ui.Screen
 import hivens.ui.feature.catalogue.project.Environment
+import hivens.ui.navigation.LauncherConfigs
 import hivens.widget.api.LocalScope
 import hivens.widget.api.rememberScopedCommand
+import hivens.widget.model.HistoryEntry
+import hivens.widget.model.Show
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -67,20 +69,20 @@ val LocalCatalogueSearch: ProvidableCompositionLocal<CatalogueSearch?> = composi
  * showed chosen in the wrong group.
  */
 @Composable
-fun rememberShellCatalogueSearch(currentScreen: Screen, onScreenChange: (Screen) -> Unit): CatalogueSearch? {
+fun rememberShellCatalogueSearch(current: HistoryEntry, show: (Show) -> Unit): CatalogueSearch? {
     val searchFor = rememberScopedCommand(CatalogueKeys.SearchFor) ?: return null
     val loadTags = rememberScopedCommand(CatalogueKeys.LoadTags)
     val tags = LocalScope.current?.find(CatalogueKeys.Tags)?.state
     val scope = rememberCoroutineScope()
-    val screen = rememberUpdatedState(currentScreen)
-    return remember(searchFor, loadTags, tags, onScreenChange, scope) {
+    val entry = rememberUpdatedState(current)
+    return remember(searchFor, loadTags, tags, show, scope) {
         CatalogueSearch { type, tag, packId ->
             scope.launch {
                 searchFromTag(
                     type, tag, packId,
                     known = { if (it is ProjectTag.Category) awaitTags(tags, loadTags, TAGS_PATIENCE) else tags?.value },
-                    currentScreen = { screen.value },
-                    onScreenChange = onScreenChange,
+                    current = { entry.value },
+                    show = show,
                     search = searchFor,
                 )
             }
@@ -107,16 +109,16 @@ internal suspend fun searchFromTag(
     tag: ProjectTag,
     packId: String?,
     known: suspend (ProjectTag) -> CatalogueTags?,
-    currentScreen: () -> Screen,
-    onScreenChange: (Screen) -> Unit,
+    current: () -> HistoryEntry,
+    show: (Show) -> Unit,
     search: (TagSearch) -> Unit,
 ) {
-    val from = currentScreen()
+    val from = current()
     val tags = known(tag)
-    if (currentScreen() != from) return
+    if (current() != from) return
     val filters = filtersFor(tag, type, tags) ?: return
     search(TagSearch(type, filters, packId))
-    onScreenChange(Screen.Browse)
+    show(Show(LauncherConfigs.Browse))
 }
 
 /** How long a tag waits for the catalogue's lists before it searches without them. */

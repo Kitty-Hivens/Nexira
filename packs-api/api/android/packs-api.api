@@ -290,6 +290,12 @@ public final class hivens/packs/api/PackOperationView {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class hivens/packs/api/PackPages {
+	public static final field INSTANCE Lhivens/packs/api/PackPages;
+	public static final field PACK_ID Ljava/lang/String;
+	public final fun getPack ()Lhivens/widget/model/PageValue;
+}
+
 public final class hivens/packs/api/PackSource {
 	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V

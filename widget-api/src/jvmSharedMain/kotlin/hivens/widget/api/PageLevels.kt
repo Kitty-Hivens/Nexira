@@ -1,7 +1,9 @@
 package hivens.widget.api
 
 import androidx.compose.runtime.RememberObserver
+import hivens.widget.model.HistoryEntry
 import hivens.widget.model.ScopeLevel
+import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
  * The page levels under one level, one per history entry, keyed by the entry's
@@ -16,7 +18,7 @@ import hivens.widget.model.ScopeLevel
  * level until it is gone.
  *
  * The key is what the owner says makes two entries the same place. The launcher's
- * router uses the screen's retention key, so the two entries of a history that
+ * router uses the page of the entry, so the two entries of a history that
  * went A, B, A share one level, the way they share their saved state. Values handed
  * over per entry would collide there. Keying by entry instead needs the router to
  * swap by entry too, and then both copies of A can be on screen during a fade,
@@ -28,6 +30,9 @@ import hivens.widget.model.ScopeLevel
 class PageLevels internal constructor(private val parent: WidgetScope) {
 
     private val levels = HashMap<String, WidgetScope>()
+
+    /** What each level made for an entry answers for it, by the page. */
+    private val entries = HashMap<String, MutableStateFlow<HistoryEntry>>()
 
     private val held = HashMap<String, Int>()
 
@@ -51,6 +56,21 @@ class PageLevels internal constructor(private val parent: WidgetScope) {
         levels[key] = level
         fresh += key
         level.install()
+        return level
+    }
+
+    /**
+     * The level of the page [entry] shows, made the first time it is asked for, which answers [PageKeys.Entry] with
+     * the entry the page was last asked for with. A page whose entry was rewritten is asked for with the new one, and
+     * its widgets read it at once.
+     */
+    fun levelFor(entry: HistoryEntry): WidgetScope {
+        val level = levelFor(entry.page) {
+            val answer = MutableStateFlow(entry)
+            entries[entry.page] = answer
+            val _ = provideSource(PageKeys.Entry, flowSource(answer))
+        }
+        entries[entry.page]?.value = entry
         return level
     }
 
@@ -95,6 +115,9 @@ class PageLevels internal constructor(private val parent: WidgetScope) {
 
     private fun sweep() {
         val gone = levels.keys.filter { it !in kept && it !in held && it !in fresh }
-        gone.forEach { key -> levels.remove(key)?.closeLogged("the page level of '$key'") }
+        gone.forEach { key ->
+            entries.remove(key)
+            levels.remove(key)?.closeLogged("the page level of '$key'")
+        }
     }
 }

@@ -32,7 +32,7 @@ import kotlin.time.Duration.Companion.minutes
 
 private const val SURFACE = "about"
 
-// about surface. AppLayout routes Screen.About here. Two
+// about surface. What the about config holds. Two
 // side-by-side slots: `left` (logo + credits) and `right` (update
 // panel, system rows, links). Chrome stays surface-level (back +
 // title) -- per the carve-out rule, removing them orphans the

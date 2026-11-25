@@ -33,12 +33,12 @@ import coil3.compose.SubcomposeAsyncImage
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackUpdateView
 import hivens.packs.api.PackView
-import hivens.ui.Screen
 import hivens.ui.components.SourceBadge
 import hivens.ui.components.rememberPackDeleteBlock
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.nx.InitialsAvatar
@@ -238,7 +238,7 @@ internal fun PendingUpdateBadge(
     val pending = statuses[packId] as? PackUpdateView.Pending ?: return
     UpdateBadgePill(
         isRollback = pending.direction == PackUpdateView.Pending.OLDER,
-        onClick    = { nav.open(Screen.PackVersions(packId)) },
+        onClick    = { nav.open(LauncherConfigs.packVersions(packId)) },
         modifier   = modifier,
         tone       = tone,
     )

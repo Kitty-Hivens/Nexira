@@ -30,7 +30,7 @@ private val PANEL_WIDTH = 380.dp
 private val THEME_PANEL_WIDTH = 320.dp
 
 /**
- * Appearance studio. AppLayout routes Screen.BackgroundSettings here. Two islands over
+ * Appearance studio. What the background config holds. Two islands over
  * the live wallpaper: the wallpaper controls (the `controls` slot -- enable + image +
  * scale + position + effects + loop + tint + reset widgets) at the start, and the theme
  * island ([AppearanceThemeIsland]: the look providers' controls) at the end.

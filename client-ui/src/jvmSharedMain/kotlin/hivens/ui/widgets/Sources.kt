@@ -2,7 +2,6 @@ package hivens.ui.widgets
 
 import hivens.core.activity.Activity
 import hivens.ui.background.BackgroundSettings
-import hivens.ui.navigation.NavState
 import hivens.ui.notifications.PersistedNotification
 import hivens.ui.host.HostWindowState
 import hivens.ui.widgets.about.SystemFacts
@@ -18,9 +17,10 @@ import hivens.widget.model.SourceKey
  *
  * A key below the app level is read with `rememberScopedSource(...)`. Most are made
  * by each level of their kind from a factory the registry holds, out of the level's
- * services, so they exist wherever such a level does, whoever draws it. The few only
- * a level's owner has, its history and its window, are declared in the registry so
- * the editor knows where they live, and the owner provides them.
+ * services, so they exist wherever such a level does, whoever draws it. What only
+ * a level's owner has, its window, is declared in the registry so the editor knows
+ * where it lives, and the owner provides it. A composition's history is the kernel's
+ * key, in `hivens.widget.api.CompositionKeys`.
  *
  * The packs and what is done to them are not here: they are the packs module's keys,
  * in `hivens.packs.api.PackKeys`, and exist only where the document names that module.
@@ -51,12 +51,6 @@ object Sources {
      * through the window commands in [Commands], never directly.
      */
     val Window = SourceKey<HostWindowState>("window.state", ScopeLevel.Window)
-
-    /**
-     * Where the composition's history stands, and how often back was asked for with
-     * nowhere left to go. Moved by the navigation commands in [Commands].
-     */
-    val Navigation = SourceKey<NavState>("nav.state", ScopeLevel.Composition)
 
     /** Whether the user let the launcher reach its own server past a certificate it does not trust. */
     val SslBypass = SourceKey<Boolean>("ssl.bypass")

@@ -26,9 +26,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
-import hivens.ui.Screen
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.nx.InitialsAvatar
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
@@ -41,7 +41,7 @@ import androidx.compose.ui.zIndex
 import hivens.ui.theme.NxMedia
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
-import hivens.ui.widgets.Commands
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.model.PropLabel
@@ -78,12 +78,12 @@ data class HeroProps(
     propsClass = HeroProps::class,
     minWidth = 280, minHeight = 140,
     maxWidth = 1600, maxHeight = 640,
-    needs = ["nav.open", "packs.library", "pack.launch"],
+    needs = ["nav.show", "packs.library", "pack.launch"],
 )
 @Composable
 fun HomeNewHero(instance: WidgetInstance) {
     val p = instance.rememberProps<HeroProps>()
-    val navigate = rememberScopedCommand(Commands.Navigate) ?: return
+    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
     val s = nexiraStrings()
     val quickLaunch = rememberQuickLaunchTarget(s.text("homeQuickButton")) ?: return
     val target = quickLaunch.target
@@ -91,7 +91,7 @@ fun HomeNewHero(instance: WidgetInstance) {
     val art = rememberPackArt(target)
 
     val eyebrow = if (target.lastPlayedEpochSecond > 0L) s.text("homeQuickContinue") else s.text("homeQuickStart")
-    val openDetail = { navigate(Screen.PackDetail(target.id)) }
+    val openDetail = { show(LauncherConfigs.pack(target.id)) }
 
     BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 12.dp)) {
         val height = when {

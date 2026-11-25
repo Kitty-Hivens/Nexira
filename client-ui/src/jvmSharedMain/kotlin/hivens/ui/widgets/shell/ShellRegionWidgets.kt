@@ -59,6 +59,7 @@ import hivens.accounts.api.SessionState
 import hivens.ui.AppSidebar
 import hivens.ui.RightPanel
 import hivens.ui.chrome.HOST_IS_MAC
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.nx.NxIconButton
 import hivens.ui.chrome.LocalRightRailSheet
 import hivens.ui.chrome.LocalUseCustomChrome
@@ -76,7 +77,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.DismissOnBack
 import hivens.ui.surface.NxSurface
-import hivens.ui.widgets.Commands
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
@@ -227,7 +228,7 @@ private fun CollapsedRegionStrip() {
     removable = false,
     propsClass = ShellLeftRegionProps::class,
     drawsOwnSurface = true,
-    needs = ["nav.switch"],
+    needs = ["nav.show"],
 )
 @Composable
 fun ShellLeftRegion(instance: WidgetInstance) {
@@ -237,7 +238,7 @@ fun ShellLeftRegion(instance: WidgetInstance) {
         return
     }
     val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
-    val switchTab = rememberScopedCommand(Commands.SwitchTab) ?: return
+    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
     // Asks first, through the window's sign-out question.
     val signOut = rememberSignOutRequest()
     Row(Modifier.fillMaxHeight()) {
@@ -262,7 +263,7 @@ fun ShellLeftRegion(instance: WidgetInstance) {
         ) {
             AppSidebar(
                 isAuthenticated = appState is SessionState.SignedIn && signOut != null,
-                onSwitchTab     = switchTab,
+                onSection       = { show(LauncherConfigs.section(it)) },
                 onLogout        = signOut ?: {},
                 modifier        = Modifier.fillMaxSize().padding(start = edge.start, bottom = edge.bottom),
             )
