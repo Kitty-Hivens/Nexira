@@ -28,8 +28,10 @@ private class SkiaSymbolFace(bytes: ByteArray) : SymbolFace {
 
     // Laid out as Compose lays its own text out, so an icon has the edges text beside it has. At a density
     // of one, since the size of a room is in its own pixels already. One for every face, kept under a lock:
-    // a window and an off-screen picture may draw at the same time.
-    private val measurer = TextMeasurer(createFontFamilyResolver(), LocaleList.Empty, Density(1f), LayoutDirection.Ltr, LAYOUTS)
+    // a window and an off-screen picture may draw at the same time. Made at the first icon drawn and not
+    // with the face: the face is read on the boot thread before any window, where Compose has no text
+    // to lay out yet, and the provider failed to open there.
+    private val measurer by lazy { TextMeasurer(createFontFamilyResolver(), LocaleList.Empty, Density(1f), LayoutDirection.Ltr, LAYOUTS) }
 
     // Named, since Compose keeps faces by name and every copy carries the family name of the first.
     override fun at(axes: SymbolAxes): SymbolInk = Ink(
