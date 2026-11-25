@@ -29,12 +29,11 @@ SCAN_EXTS = {".kt"}
 EXCLUDE_PATH_FRAGMENTS = ("/build/", "/.gradle/", "/.idea/")
 
 # Where the durations themselves are answered, the places allowed to write them:
-# the motion axis's contract with its neutral base answers, and the nx answers in
-# nx-ui that the nx motion provider and the previews both read. Anything else
-# writing a duration is bypassing the axis.
+# the motion axis's contract with its neutral base answers, and the nx motion
+# provider. Anything else writing a duration is bypassing the axis.
 VOCABULARY = (
     "look/motion-api/src/jvmSharedMain/",
-    "nx-ui/src/jvmSharedMain/kotlin/hivens/ui/theme/Motion.kt",
+    "look/motion-nx/src/jvmSharedMain/",
 )
 
 # Tests hold the answers to the numbers they must equal, so a literal there is the
