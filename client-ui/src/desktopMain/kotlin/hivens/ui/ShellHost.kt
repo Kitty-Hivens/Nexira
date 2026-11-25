@@ -19,12 +19,13 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
-import hivens.config.Branding
 import hivens.core.platform.OS
 import hivens.launcher.platform.AppRelauncher
 import hivens.ui.bootstrap.GuiBootstrap
 import hivens.ui.bootstrap.RecoveryEntry
 import hivens.ui.chrome.OPENING_FLOOR
+import hivens.ui.chrome.size
+import hivens.ui.chrome.titleIn
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
 import hivens.ui.i18n.NexiraStrings
@@ -34,7 +35,8 @@ import hivens.ui.threshold.BootOutcome
 import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.ThresholdOverlay
 import hivens.ui.threshold.ThresholdPalette
-import hivens.window.RESTORE_WINDOW_SIZE
+import hivens.widget.model.CompositionName
+import hivens.widget.model.Frame
 import hivens.window.SavedWindow
 import hivens.window.WindowManagerProbe
 import hivens.window.currentWorkAreas
@@ -70,7 +72,9 @@ class WindowChromeHooks(defaultClose: () -> Unit) {
  * a visible flash.
  *
  * Window-creation-time values that normally live behind Koin come from before
- * it: undecorated chrome from the pre-Koin [GuiBootstrap.PreBoot.peek], and the
+ * it: the frame the composition asks for from the document
+ * ([GuiBootstrap.PreBoot.document]), whether the person wants the system's frame
+ * instead from the pre-Koin [GuiBootstrap.PreBoot.peek], and the
  * words and the look from what the modules compiled in answered before the boot
  * ([GuiBootstrap.PreBoot.boot]). The boot screen is drawn day or night as that look
  * answers whether it is dark. Once the boot is ready,
@@ -91,10 +95,14 @@ fun ApplicationScope.ShellHost(
 ) {
     val outcome by outcomeFlow.collectAsState()
 
-    val undecorated = pre.peek.useCustomChrome && WindowManagerProbe.allowsCustomFrame
+    // What the composition asks of its window. The person's own choice of the system's
+    // frame is stronger than a composition that would draw one.
+    val frame = remember { pre.document.startComposition?.frame ?: Frame() }
+    val consoleFrame = remember { pre.document.compositions[CompositionName("console")]?.frame ?: Frame() }
+    val undecorated = !frame.systemChrome && pre.peek.useCustomChrome && WindowManagerProbe.allowsCustomFrame
     // Opens the way it was left: maximised, or as a window with the frame it had.
-    // A first run, and a window manager that places windows itself, open
-    // maximised and born at the size that will be (see [openingFrame]).
+    // A first run opens the way the frame asks, and under a window manager that places
+    // windows itself it is born at the size that will be (see [openingFrame]).
     //
     // The OS owns the maximised geometry per its own rules -- never a
     // hand-computed frame -- and a tiling compositor assigns the frame regardless
@@ -110,9 +118,10 @@ fun ApplicationScope.ShellHost(
             saved     = SavedWindow.read(pre.core.initialPaths.dataDir),
             workAreas = areas,
             primary   = areas.firstOrNull() ?: screenWorkArea(null),
-            restore   = RESTORE_WINDOW_SIZE,
+            restore   = frame.size,
             floor     = OPENING_FLOOR,
             placeable = WindowManagerProbe.allowsCustomFrame,
+            firstMaximized = frame.opensMaximized,
         )
     }
     // Windows is the one system where an app decides how big its maximised window
@@ -156,7 +165,7 @@ fun ApplicationScope.ShellHost(
         onCloseRequest = { chrome.onCloseRequest() },
         state          = windowState,
         visible        = visibleState.value,
-        title          = Branding.TITLE,
+        title          = frame.titleIn(thresholdStrings),
         // Replace the OS title bar with our own -- but ONLY where the window
         // manager leaves the frame to the window (WindowManagerProbe). One that
         // manages every window itself draws no title bar to replace, and an
@@ -165,7 +174,7 @@ fun ApplicationScope.ShellHost(
         // Peeked pre-Koin because flipping undecorated later recreates the
         // AWT peer -- a visible flash.
         undecorated    = undecorated,
-        resizable      = true,
+        resizable      = frame.resizable,
         icon           = windowIcon,
         onPreviewKeyEvent = { chrome.onPreviewKey(it) },
         onKeyEvent        = { chrome.onKey(it) },
@@ -196,6 +205,7 @@ fun ApplicationScope.ShellHost(
                         visibleState    = visibleState,
                         chrome          = chrome,
                         opening         = opening,
+                        frame           = frame,
                         look            = look,
                         exitApp         = { exitApplication() },
                     )
@@ -219,5 +229,5 @@ fun ApplicationScope.ShellHost(
         }
     }
     // Koin is up once the boot is ready, and the console asks it for its service.
-    (outcome as? BootOutcome.Ready)?.let { ready -> ConsoleWindow(look, ready.result.koin) }
+    (outcome as? BootOutcome.Ready)?.let { ready -> ConsoleWindow(look, consoleFrame, ready.result.koin) }
 }

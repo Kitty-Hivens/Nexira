@@ -5,6 +5,8 @@ import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.ui.diag.CrashDialog
 import hivens.ui.diag.ShellRecovery
 import hivens.widget.api.BootValues
+import hivens.widget.model.Document
+import hivens.widget.model.StandardDocument
 import org.koin.core.module.Module
 import org.slf4j.LoggerFactory
 import java.util.concurrent.CompletableFuture
@@ -43,6 +45,9 @@ object GuiBootstrap {
         val peek: SettingsPeek,
         val crashReporter: AtomicReference<CrashReporter>,
     ) {
+        /** The document the windows are opened from, read before any of them is made, since a frame cannot change later. */
+        val document: Document by lazy { StandardDocument.load() }
+
         /**
          * What the modules compiled in answer of their app sources before the host is up, the
          * theme, the scheme and the words the boot window is drawn in among them (see

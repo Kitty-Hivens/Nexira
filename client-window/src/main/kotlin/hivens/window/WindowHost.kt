@@ -39,7 +39,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  * area, since it is born there (see [initialWindowSize]), so the first restore
  * would look exactly like a maximised window. That first restore is given
  * [firstRestore], the frame the window had when it was last closed (see
- * [WindowSessionRecorder]), or [RESTORE_WINDOW_SIZE] where nothing was saved, and
+ * [WindowSessionRecorder]), or [restoreSize] where nothing was saved, and
  * from then on the system remembers a real normal size. Windows offers no way to
  * set that size while the frame stays maximised: a reshape of a zoomed frame
  * drops the maximised bit. A window manager that does not allow the window to be
@@ -56,6 +56,7 @@ class WindowHost internal constructor(
     internal val frame: FrameOps,
     private val backend: Backend,
     private val firstRestore: Rectangle?,
+    private val restoreSize: Dimension = RESTORE_WINDOW_SIZE,
 ) : AutoCloseable {
     private var frameState = frame.extendedState
 
@@ -261,7 +262,7 @@ class WindowHost internal constructor(
         dump("first-restore-size")
     }
 
-    private fun firstRestoreBounds(): Rectangle = firstRestore ?: restoredBounds(frame.workArea, RESTORE_WINDOW_SIZE)
+    private fun firstRestoreBounds(): Rectangle = firstRestore ?: restoredBounds(frame.workArea, restoreSize)
 
     private fun isMax(s: Int) = (s and Frame.MAXIMIZED_BOTH) == Frame.MAXIMIZED_BOTH
 
@@ -298,9 +299,16 @@ class WindowHost internal constructor(
          * Takes [window] over, on the AWT event thread, once it has a native
          * peer. [handle] is the peer's native window, [customFrame] says the
          * window is undecorated and draws its own frame, and [firstRestore] is
-         * the normal frame a window born maximised gets on its first restore.
+         * the normal frame a window born maximised gets on its first restore, or null
+         * for one of [restoreSize], centred.
          */
-        fun attach(window: Frame, handle: Long, customFrame: Boolean, firstRestore: Rectangle?): WindowHost =
-            WindowHost(AwtFrameOps(window), Backend.choose(window, handle, customFrame), firstRestore).also { it.start() }
+        fun attach(
+            window: Frame,
+            handle: Long,
+            customFrame: Boolean,
+            firstRestore: Rectangle?,
+            restoreSize: Dimension = RESTORE_WINDOW_SIZE,
+        ): WindowHost =
+            WindowHost(AwtFrameOps(window), Backend.choose(window, handle, customFrame), firstRestore, restoreSize).also { it.start() }
     }
 }

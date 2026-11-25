@@ -1225,6 +1225,11 @@ public final class hivens/widget/model/SourceKey {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class hivens/widget/model/StandardDocument {
+	public static final field INSTANCE Lhivens/widget/model/StandardDocument;
+	public final fun load ()Lhivens/widget/model/Document;
+}
+
 public final class hivens/widget/model/SurfaceBorder {
 	public static final field Companion Lhivens/widget/model/SurfaceBorder$Companion;
 	public fun <init> ()V

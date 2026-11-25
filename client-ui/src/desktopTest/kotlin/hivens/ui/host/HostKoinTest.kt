@@ -13,6 +13,7 @@ import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.LevelHost
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
+import hivens.widget.model.Frame
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.koin.compose.getKoin
@@ -58,7 +59,7 @@ class HostKoinTest {
         try {
             assertFalse(console.shouldShowConsole, "the premise: a hidden console opens no window")
             val scene = ImageComposeScene(40, 40, density = Density(1f)) {
-                ConsoleWindow(ShellLook(words = NexiraStrings.translator("en")), graph)
+                ConsoleWindow(ShellLook(words = NexiraStrings.translator("en")), Frame(), graph)
             }
             try {
                 scene.render()

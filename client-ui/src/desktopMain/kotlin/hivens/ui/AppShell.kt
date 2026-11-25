@@ -50,10 +50,11 @@ import hivens.ui.chrome.LocalWindowFrame
 import hivens.ui.chrome.LocalWindowHide
 import hivens.ui.chrome.LocalWindowHost
 import hivens.ui.chrome.LocalWindowState
-import hivens.ui.chrome.MIN_SHELL_SIZE
 import hivens.ui.chrome.ShellChord
 import hivens.ui.chrome.WindowResizeHandles
+import hivens.ui.chrome.minimum
 import hivens.ui.chrome.resolveShellChord
+import hivens.ui.chrome.size
 import hivens.ui.chrome.toCapabilities
 import hivens.ui.components.QuitGate
 import hivens.ui.components.QuitWithGameHost
@@ -126,6 +127,7 @@ import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetSurfaceRenderer
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.Frame
 import hivens.widget.model.walkInstances
 import hivens.window.OpeningFrame
 import hivens.window.WindowHost
@@ -180,11 +182,12 @@ fun FrameWindowScope.AppShellContent(
     visibleState: MutableState<Boolean>,
     chrome: WindowChromeHooks,
     opening: OpeningFrame,
+    frame: Frame,
     look: ShellLook,
     exitApp: () -> Unit,
 ) {
     HostKoin(boot.koin) {
-        ShellContent(boot, windowState, visibleState, chrome, opening, look, exitApp)
+        ShellContent(boot, windowState, visibleState, chrome, opening, frame, look, exitApp)
     }
 }
 
@@ -196,6 +199,7 @@ private fun FrameWindowScope.ShellContent(
     visibleState: MutableState<Boolean>,
     chrome: WindowChromeHooks,
     opening: OpeningFrame,
+    frame: Frame,
     look: ShellLook,
     exitApp: () -> Unit,
 ) {
@@ -241,6 +245,9 @@ private fun FrameWindowScope.ShellContent(
 
     val settings = remember { settingsService.getSettings() }
 
+    // Whether the window draws its own frame: the composition asks for one, and the person
+    // did not choose the system's. Where the window manager has no say is asked apart.
+    val ownFrame = !frame.systemChrome && settings.useCustomChrome
 
     // The console's own commands, declared in ConsoleCommands. Registered once;
     // the console service is a process singleton. The UI-debug toggle is among
@@ -275,9 +282,10 @@ private fun FrameWindowScope.ShellContent(
         WindowHost.attach(
             window       = window,
             handle       = window.windowHandle,
-            customFrame  = settings.useCustomChrome && WindowManagerProbe.allowsCustomFrame,
+            customFrame  = ownFrame && WindowManagerProbe.allowsCustomFrame,
             firstRestore = opening.normal,
-        ).also { it.keepMinimumSize(MIN_SHELL_SIZE) }
+            restoreSize  = frame.size,
+        ).also { host -> frame.minimum?.let(host::keepMinimumSize) }
     }
     DisposableEffect(windowHost) { onDispose { windowHost.close() } }
     val windowRegistry: WindowRegistry = koinInject()
@@ -517,9 +525,9 @@ private fun FrameWindowScope.ShellContent(
         // interface is in that language at all, they are in it too.
         val interfaceText = s.text("settingsTitle") + s.text("navLibrary") + s.text("aboutTitle")
 
-        // Came back from a crash restart: surface a one-shot notice so the reload
-        // -- which resets the current screen -- is not silent. consumeRecovered()
-        // is one-shot, so a normal start stays quiet.
+        // Came back from a crash restart: surface a one-shot notice so the reload,
+        // which steps back from the page that was shown, is not silent.
+        // consumeRecovered() is one-shot, so a normal start stays quiet.
         // Composing is not evidence of anything: the shell mounts under the
         // still-opaque threshold, and a render-path crash happens after this
         // point by construction. Staying up is the evidence, so the crash guard
@@ -888,10 +896,10 @@ private fun FrameWindowScope.ShellContent(
                 LocalComposeWindow                       provides window,
                 LocalChromeClose                         provides onCloseChrome,
                 LocalWindowHide                          provides { isWindowVisible = false },
-                LocalUseCustomChrome                     provides settings.useCustomChrome,
+                LocalUseCustomChrome                     provides ownFrame,
                 LocalWindowFrame                         provides windowFrame,
                 LocalWindowCapabilities                  provides windowCapabilities.value,
-                LocalCustomChromeAvailable               provides WindowManagerProbe.allowsCustomFrame,
+                LocalCustomChromeAvailable               provides (WindowManagerProbe.allowsCustomFrame && !frame.systemChrome),
             ) {
             // Every axis of the look the manager answers, around all the window draws.
             // The shell knows none of them: it wraps what it draws in the one value.
@@ -982,12 +990,12 @@ private fun FrameWindowScope.ShellContent(
             // with custom chrome (else the OS frame resizes); self-gates to
             // Floating, to a window manager that allows resizing, and is
             // transparent, so it's otherwise harmless.
-            if (settings.useCustomChrome) {
+            if (ownFrame) {
                 WindowResizeHandles(
                     window    = window,
                     host      = windowHost,
                     maximized = windowStatus.maximized,
-                    canResize = windowCapabilities.value.resize && !windowHost.nativeFrame,
+                    canResize = frame.resizable && windowCapabilities.value.resize && !windowHost.nativeFrame,
                 )
             }
             } // end LayerHost

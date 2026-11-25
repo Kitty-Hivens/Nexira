@@ -18,8 +18,8 @@ class WindowSessionTest {
     private val restore = Dimension(1100, 720)
     private val floor = Dimension(800, 600)
 
-    private fun open(saved: SavedWindow?, areas: List<Rectangle> = listOf(left, right), placeable: Boolean = true) =
-        openingFrame(saved, areas, areas.first(), restore, floor, placeable)
+    private fun open(saved: SavedWindow?, areas: List<Rectangle> = listOf(left, right), placeable: Boolean = true, firstMaximized: Boolean = true) =
+        openingFrame(saved, areas, areas.first(), restore, floor, placeable, firstMaximized)
 
     @Test
     fun `a first run opens maximised over the primary work area`() {
@@ -27,6 +27,26 @@ class WindowSessionTest {
         assertTrue(frame.maximized)
         assertEquals(left, frame.bounds)
         assertNull(frame.normal, "nothing chosen yet, so the first restore picks its own size")
+    }
+
+    @Test
+    fun `a first run that is not asked to open maximised opens as a window in the middle of the primary screen`() {
+        val frame = open(null, firstMaximized = false)
+        assertEquals(false, frame.maximized)
+        assertEquals(restoredBounds(left, restore), frame.bounds)
+        assertEquals(frame.bounds, frame.normal)
+    }
+
+    @Test
+    fun `what was saved is stronger than what a first run opens as`() {
+        val saved = SavedWindow(maximized = true, x = 100, y = 100, width = 1200, height = 800)
+        assertTrue(open(saved, firstMaximized = false).maximized)
+        assertEquals(false, open(saved.copy(maximized = false), firstMaximized = true).maximized)
+    }
+
+    @Test
+    fun `a window manager that places windows itself is not asked for a window either`() {
+        assertTrue(open(null, placeable = false, firstMaximized = false).maximized)
     }
 
     @Test

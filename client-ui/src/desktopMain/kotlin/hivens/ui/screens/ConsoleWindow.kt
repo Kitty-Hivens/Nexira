@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.rememberWindowState
 import hivens.i18n.api.LocalTranslator
 import hivens.ui.ShellLook
@@ -26,6 +27,9 @@ import hivens.ui.chrome.LocalWindowFrame
 import hivens.ui.chrome.LocalWindowHide
 import hivens.ui.chrome.LocalWindowHost
 import hivens.ui.chrome.LocalWindowState
+import hivens.ui.chrome.minimum
+import hivens.ui.chrome.size
+import hivens.ui.chrome.titleIn
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.host.DesktopWindowBackend
 import hivens.ui.host.HostKoin
@@ -44,7 +48,9 @@ import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.widget.api.LocalScope
 import hivens.widget.api.WidgetScope
+import hivens.widget.model.Frame
 import hivens.window.WindowHost
+import hivens.window.WindowManagerProbe
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.compose.koinInject
 import org.koin.core.KoinApplication
@@ -62,20 +68,21 @@ import java.awt.event.WindowEvent
  * own window level, its own layers and dismiss stack, and the window locals of its
  * own window. It draws in the answers of every axis of the look, read off the app level
  * as the main window reads them, and in the words, the face and the customization the
- * main shell decided, read through [look]. Its frame is the system's, so nothing of the
- * app's frame is offered in it.
+ * main shell decided, read through [look]. [frame] is what its composition asks of the
+ * window. Nothing of the main window's frame is offered in it, so a composition that asks
+ * for no system frame draws its own.
  *
  * [koin] is the launcher's graph, which it is drawn inside (see [HostKoin]).
  */
 @Composable
-fun ConsoleWindow(look: ShellLook, koin: KoinApplication) {
+fun ConsoleWindow(look: ShellLook, frame: Frame, koin: KoinApplication) {
     // Inside the launcher's graph here rather than by the caller, so no caller can open
     // the console without the graph it injects from.
-    HostKoin(koin) { ConsoleWindowContent(look) }
+    HostKoin(koin) { ConsoleWindowContent(look, frame) }
 }
 
 @Composable
-private fun ConsoleWindowContent(look: ShellLook) {
+private fun ConsoleWindowContent(look: ShellLook, frame: Frame) {
     val console: GameConsoleService = koinInject()
     if (!console.shouldShowConsole) return
     val appLevel: WidgetScope = koinInject()
@@ -83,17 +90,23 @@ private fun ConsoleWindowContent(look: ShellLook) {
     // reported slider value, and nothing else should repaint for it.
     val settingsStore: ConsoleSettingsStore = koinInject()
     val settings by settingsStore.settings.collectAsState()
-    val windowState = rememberWindowState(width = 960.dp, height = 620.dp)
+    val windowState = rememberWindowState(
+        placement = if (frame.opensMaximized) WindowPlacement.Maximized else WindowPlacement.Floating,
+        width     = frame.size.width.dp,
+        height    = frame.size.height.dp,
+    )
     val layers = rememberWindowLayers()
     val close = remember(console) { { console.hide() } }
+    val ownFrame = !frame.systemChrome && WindowManagerProbe.allowsCustomFrame
 
     CompositionLocalProvider(LocalTranslator provides look.words) {
         Window(
             onCloseRequest    = close,
             state             = windowState,
-            title             = nexiraStrings().text("consoleTitle"),
+            title             = frame.titleIn(nexiraStrings()),
             alwaysOnTop       = false,
-            undecorated       = false,
+            undecorated       = ownFrame,
+            resizable         = frame.resizable,
             // The window's own dismiss stack hears every key first and last, as the
             // main window's does. Escape that nothing in the console used closes
             // the topmost of its layers.
@@ -108,7 +121,8 @@ private fun ConsoleWindowContent(look: ShellLook) {
             DisposableEffect(window) {
                 fun attach() {
                     if (hosts.value != null || !window.isShowing || window.windowHandle == 0L) return
-                    hosts.value = WindowHost.attach(window = window, handle = window.windowHandle, customFrame = false, firstRestore = null)
+                    hosts.value = WindowHost.attach(window = window, handle = window.windowHandle, customFrame = ownFrame, firstRestore = null, restoreSize = frame.size)
+                        .also { host -> frame.minimum?.let(host::keepMinimumSize) }
                 }
                 val opened = object : WindowAdapter() {
                     override fun windowOpened(e: WindowEvent) = attach()

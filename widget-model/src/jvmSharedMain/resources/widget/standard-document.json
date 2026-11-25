@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "start": "launcher",
+  "compositions": {
+    "launcher": {
+      "start": "home",
+      "frame": {
+        "width": 1100,
+        "height": 720,
+        "min_width": 960,
+        "min_height": 600,
+        "state": "maximized",
+        "chrome": "none"
+      }
+    },
+    "console": {
+      "start": "console",
+      "frame": {
+        "width": 960,
+        "height": 620,
+        "title": "consoleTitle"
+      }
+    }
+  }
+}

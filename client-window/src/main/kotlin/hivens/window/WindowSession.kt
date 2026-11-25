@@ -65,8 +65,10 @@ data class OpeningFrame(val bounds: Rectangle, val maximized: Boolean, val norma
 /**
  * Decides [OpeningFrame] from what was saved and the screens there are now.
  *
- * Nothing saved, or a window manager that places windows itself ([placeable]
- * false), opens maximised on [primary] as before. A saved frame is used only
+ * Under a window manager that places windows itself ([placeable] false) it opens
+ * maximised on [primary], whatever was saved or asked for. Nothing saved opens the
+ * way [firstMaximized] says, as a window at the restore size centred on [primary]
+ * where not maximised. A saved frame is used only
  * while its top strip, the part that is grabbed to move the window, is still on
  * some screen: a monitor unplugged since, or a resolution dropped, would
  * otherwise bring the window back where nobody can reach it. A frame that
@@ -82,8 +84,10 @@ fun openingFrame(
     restore: Dimension,
     floor: Dimension,
     placeable: Boolean,
+    firstMaximized: Boolean,
 ): OpeningFrame {
-    if (saved == null || !placeable) return OpeningFrame(maximizedFrame(primary, restore, floor), maximized = true, normal = null)
+    if (!placeable || (saved == null && firstMaximized)) return OpeningFrame(maximizedFrame(primary, restore, floor), maximized = true, normal = null)
+    if (saved == null) return restoredBounds(primary, restore).let { OpeningFrame(it, maximized = false, normal = it) }
     val normal = fitToScreens(saved.normalBounds, workAreas) ?: restoredBounds(primary, restore)
     if (!saved.maximized) return OpeningFrame(normal, maximized = false, normal = normal)
     val centre = Point(normal.centerX.toInt(), normal.centerY.toInt())
