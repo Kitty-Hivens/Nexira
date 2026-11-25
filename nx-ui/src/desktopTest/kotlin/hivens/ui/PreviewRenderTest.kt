@@ -48,7 +48,7 @@ class PreviewRenderTest {
         assertTrue(previews.isNotEmpty(), "no @Preview function was found under ${classesRoot()}")
         val out = System.getProperty(OUT_PROPERTY)?.let { Paths.get(it) }?.also { Files.createDirectories(it) }
         val failures = previews.mapNotNull { preview ->
-            runCatching { render(preview, out) }.exceptionOrNull()?.let { "${preview.label}: ${it.describe()}" }
+            runCatching { onEventThread { render(preview, out) } }.exceptionOrNull()?.let { "${preview.label}: ${it.describe()}" }
         }
         println("PreviewRenderTest: ${previews.size} previews, ${failures.size} failed" + (out?.let { ", frames in $it" } ?: ""))
         if (failures.isNotEmpty()) fail("${failures.size} of ${previews.size} previews did not render:\n" + failures.joinToString("\n"))
