@@ -26,7 +26,6 @@ import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertTrue
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.Status
 
 /**
  * What a viewer sees while a video is being fetched. Every phase is rendered
@@ -66,7 +65,7 @@ class FetchStatusRenderTest {
                 CompositionLocalProvider(
                     LocalTranslator provides NexiraStrings.translator("en"),
                 ) {
-                    progressAccent = NxColor.status(Status.Info)
+                    progressAccent = NxColor.lead()
                     Column(
                         modifier            = Modifier.fillMaxSize().background(Color(0xFF101014)).padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
