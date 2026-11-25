@@ -127,6 +127,10 @@ object UiRecoverySignal {
         lastHealthyAt = now
     }
 
+    /** How many crashes were recorded since a shell last proved it could stay up, the one being handled not counted. */
+    @Synchronized
+    fun crashesSinceHealthy(): Int = crashTimes.count { it > lastHealthyAt }
+
     /**
      * Record a shell-composition crash and decide how to recover. Thread-safe;
      * called from the entry point's main thread after `application {}` unwinds.

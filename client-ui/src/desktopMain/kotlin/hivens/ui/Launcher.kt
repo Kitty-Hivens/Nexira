@@ -386,7 +386,8 @@ fun runLauncher(args: Array<String>) {
  *
  * The data dirs and the Koin singletons are created by [GuiBootstrap.preWindow] and [GuiBootstrap.completeBoot]
  * -- outside this loop -- so a restart keeps the user's data, session, audio
- * playback and history, one step back from the page that was shown. Only transient
+ * playback and history, a step back from the page that was shown, or home after a
+ * crash that came before the interface had stayed up. Only transient
  * composition state, scroll say, is lost.
  */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -476,7 +477,8 @@ private fun runShellWithRecovery(
                 val modules = koin?.getOrNull<WidgetModules>()
                 modules?.culpritOf(crash)?.let { modules.switchOffAfterCrash(it, crash) }
             }.onFailure { log.warn("Could not trace the crash to a widget module", it) }
-            runCatching { koin?.getOrNull<CompositionHistories>()?.stepBackAfterCrash() }
+            val again = UiRecoverySignal.crashesSinceHealthy() > 0
+            runCatching { koin?.getOrNull<CompositionHistories>()?.afterCrash(again) }
                 .onFailure { log.warn("Could not step back from the page shown", it) }
         }
 

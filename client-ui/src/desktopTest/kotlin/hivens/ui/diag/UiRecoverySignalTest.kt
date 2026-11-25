@@ -133,4 +133,16 @@ class UiRecoverySignalTest {
         UiRecoverySignal.noteShellHealthy(t0 + 6 * 30_000L - 1)
         assertEquals(ShellRecovery.SAFE_MODE, UiRecoverySignal.recordShellCrash(t0 + 6 * 30_000L))
     }
+
+    @Test
+    fun `crashes are counted since the shell last stayed up`() {
+        val t0 = 1_000_000L
+        assertEquals(0, UiRecoverySignal.crashesSinceHealthy())
+        UiRecoverySignal.recordShellCrash(t0)
+        assertEquals(1, UiRecoverySignal.crashesSinceHealthy())
+        UiRecoverySignal.noteShellHealthy(t0 + 6_000)
+        assertEquals(0, UiRecoverySignal.crashesSinceHealthy(), "the crash before a healthy session is not this run's")
+        UiRecoverySignal.recordShellCrash(t0 + 10_000)
+        assertEquals(1, UiRecoverySignal.crashesSinceHealthy())
+    }
 }

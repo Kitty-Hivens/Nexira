@@ -15,12 +15,16 @@ class CompositionHistories {
     fun of(composition: CompositionName, root: ConfigId): CompositionHistory = kept.getOrPut(composition) { CompositionHistory(root) }
 
     /**
-     * Steps every history back one entry, after the interface crashed: what was shown may be what it crashed on, and
-     * shown again by itself it would crash every restart until none is left. It stays one step forward, and a history
-     * at its root stays there.
+     * Moves every history off what it showed when the interface crashed: what was shown may be what it crashed on,
+     * and shown again by itself it would crash every restart until the crash guard gave up on the interface. The
+     * first crash steps back one entry. One [again], before the interface came up and stayed up since the last, goes
+     * back to the root, since the page behind was no better, so no crash restarts further back than going home did.
+     * What was left stays ahead, and a history at its root stays there.
      */
     @Synchronized
-    fun stepBackAfterCrash() {
-        kept.values.filter { it.now.canGoBack }.forEach { it.back() }
+    fun afterCrash(again: Boolean) {
+        kept.values.filter { it.now.canGoBack }.forEach { history ->
+            if (again) history.backTo(history.now.entries.first()) else history.back()
+        }
     }
 }

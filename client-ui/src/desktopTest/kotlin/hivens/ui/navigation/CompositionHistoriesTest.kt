@@ -36,17 +36,30 @@ class CompositionHistoriesTest {
     fun `after a crash the page that was shown is one step forward`() {
         launcher().show(Show(LauncherConfigs.Library))
         launcher().show(LauncherConfigs.pack("a"))
-        histories.stepBackAfterCrash()
+        histories.afterCrash(again = false)
         assertEquals(LauncherConfigs.Library, launcher().now.current.config)
         launcher().forward()
         assertEquals(LauncherConfigs.Pack, launcher().now.current.config)
+    }
+
+    @Test
+    fun `a crash again before the interface stayed up goes home, and keeps the way forward`() {
+        launcher().show(Show(LauncherConfigs.Library))
+        launcher().show(LauncherConfigs.pack("a"))
+        launcher().show(LauncherConfigs.packVersions("a"))
+        histories.afterCrash(again = false)
+        assertEquals(LauncherConfigs.Pack, launcher().now.current.config)
+        histories.afterCrash(again = true)
+        assertEquals(listOf(LauncherConfigs.Home), launcher().configs())
+        launcher().forward()
+        assertEquals(LauncherConfigs.Library, launcher().now.current.config)
     }
 
     // One crash after another walks to the root instead of restarting on the same page until none is left.
     @Test
     fun `at its root a history stays there, and no back is counted against it`() {
         launcher().show(Show(LauncherConfigs.Library))
-        repeat(3) { histories.stepBackAfterCrash() }
+        repeat(3) { histories.afterCrash(again = false) }
         assertEquals(listOf(LauncherConfigs.Home), launcher().configs())
         assertEquals(0, launcher().now.backsAtRoot)
         assertTrue(launcher().now.canGoForward)
