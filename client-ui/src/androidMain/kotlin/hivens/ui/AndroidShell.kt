@@ -60,6 +60,7 @@ import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.host.CompositionWindows
 import hivens.ui.host.HostKoin
 import hivens.ui.host.HostedWindow
+import hivens.ui.host.KernelLocals
 import hivens.ui.host.MainWindowNavigation
 import hivens.ui.host.WindowId
 import hivens.ui.host.WindowOwner
@@ -78,30 +79,11 @@ import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.rememberThemeReveal
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
-import hivens.ui.widgets.NxMapControls
-import hivens.ui.widgets.NxViewportScrollbar
-import hivens.ui.widgets.PlayedWidgetEntrance
-import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.modules.WidgetModules
-import hivens.ui.widgets.state.WidgetStateStore
-import hivens.widget.api.LocalLayoutGraph
-import hivens.widget.api.LocalMapControls
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSlotChromeModifier
-import hivens.widget.api.LocalViewportScrollbar
-import hivens.widget.api.LocalWidgetCommandRegistry
-import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetDecorator
-import hivens.widget.api.LocalWidgetEntrance
-import hivens.widget.api.LocalWidgetRegistry
-import hivens.widget.api.LocalWidgetServiceRegistry
-import hivens.widget.api.LocalWidgetStateHost
-import hivens.widget.api.LocalWidgetSurfaceRenderer
-import hivens.widget.api.WidgetCommandRegistry
-import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
-import hivens.widget.api.WidgetServiceRegistry
-import hivens.widget.api.WidgetSurfaceRenderer
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.Document
 import hivens.widget.model.walkInstances
@@ -138,8 +120,6 @@ private fun AndroidShellContent() {
     val gameConsole: GameConsoleService = koinInject()
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
     val widgetModules: WidgetModules = koinInject()
-    val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
-    val widgetDataRegistry: WidgetDataRegistry = koinInject()
     val appLevel: WidgetScope = koinInject()
     // The app level outlives the Activity, and with it the record of which of its
     // parts could not be made. A shell made again for a new Activity gives them
@@ -147,8 +127,6 @@ private fun AndroidShellContent() {
     // effect would run after: by then the parts below had already read the failure.
     @Suppress("RememberReturnType")
     remember(appLevel) { appLevel.retryFailed() }
-    val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
-    val widgetStateStore: WidgetStateStore = koinInject()
     val applicationScope: CoroutineScope = koinInject()
     val preferences: PreferenceWriter = koinInject()
     val accountStore: AccountStore = koinInject()
@@ -245,25 +223,11 @@ private fun AndroidShellContent() {
         val customizationManager = remember { CustomizationManager(dataDirectory, customizationJson, AtomicFiles::writeString) }
         var customization by remember { mutableStateOf(customizationManager.load()) }
 
-        val layoutGraph by remember(layoutGraphRepo) { layoutGraphRepo.observe() }.collectAsState()
-        val modules by widgetModules.state.collectAsState()
-        val surfaceRenderer: WidgetSurfaceRenderer = remember { { spec, content -> WidgetSurface(spec, content) } }
-
+        KernelLocals {
         CompositionLocalProvider(
             LocalCustomization provides customization,
-            LocalLayoutGraph provides layoutGraph,
-            LocalWidgetRegistry provides modules.registry,
-            LocalWidgetServiceRegistry provides widgetServiceRegistry,
-            LocalWidgetDataRegistry provides widgetDataRegistry,
-            LocalScope provides appLevel,
-            LocalWidgetCommandRegistry provides widgetCommandRegistry,
-            LocalWidgetStateHost provides widgetStateStore,
             LocalWidgetDecorator provides IdentityWidgetDecorator,
             LocalSlotChromeModifier provides IdentitySlotChromeModifier,
-            LocalWidgetSurfaceRenderer provides surfaceRenderer,
-            LocalWidgetEntrance provides PlayedWidgetEntrance,
-            LocalViewportScrollbar provides NxViewportScrollbar,
-            LocalMapControls provides NxMapControls,
             LocalUseCustomChrome provides false,
             LocalRightRailSheet provides true,
         ) {
@@ -380,5 +344,6 @@ private fun AndroidShellContent() {
           }
           } // end Look.Provide
         }
+        } // end KernelLocals
     }
 }

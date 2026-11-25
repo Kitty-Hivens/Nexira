@@ -28,6 +28,15 @@ class CompositionWindowsTest {
     }
 
     @Test
+    fun `after a crash every window is closed, and opens again when asked`() {
+        windows.show(console)
+        windows.closeAfterCrash()
+        assertEquals(emptySet(), windows.open.value)
+        assertTrue(windows.show(console))
+        assertEquals(setOf(console), windows.open.value)
+    }
+
+    @Test
     fun `one the document does not have opens nothing`() {
         assertFalse(windows.show(CompositionName("nowhere")))
         assertEquals(emptySet(), windows.open.value)

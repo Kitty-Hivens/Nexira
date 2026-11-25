@@ -77,6 +77,7 @@ import hivens.ui.host.CompositionWindows
 import hivens.ui.host.DesktopWindowBackend
 import hivens.ui.host.HostKoin
 import hivens.ui.host.HostedWindow
+import hivens.ui.host.KernelLocals
 import hivens.ui.host.MainWindowNavigation
 import hivens.ui.host.WindowCommand
 import hivens.ui.host.WindowId
@@ -103,31 +104,11 @@ import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.rememberThemeReveal
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
-import hivens.ui.widgets.NxMapControls
-import hivens.ui.widgets.NxViewportScrollbar
-import hivens.ui.widgets.PlayedWidgetEntrance
-import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.modules.WidgetModules
-import hivens.ui.widgets.state.WidgetStateStore
-import hivens.widget.api.LocalLayoutGraph
-import hivens.widget.api.LocalMapControls
-import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSlotChromeModifier
-import hivens.widget.api.LocalViewportScrollbar
-import hivens.widget.api.LocalWidgetCommandRegistry
-import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetDecorator
-import hivens.widget.api.LocalWidgetEntrance
-import hivens.widget.api.LocalWidgetRegistry
-import hivens.widget.api.LocalWidgetServiceRegistry
-import hivens.widget.api.LocalWidgetStateHost
-import hivens.widget.api.LocalWidgetSurfaceRenderer
-import hivens.widget.api.WidgetCommandRegistry
-import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
-import hivens.widget.api.WidgetServiceRegistry
-import hivens.widget.api.WidgetSurfaceRenderer
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.Frame
 import hivens.widget.model.walkInstances
@@ -228,15 +209,11 @@ private fun FrameWindowScope.ShellContent(
     val layoutGraphRepo: LayoutGraphRepository = koinInject()
     val widgetRegistry: WidgetRegistry         = koinInject()
     val widgetModules: WidgetModules           = koinInject()
-    val widgetServiceRegistry: WidgetServiceRegistry = koinInject()
-    val widgetDataRegistry: WidgetDataRegistry = koinInject()
     val appLevel: WidgetScope = koinInject()
     // The app level outlives this shell, and with it the record of which of its parts
     // could not be made. A shell made again after a crash reload gives them another
     // try before anything in it reads them.
     remember(appLevel) { appLevel.retryFailed() }
-    val widgetCommandRegistry: WidgetCommandRegistry = koinInject()
-    val widgetStateStore: WidgetStateStore = koinInject()
     val editModeController: EditModeController  = koinInject()
     val sessions: hivens.ui.notifications.SessionRegistry = koinInject()
     // Shared process-lifetime scope (createdAtStart in appModule; canceled
@@ -852,33 +829,12 @@ private fun FrameWindowScope.ShellContent(
                 SwingUtilities.invokeLater { windowHost.raise() }
             }
 
-            // Remembered: observe() hands out a new flow per call, and collecting a new
-            // one cancels the collector and starts it again on every recomposition.
-            val layoutGraph by remember(layoutGraphRepo) { layoutGraphRepo.observe() }.collectAsState()
-            // The registry as it is now. A module switched on or off, or the folder
-            // read again, is a new value here and a whole-tree recomposition, which
-            // is what a change to the set of widgets that exist is.
-            val modules by widgetModules.state.collectAsState()
-            // Production renderer for a widget's own surface, see
-            // [hivens.ui.widgets.WidgetSurface]. Invoked by the kernel only when a
-            // widget carries one, so a widget without a plane pays nothing.
-            // Remembered so its identity stays stable across AppShell recomposes:
-            // it is provided through the *static* LocalWidgetSurfaceRenderer, and a
-            // fresh identity each recompose would invalidate the whole content
-            // subtree rather than just the widgets that have a surface.
-            val surfaceRenderer: WidgetSurfaceRenderer = remember { { spec, content -> WidgetSurface(spec, content) } }
             val windowFrame = remember(window, windowHost, onCloseChrome) {
                 DesktopWindowFrame(window, windowHost, windowCapabilities, onCloseChrome)
             }
+            KernelLocals {
             CompositionLocalProvider(
                 LocalCustomization                       provides customization,
-                LocalLayoutGraph                         provides layoutGraph,
-                LocalWidgetRegistry                      provides modules.registry,
-                LocalWidgetServiceRegistry               provides widgetServiceRegistry,
-                LocalWidgetDataRegistry                  provides widgetDataRegistry,
-                LocalScope                               provides appLevel,
-                LocalWidgetCommandRegistry               provides widgetCommandRegistry,
-                LocalWidgetStateHost                     provides widgetStateStore,
                 // Dev UI-debug seams: report-only bounds instrumentation, mounted
                 // ONLY while a non-release build has the overlay on AND a facet needs
                 // it -- else identity, so a dev build with the overlay off runs the
@@ -890,10 +846,6 @@ private fun FrameWindowScope.ShellContent(
                 LocalSlotChromeModifier                  provides
                     if (debugOverlay.available && debugOverlay.enabled && debugOverlay.needsDecorators)
                         debugOverlay.slotChrome else IdentitySlotChromeModifier,
-                LocalWidgetSurfaceRenderer               provides surfaceRenderer,
-                LocalWidgetEntrance                      provides PlayedWidgetEntrance,
-                LocalViewportScrollbar                   provides NxViewportScrollbar,
-                LocalMapControls                         provides NxMapControls,
                 LocalWindowState                         provides windowState,
                 LocalWindowHost                          provides windowHost,
                 LocalComposeWindow                       provides window,
@@ -1005,6 +957,7 @@ private fun FrameWindowScope.ShellContent(
             } // end HostedWindow(Main)
             } // end Look.Provide
             } // end CompositionLocalProvider(LocalCustomization)
+            } // end KernelLocals
         }
     }
 }

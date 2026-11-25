@@ -41,7 +41,6 @@ import hivens.ui.read
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
-import hivens.widget.api.LocalScope
 import hivens.widget.api.WidgetScope
 import hivens.widget.model.Composition
 import hivens.widget.model.CompositionName
@@ -144,8 +143,10 @@ private fun CompositionWindow(name: CompositionName, composition: Composition, l
             val hostState = backend.state.collectAsState()
             val capabilities by remember(hostState) { derivedStateOf { hostState.value.allowed } }
 
+            // The kernel's locals around the window's level: the app level among them is
+            // what the window's own level is made under.
+            KernelLocals {
             CompositionLocalProvider(
-                LocalScope                 provides appLevel,
                 LocalCustomization         provides look.customization,
                 LocalComposeWindow         provides window,
                 LocalWindowHost            provides host,
@@ -171,6 +172,7 @@ private fun CompositionWindow(name: CompositionName, composition: Composition, l
                     }
                 }
             }
+            } // end KernelLocals
         }
     }
 }

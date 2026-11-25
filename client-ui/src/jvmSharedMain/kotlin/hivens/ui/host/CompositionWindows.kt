@@ -47,6 +47,15 @@ class CompositionWindows(private val has: (CompositionName) -> Boolean) {
         _open.update { it - name }
     }
 
+    /**
+     * Closes every window, after the interface crashed: a window stays open across the restart that follows, so one
+     * that crashed it would open again by itself and crash every restart until the crash guard gave up on the
+     * interface. Asked for again, it opens as before.
+     */
+    fun closeAfterCrash() {
+        _open.value = emptySet()
+    }
+
     private companion object {
         const val RAISES = 8
     }

@@ -43,6 +43,7 @@ import hivens.ui.diag.ShellRecovery
 import hivens.ui.diag.UiRecoverySignal
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.presets.PresetRepository
+import hivens.ui.host.CompositionWindows
 import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary
@@ -480,6 +481,8 @@ private fun runShellWithRecovery(
             val again = UiRecoverySignal.crashesSinceHealthy() > 0
             runCatching { koin?.getOrNull<CompositionHistories>()?.afterCrash(again) }
                 .onFailure { log.warn("Could not step back from the page shown", it) }
+            runCatching { koin?.getOrNull<CompositionWindows>()?.closeAfterCrash() }
+                .onFailure { log.warn("Could not close the windows opened beside the main one", it) }
         }
 
         val saved = runCatching {
