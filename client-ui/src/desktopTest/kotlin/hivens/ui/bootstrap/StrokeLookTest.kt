@@ -5,7 +5,7 @@ import hivens.look.stroke.api.Stroke
 import hivens.test.stopThenDelete
 import hivens.ui.ModuleAppLevel
 import hivens.ui.prepareLook
-import hivens.ui.theme.nxStrokeAnswers
+import hivens.look.stroke.nx.nxStrokeAnswers
 import hivens.ui.widgets.modules.CompiledModules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

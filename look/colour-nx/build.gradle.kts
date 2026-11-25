@@ -72,6 +72,8 @@ kotlin {
                 implementation(libs.compose.foundation)
                 implementation(libs.compose.material3)
                 implementation(compose.desktop.currentOs)
+                // What draws the shots beyond the theme they are of.
+                runtimeOnly(project(":look:preview"))
             }
         }
     }

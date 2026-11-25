@@ -13,7 +13,7 @@ import hivens.launcher.bootstrap.LauncherBootstrap
 import hivens.launcher.platform.PlatformPaths
 import hivens.look.motion.api.Motion
 import hivens.ui.i18n.NexiraStrings
-import hivens.ui.theme.nxMotionAnswers
+import hivens.look.motion.nx.nxMotionAnswers
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.jetbrains.skia.EncodedImageFormat
 import org.koin.dsl.koinApplication

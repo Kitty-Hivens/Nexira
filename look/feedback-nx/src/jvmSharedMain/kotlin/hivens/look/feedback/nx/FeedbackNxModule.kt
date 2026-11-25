@@ -7,7 +7,6 @@ import hivens.look.manager.api.LookProvider
 import hivens.look.feedback.api.Feedback
 import hivens.look.feedback.api.FeedbackAnswers
 import hivens.look.feedback.api.FeedbackApi
-import hivens.ui.theme.nxFeedbackAnswers
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleStrings
@@ -33,7 +32,7 @@ object FeedbackNxModule : CompiledModule {
 }
 
 /**
- * The nx family of the feedback axis: nx's state layers, as nx-ui answers them ([nxFeedbackAnswers]). They
+ * The nx family of the feedback axis: nx's state layers ([nxFeedbackAnswers]). They
  * depend on nothing the person chose, so the window drawn before the host is up gets the same
  * answers as the shell, and they never change while open.
  */

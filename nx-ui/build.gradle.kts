@@ -110,14 +110,14 @@ kotlin {
                 implementation(project(":look:timing-nx"))
                 implementation(project(":look:feedback-nx"))
                 implementation(project(":look:type-nx"))
-                // What the previews drawn by the tests take from providers this module does not know.
+                // What draws the previews and the tests, which this module answers no axis for itself.
                 runtimeOnly(project(":look:preview"))
             }
         }
     }
 }
 
-// Own composeResources -- the typography fonts live here. The generated
+// Own composeResources: the console's Braille face lives here. The generated
 // Res accessor uses a DIFFERENT package than client-ui's (hivens.ui.generated.resources)
 // so the two Res objects never collide on the classpath.
 // Every class this artifact holds, one binary name per line, for the widget module loader:
@@ -153,7 +153,7 @@ kotlin.sourceSets.getByName("desktopMain").resources.srcDir(files(sharedClassLis
 // path only, so it reaches neither the published artifact nor the app.
 dependencies {
     "androidRuntimeClasspath"(libs.compose.ui.tooling)
-    // The same for what the IDE's previews take from providers this module does not know.
+    // The same for what draws the IDE's previews.
     "androidRuntimeClasspath"(project(":look:preview"))
 }
 

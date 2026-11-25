@@ -5,7 +5,7 @@ import hivens.look.surface.api.Surface
 import hivens.test.stopThenDelete
 import hivens.ui.ModuleAppLevel
 import hivens.ui.prepareLook
-import hivens.ui.theme.nxSurfaceAnswers
+import hivens.look.surface.nx.nxSurfaceAnswers
 import hivens.ui.widgets.modules.CompiledModules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

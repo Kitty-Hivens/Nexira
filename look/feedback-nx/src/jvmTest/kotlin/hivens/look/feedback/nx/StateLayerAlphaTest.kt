@@ -1,4 +1,4 @@
-package hivens.ui.nx
+package hivens.look.feedback.nx
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

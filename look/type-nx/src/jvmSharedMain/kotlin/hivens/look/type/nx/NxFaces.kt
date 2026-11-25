@@ -1,20 +1,19 @@
-package hivens.ui.theme
+package hivens.look.type.nx
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.Font as FontFace
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import hivens.nx.ui.generated.resources.Res
-import hivens.nx.ui.generated.resources.jetbrains_mono_bold
-import hivens.nx.ui.generated.resources.jetbrains_mono_medium
-import hivens.nx.ui.generated.resources.jetbrains_mono_regular
-import hivens.nx.ui.generated.resources.jetbrains_mono_semibold
-import hivens.nx.ui.generated.resources.noto_cjk_jp
-import hivens.nx.ui.generated.resources.roboto_flex_bold
-import hivens.nx.ui.generated.resources.roboto_flex_medium
-import hivens.nx.ui.generated.resources.roboto_flex_regular
-import hivens.nx.ui.generated.resources.roboto_flex_semibold
-import hivens.ui.text.needsCjkFace
+import hivens.look.type.nx.generated.resources.Res
+import hivens.look.type.nx.generated.resources.jetbrains_mono_bold
+import hivens.look.type.nx.generated.resources.jetbrains_mono_medium
+import hivens.look.type.nx.generated.resources.jetbrains_mono_regular
+import hivens.look.type.nx.generated.resources.jetbrains_mono_semibold
+import hivens.look.type.nx.generated.resources.noto_cjk_jp
+import hivens.look.type.nx.generated.resources.roboto_flex_bold
+import hivens.look.type.nx.generated.resources.roboto_flex_medium
+import hivens.look.type.nx.generated.resources.roboto_flex_regular
+import hivens.look.type.nx.generated.resources.roboto_flex_semibold
 import java.util.concurrent.ConcurrentHashMap
 import org.jetbrains.compose.resources.Font
 
@@ -35,7 +34,7 @@ import org.jetbrains.compose.resources.Font
  *   disk rather than from the app.
  */
 @Composable
-fun nexiraSansFamily(): FontFamily = FontFamily(
+internal fun nexiraSansFamily(): FontFamily = FontFamily(
     Font(Res.font.roboto_flex_regular,  FontWeight.Normal),
     Font(Res.font.roboto_flex_medium,   FontWeight.Medium),
     Font(Res.font.roboto_flex_semibold, FontWeight.SemiBold),
@@ -43,7 +42,7 @@ fun nexiraSansFamily(): FontFamily = FontFamily(
 )
 
 @Composable
-fun nexiraMonoFamily(): FontFamily = FontFamily(
+internal fun nexiraMonoFamily(): FontFamily = FontFamily(
     Font(Res.font.jetbrains_mono_regular,  FontWeight.Normal),
     Font(Res.font.jetbrains_mono_medium,   FontWeight.Medium),
     Font(Res.font.jetbrains_mono_semibold, FontWeight.SemiBold),
@@ -70,7 +69,7 @@ fun nexiraMonoFamily(): FontFamily = FontFamily(
  * Regenerate with tools/fonts/regenerate.py.
  */
 @Composable
-fun nexiraCjkFamily(): FontFamily {
+internal fun nexiraCjkFamily(): FontFamily {
     val face = Font(Res.font.noto_cjk_jp, FontWeight.Normal)
     return cjkFamilies.computeIfAbsent(face) { FontFamily(it) }
 }

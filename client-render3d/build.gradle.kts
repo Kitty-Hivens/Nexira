@@ -59,6 +59,7 @@ kotlin {
 
         getByName("desktopTest") {
             dependencies {
+                implementation(project(":look:motion-nx"))
                 implementation(kotlin("test"))
                 implementation(libs.kotlinx.coroutines.test)
                 // Skiko native runtime (current OS) so the render tests can create

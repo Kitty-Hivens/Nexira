@@ -7,7 +7,6 @@ import hivens.look.manager.api.LookProvider
 import hivens.look.shape.api.Shape
 import hivens.look.shape.api.ShapeAnswers
 import hivens.look.shape.api.ShapeApi
-import hivens.ui.theme.nxShapeAnswers
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleStrings
@@ -33,7 +32,7 @@ object ShapeNxModule : CompiledModule {
 }
 
 /**
- * The nx family of the shape axis: nx's corners, as nx-ui answers them ([nxShapeAnswers]). They
+ * The nx family of the shape axis: nx's corners ([nxShapeAnswers]). They
  * depend on nothing the person chose, so the window drawn before the host is up gets the same
  * answers as the shell, and they never change while open.
  */

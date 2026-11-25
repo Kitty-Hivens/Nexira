@@ -1,10 +1,9 @@
-package hivens.ui.theme
+package hivens.look.type.nx
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontFamily
 import hivens.look.type.api.TypeAnswers
 import hivens.look.type.api.TypeFace
-import hivens.ui.text.needsCjkFace
 
 /**
  * nx's faces as the type axis's answers: what the nx type provider answers, and what previews and

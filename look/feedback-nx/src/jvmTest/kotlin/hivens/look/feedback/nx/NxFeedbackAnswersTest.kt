@@ -1,11 +1,9 @@
-package hivens.ui.theme
+package hivens.look.feedback.nx
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import hivens.look.feedback.api.FeedbackAnswers
 import hivens.look.feedback.api.FeedbackTarget
-import hivens.ui.nx.StateLayer
-import hivens.ui.nx.StateLayerAlphas
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals

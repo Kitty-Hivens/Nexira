@@ -10,7 +10,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import hivens.look.motion.api.Motion
-import hivens.ui.theme.nxMotionAnswers
+import hivens.look.motion.nx.nxMotionAnswers
 import hivens.ui.widgets.modules.WidgetModules.Contributed
 import hivens.widget.api.ModuleSetting
 import hivens.widget.api.ScreenEffect

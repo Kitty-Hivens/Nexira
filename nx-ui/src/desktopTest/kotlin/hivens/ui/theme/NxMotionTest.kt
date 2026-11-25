@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hivens.look.motion.api.MotionAnswers
+import hivens.look.motion.nx.nxMotionAnswers
 import hivens.widget.model.Entrance
 import kotlin.test.Test
 import kotlin.test.assertEquals

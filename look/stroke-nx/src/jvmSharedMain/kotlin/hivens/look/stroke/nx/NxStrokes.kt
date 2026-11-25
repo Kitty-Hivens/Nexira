@@ -1,4 +1,4 @@
-package hivens.ui.theme
+package hivens.look.stroke.nx
 
 import androidx.compose.ui.unit.dp
 import hivens.look.stroke.api.Dash

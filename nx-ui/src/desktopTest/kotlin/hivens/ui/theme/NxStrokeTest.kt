@@ -30,6 +30,7 @@ import hivens.look.stroke.api.Stroke
 import hivens.look.stroke.api.StrokeAnswers
 import hivens.look.stroke.api.StrokeRole
 import hivens.look.stroke.api.drawStroke
+import hivens.look.stroke.nx.nxStrokeAnswers
 import hivens.ui.nx.NxPlaceholderOutline
 import hivens.ui.nx.NxRule
 import hivens.ui.nx.NxSettingGroup

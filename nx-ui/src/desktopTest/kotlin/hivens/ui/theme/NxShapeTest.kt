@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.look.shape.api.Shape
 import hivens.look.shape.api.ShapeAnswers
+import hivens.look.shape.nx.nxShapeAnswers
 import hivens.ui.surface.PolygonShape
 import kotlin.test.Test
 import kotlin.test.assertEquals

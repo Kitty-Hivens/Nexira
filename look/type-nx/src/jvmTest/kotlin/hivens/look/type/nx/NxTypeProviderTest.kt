@@ -4,7 +4,6 @@ import hivens.look.manager.api.LookContext
 import hivens.look.type.api.Type
 import hivens.look.type.api.TypeApi
 import hivens.look.type.api.TextRole
-import hivens.ui.theme.nxTypeAnswers
 import hivens.widget.api.BootContext
 import hivens.widget.api.LevelServices
 import hivens.widget.api.SettingsDomain

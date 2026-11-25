@@ -3,7 +3,6 @@ package hivens.look.motion.nx
 import hivens.look.manager.api.LookContext
 import hivens.look.motion.api.Motion
 import hivens.look.motion.api.MotionApi
-import hivens.ui.theme.nxMotionAnswers
 import hivens.widget.api.BootContext
 import hivens.widget.api.LevelServices
 import hivens.widget.api.SettingsChange

@@ -4,7 +4,6 @@ import hivens.look.manager.api.LookContext
 import hivens.look.timing.api.Timing
 import hivens.look.timing.api.TimingApi
 import hivens.look.timing.api.TooltipKind
-import hivens.ui.theme.nxTimingAnswers
 import hivens.widget.api.BootContext
 import hivens.widget.api.LevelServices
 import hivens.widget.api.SettingsDomain

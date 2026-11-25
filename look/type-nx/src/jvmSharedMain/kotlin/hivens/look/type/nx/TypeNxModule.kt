@@ -7,7 +7,6 @@ import hivens.look.manager.api.LookProvider
 import hivens.look.type.api.Type
 import hivens.look.type.api.TypeAnswers
 import hivens.look.type.api.TypeApi
-import hivens.ui.theme.nxTypeAnswers
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleStrings
@@ -33,7 +32,7 @@ object TypeNxModule : CompiledModule {
 }
 
 /**
- * The nx family of the type axis: nx's faces, as nx-ui answers them ([nxTypeAnswers]). They
+ * The nx family of the type axis: nx's faces ([nxTypeAnswers]). They
  * depend on nothing the person chose, so the window drawn before the host is up gets the same
  * answers as the shell, and they never change while open.
  */

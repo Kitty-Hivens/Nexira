@@ -5,7 +5,7 @@ import hivens.look.timing.api.Timing
 import hivens.test.stopThenDelete
 import hivens.ui.ModuleAppLevel
 import hivens.ui.prepareLook
-import hivens.ui.theme.nxTimingAnswers
+import hivens.look.timing.nx.nxTimingAnswers
 import hivens.ui.widgets.modules.CompiledModules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

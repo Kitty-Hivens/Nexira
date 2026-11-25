@@ -1,4 +1,4 @@
-package hivens.ui.theme
+package hivens.look.motion.nx
 
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.Easing

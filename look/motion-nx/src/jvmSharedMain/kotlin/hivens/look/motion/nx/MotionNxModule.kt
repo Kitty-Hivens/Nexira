@@ -11,7 +11,6 @@ import hivens.look.manager.api.LookProvider
 import hivens.look.motion.api.Motion
 import hivens.look.motion.api.MotionAnswers
 import hivens.look.motion.api.MotionApi
-import hivens.ui.theme.nxMotionAnswers
 import hivens.widget.api.BootContext
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.HostApi
@@ -164,7 +163,7 @@ private fun choiceOf(context: ServiceContext): NxMotionChoice {
 }
 
 /**
- * The nx family of the motion axis: nx's durations and curves, as nx-ui answers them
+ * The nx family of the motion axis: nx's durations and curves
  * ([nxMotionAnswers]), with the movement that only decorates held still where the person asked for less.
  *
  * Before the host is up it answers from the module's own settings, and the earlier choice where they

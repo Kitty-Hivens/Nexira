@@ -7,7 +7,6 @@ import hivens.look.manager.api.LookProvider
 import hivens.look.timing.api.Timing
 import hivens.look.timing.api.TimingAnswers
 import hivens.look.timing.api.TimingApi
-import hivens.ui.theme.nxTimingAnswers
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleStrings
@@ -33,7 +32,7 @@ object TimingNxModule : CompiledModule {
 }
 
 /**
- * The nx family of the timing axis: nx's waits, as nx-ui answers them ([nxTimingAnswers]). They
+ * The nx family of the timing axis: nx's waits ([nxTimingAnswers]). They
  * depend on nothing the person chose, so the window drawn before the host is up gets the same
  * answers as the shell, and they never change while open.
  */

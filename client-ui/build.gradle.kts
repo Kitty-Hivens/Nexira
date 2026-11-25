@@ -343,7 +343,7 @@ kotlin {
         // in fakes from sibling modules.
         getByName("desktopTest") {
             dependencies {
-                // The icon library the tests draw with where no look is around.
+                // What the tests draw with where no look is around.
                 runtimeOnly(project(":look:preview"))
                 // The root applies this to every `java` module; a KMP module has
                 // no such plugin, so it pins the same JUnit here -- otherwise the

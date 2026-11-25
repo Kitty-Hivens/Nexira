@@ -7,7 +7,6 @@ import hivens.look.manager.api.LookProvider
 import hivens.look.surface.api.Surface
 import hivens.look.surface.api.SurfaceAnswers
 import hivens.look.surface.api.SurfaceApi
-import hivens.ui.theme.nxSurfaceAnswers
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleStrings
@@ -33,7 +32,7 @@ object SurfaceNxModule : CompiledModule {
 }
 
 /**
- * The nx family of the surface axis: nx's planes, as nx-ui answers them ([nxSurfaceAnswers]). They
+ * The nx family of the surface axis: nx's planes ([nxSurfaceAnswers]). They
  * depend on nothing the person chose, so the window drawn before the host is up gets the same
  * answers as the shell, and they never change while open.
  */

@@ -4,7 +4,7 @@ import androidx.compose.ui.graphics.Color
 import hivens.look.surface.api.PlateAnswer
 import hivens.ui.theme.Backdrop
 import hivens.ui.theme.Plane
-import hivens.ui.theme.nxSurfaceAnswers
+import hivens.look.surface.nx.nxSurfaceAnswers
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue

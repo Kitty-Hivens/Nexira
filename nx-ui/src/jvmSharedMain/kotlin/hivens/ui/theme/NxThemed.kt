@@ -4,29 +4,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import hivens.look.colour.api.Colour
-import hivens.look.feedback.api.Feedback
 import hivens.look.manager.api.LocalLookProvision
 import hivens.look.manager.api.LookProvision
-import hivens.look.motion.api.Motion as MotionAxis
 import hivens.look.preview.api.PreviewLook
-import hivens.look.shape.api.Shape
-import hivens.look.stroke.api.Stroke
-import hivens.look.surface.api.Surface
-import hivens.look.timing.api.Timing
-import hivens.look.type.api.Type
 
 /**
- * [content] drawn in [theme], in its dark scheme or its light one by [dark], moving as nx moves, with
- * its decorative movement held still by [reduceMotion], and in nx's corners, strokes, planes, waits,
- * feedback and faces, whatever the look around answers: the theme's answers provided for the colour
- * axis, nx's for the motion axis ([nxMotionAnswers]), the shape axis ([nxShapeAnswers]), the stroke
- * axis ([nxStrokeAnswers]), the surface axis ([nxSurfaceAnswers]), the timing axis ([nxTimingAnswers]),
- * the feedback axis ([nxFeedbackAnswers]) and the type axis ([nxTypeAnswers]), and the bridge
- * ([NxTheme]) set from them. For what draws one theme on purpose, a preview of it or a render of a
- * component in it. [interfaceText] decides the interface face as it does for [NxTheme].
+ * [content] drawn in [theme], in its dark scheme or its light one by [dark]: the theme's answers provided
+ * for the colour axis, whatever the look around answers, and the bridge ([NxTheme]) set from them. For
+ * what draws one theme on purpose, a preview of it or a render of a component in it. [interfaceText]
+ * decides the interface face as it does for [NxTheme].
  *
- * Icons are drawn as the look around draws them, and where none is around, in a preview or a test, as
- * the [PreviewLook] there answers.
+ * Every other axis is drawn as the look around answers it, and where none is around, in a preview or a
+ * test, as the [PreviewLook] there answers it, with decorative movement held still by [reduceMotion].
  */
 @Composable
 fun NxThemed(
@@ -38,21 +27,12 @@ fun NxThemed(
 ) {
     val scheme = theme.scheme(dark)
     val answers = remember(scheme) { scheme.colourAnswers() }
-    CompositionLocalProvider(
-        Colour.local provides answers,
-        MotionAxis.local provides nxMotionAnswers(reduceMotion),
-        Shape.local provides nxShapeAnswers(),
-        Stroke.local provides nxStrokeAnswers(),
-        Surface.local provides nxSurfaceAnswers(),
-        Timing.local provides nxTimingAnswers(),
-        Feedback.local provides nxFeedbackAnswers(),
-        Type.local provides nxTypeAnswers(),
-    ) {
-        val preview = if (LocalLookProvision.current === LookProvision.NONE) PreviewLook.found else null
+    val preview = if (LocalLookProvision.current === LookProvision.NONE) PreviewLook.found else null
+    CompositionLocalProvider(Colour.local provides answers) {
         if (preview == null) {
             NxTheme(interfaceText = interfaceText, content = content)
         } else {
-            preview.Provide { NxTheme(interfaceText = interfaceText, content = content) }
+            preview.Provide(reduceMotion) { NxTheme(interfaceText = interfaceText, content = content) }
         }
     }
 }

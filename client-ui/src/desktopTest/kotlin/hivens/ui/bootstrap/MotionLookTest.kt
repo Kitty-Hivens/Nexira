@@ -7,7 +7,7 @@ import hivens.look.motion.nx.MotionNxKeys
 import hivens.test.stopThenDelete
 import hivens.ui.ModuleAppLevel
 import hivens.ui.prepareLook
-import hivens.ui.theme.nxMotionAnswers
+import hivens.look.motion.nx.nxMotionAnswers
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.widget.api.current
 import kotlinx.coroutines.CoroutineScope

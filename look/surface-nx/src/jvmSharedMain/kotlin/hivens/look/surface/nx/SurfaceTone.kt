@@ -1,4 +1,4 @@
-package hivens.ui.theme
+package hivens.look.surface.nx
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -13,6 +13,6 @@ import androidx.compose.ui.graphics.luminance
  * @param body  the resolved body color of this surface
  * @param delta lerp fraction toward white (dark body) or black (light body)
  */
-fun bevelHairline(body: Color, delta: Float = 0.08f): Color =
+internal fun bevelHairline(body: Color, delta: Float = 0.08f): Color =
     if (body.luminance() < 0.5f) lerp(body, Color.White, delta)
     else lerp(body, Color.Black, delta)

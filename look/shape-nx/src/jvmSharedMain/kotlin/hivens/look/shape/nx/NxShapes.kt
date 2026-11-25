@@ -1,4 +1,4 @@
-package hivens.ui.theme
+package hivens.look.shape.nx
 
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.graphics.RectangleShape

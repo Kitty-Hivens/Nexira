@@ -1,4 +1,4 @@
-package hivens.ui.nx
+package hivens.look.feedback.nx
 
 import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.interaction.FocusInteraction

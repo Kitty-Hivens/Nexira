@@ -5,7 +5,7 @@ import hivens.look.type.api.Type
 import hivens.test.stopThenDelete
 import hivens.ui.ModuleAppLevel
 import hivens.ui.prepareLook
-import hivens.ui.theme.nxTypeAnswers
+import hivens.look.type.nx.nxTypeAnswers
 import hivens.ui.widgets.modules.CompiledModules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

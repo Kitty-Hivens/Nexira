@@ -16,8 +16,8 @@ typealias MotionLoop = hivens.look.motion.api.MotionLoop
  * The motion axis under the name nx-ui has always asked it by, while the components still live here.
  *
  * A call site asks for what is happening, a panel arriving, content opening, a press answering, and
- * gets what the look answers for it: nx's durations and curves where the nx motion provider draws
- * ([nxMotionAnswers]), the axis's plain base where none does. Reach for the nearest role. A genuinely new
+ * gets what the look answers for it: nx's durations and curves where the nx motion provider draws,
+ * the axis's plain base where none does. Reach for the nearest role. A genuinely new
  * kind of movement is a new role of the axis, not a literal at the call site.
  */
 object Motion {

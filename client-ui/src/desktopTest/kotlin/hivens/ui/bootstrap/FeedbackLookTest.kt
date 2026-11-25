@@ -5,7 +5,7 @@ import hivens.look.feedback.api.Feedback
 import hivens.test.stopThenDelete
 import hivens.ui.ModuleAppLevel
 import hivens.ui.prepareLook
-import hivens.ui.theme.nxFeedbackAnswers
+import hivens.look.feedback.nx.nxFeedbackAnswers
 import hivens.ui.widgets.modules.CompiledModules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

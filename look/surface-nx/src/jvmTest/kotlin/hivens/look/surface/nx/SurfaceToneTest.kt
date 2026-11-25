@@ -1,4 +1,4 @@
-package hivens.ui.theme
+package hivens.look.surface.nx
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance

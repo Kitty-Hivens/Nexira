@@ -8,7 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import androidx.compose.ui.unit.Density
 import hivens.look.motion.api.Motion
-import hivens.ui.theme.nxMotionAnswers
+import hivens.look.motion.nx.nxMotionAnswers
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.ColorAlphaType
 import org.jetbrains.skia.ColorType

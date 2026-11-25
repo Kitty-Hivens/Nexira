@@ -7,7 +7,6 @@ import hivens.look.manager.api.LookProvider
 import hivens.look.stroke.api.Stroke
 import hivens.look.stroke.api.StrokeAnswers
 import hivens.look.stroke.api.StrokeApi
-import hivens.ui.theme.nxStrokeAnswers
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.ModuleStrings
@@ -33,7 +32,7 @@ object StrokeNxModule : CompiledModule {
 }
 
 /**
- * The nx family of the stroke axis: nx's strokes, as nx-ui answers them ([nxStrokeAnswers]). They
+ * The nx family of the stroke axis: nx's strokes ([nxStrokeAnswers]). They
  * depend on nothing the person chose, so the window drawn before the host is up gets the same
  * answers as the shell, and they never change while open.
  */

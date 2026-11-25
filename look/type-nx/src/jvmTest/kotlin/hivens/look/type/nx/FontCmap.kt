@@ -1,4 +1,4 @@
-package hivens.ui.theme
+package hivens.look.type.nx
 
 import org.jetbrains.skia.Typeface
 import java.nio.ByteBuffer

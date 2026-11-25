@@ -4,17 +4,17 @@ import androidx.compose.runtime.Composable
 import java.util.ServiceLoader
 
 /**
- * What a preview or a render in a test takes from outside the module that draws it: the answers of an
- * axis whose provider that module does not know, the icon library's say. It wraps what it draws in the
- * one that is on the class path, found as a service of this interface, and only where no look is around.
+ * What a preview or a render in a test takes from outside the module that draws it: the answers of the
+ * axes, whose providers that module does not know. It wraps what it draws in the one that is on the
+ * class path, found as a service of this interface, and only where no look is around.
  *
  * An implementation is on the class path of previews and tests and never of the application, which draws
  * in the look the person chose.
  */
 interface PreviewLook {
-    /** [content] with the answers it brings. */
+    /** [content] with the answers it brings, with decorative movement held still by [reduceMotion]. */
     @Composable
-    fun Provide(content: @Composable () -> Unit)
+    fun Provide(reduceMotion: Boolean, content: @Composable () -> Unit)
 
     companion object {
         /** The one on the class path, null where there is none. */

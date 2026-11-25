@@ -1,6 +1,5 @@
-package hivens.ui.theme
+package hivens.look.type.nx
 
-import hivens.ui.text.needsCjkFace
 import org.jetbrains.skia.FontMgr
 import org.jetbrains.skia.Typeface
 import java.io.File

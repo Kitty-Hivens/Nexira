@@ -1,4 +1,4 @@
-package hivens.ui.text
+package hivens.look.type.nx
 
 /**
  * Does [text] hold anything the bundled CJK face draws and the UI face does not?
@@ -29,7 +29,7 @@ package hivens.ui.text
  * currency block, none of which the face carries, and every one would have been a
  * box on screen.
  */
-fun needsCjkFace(text: String): Boolean = text.codePoints().anyMatch(::inCjkOnly)
+internal fun needsCjkFace(text: String): Boolean = text.codePoints().anyMatch(::inCjkOnly)
 
 /** Binary search over the flattened start/end pairs. */
 private fun inCjkOnly(codePoint: Int): Boolean {

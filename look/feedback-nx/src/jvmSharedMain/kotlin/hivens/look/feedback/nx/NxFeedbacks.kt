@@ -1,9 +1,7 @@
-package hivens.ui.theme
+package hivens.look.feedback.nx
 
 import hivens.look.feedback.api.FeedbackAnswers
 import hivens.look.feedback.api.FeedbackTarget
-import hivens.ui.nx.StateLayer
-import hivens.ui.nx.StateLayerAlphas
 
 /**
  * nx's feedback as the feedback axis's answers: what the nx feedback provider answers, and what
