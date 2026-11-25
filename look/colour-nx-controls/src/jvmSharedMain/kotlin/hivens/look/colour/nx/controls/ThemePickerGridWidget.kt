@@ -44,7 +44,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.Theme
+import hivens.themes.api.Theme
 import hivens.ui.puppet.PuppetClick
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull

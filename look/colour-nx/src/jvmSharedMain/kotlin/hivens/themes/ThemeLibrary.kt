@@ -1,6 +1,6 @@
 package hivens.themes
 
-import hivens.ui.theme.Theme
+import hivens.themes.api.Theme
 
 /**
  * The themes a person can choose from and the one in use: everything that ships, the one

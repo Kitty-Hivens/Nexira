@@ -37,7 +37,7 @@ kotlin {
                 implementation(project(":look:colour-nx"))
                 implementation(compose.desktop.currentOs)
                 // What the tests draw with where no look is around.
-                runtimeOnly(project(":look:preview"))
+                implementation(project(":nx-ui-testing"))
             }
         }
     }

@@ -7,9 +7,9 @@ import hivens.themes.api.ThemeInputs
 import hivens.themes.api.ThemeMode
 import hivens.themes.api.ThemeScheme
 import hivens.themes.api.ThemeSettings
-import hivens.ui.theme.Scheme
-import hivens.ui.theme.Theme
-import hivens.ui.theme.WallpaperTone
+import hivens.themes.api.Scheme
+import hivens.themes.api.Theme
+import hivens.themes.api.WallpaperTone
 import hivens.widget.api.ModuleContribution
 import hivens.widget.api.SettingsStore
 import hivens.widget.api.TakenContribution

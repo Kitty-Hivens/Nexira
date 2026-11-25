@@ -24,9 +24,8 @@ plugins {
 // from the theme in use, before the boot from the same files and once the host is up from its
 // own manager, so the look manager opens it like any provider and knows nothing of themes.
 //
-// Drawing is not here: nx-ui draws from the colour axis's answers, which it makes of a scheme
-// the same way for this provider and for its own previews, and never knows where the choice
-// is kept. This module knows the widget kernel, its own API, the colour
+// Drawing is not here: nx-ui draws from the colour axis's answers and knows no theme. A scheme
+// answers them in :look:colour-nx-api, for this provider and for a preview alike. This module knows the widget kernel, its own API, the colour
 // axis's API and the language module's API, whose words name the themes modules bring, and
 // nothing of the launcher.
 kotlin {
@@ -73,7 +72,7 @@ kotlin {
                 implementation(libs.compose.material3)
                 implementation(compose.desktop.currentOs)
                 // What draws the shots beyond the theme they are of.
-                runtimeOnly(project(":look:preview"))
+                implementation(project(":nx-ui-testing"))
             }
         }
     }

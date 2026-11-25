@@ -80,6 +80,8 @@ include(":client-config")
 include(":client-core")
 // Shared test doubles for :client-core and its consumers (stands in for java-test-fixtures).
 include(":client-core-testing")
+// A render of a component in one theme, for the tests that draw with :nx-ui.
+include(":nx-ui-testing")
 // Auth seam carved out of the launcher god-module: :client-auth holds the
 // provider-agnostic AuthProvider SPI, :client-auth-smartycraft the SmartyCraft impl,
 // :client-auth-microsoft the Microsoft (MSA device-code) impl.

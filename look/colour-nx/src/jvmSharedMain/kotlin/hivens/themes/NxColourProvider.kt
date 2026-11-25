@@ -7,7 +7,7 @@ import hivens.look.manager.api.LookAnswers
 import hivens.look.manager.api.LookContext
 import hivens.look.manager.api.LookProvider
 import hivens.themes.api.ThemesApi
-import hivens.ui.theme.colourAnswers
+import hivens.themes.api.colourAnswers
 import hivens.widget.api.get
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 
 /**
  * The nx family of the colour axis: the colours of the theme in use, in the scheme of the mode in use,
- * as this module's manager holds them, answered the way nx-ui answers a scheme (`Scheme.colourAnswers`).
+ * as this module's manager holds them, answered the way the API answers a scheme (`Scheme.colourAnswers`).
  *
  * Before the host is up it answers from the module's own settings and theme file, worked out the way
  * the boot window's theme is ([bootOpening]), and once the host is up from the module's own manager,

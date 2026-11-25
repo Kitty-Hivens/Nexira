@@ -4,13 +4,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.materialkolor.hct.Hct
 import hivens.themes.api.ThemesApi
-import hivens.ui.theme.Scheme
-import hivens.ui.theme.Theme
+import hivens.themes.api.Scheme
+import hivens.themes.api.Theme
 import kotlin.math.max
 
 /**
- * A theme authored from a wallpaper's [colours], best first, as
- * [hivens.ui.theme.coloursFromImage] ranks them.
+ * A theme authored from a wallpaper's [colours], best first, as the host ranks them
+ * ([hivens.themes.api.WallpaperTone]).
  *
  * It is a theme like any other, not a filter over the active one: the ladder and inks
  * are Celestia's, measured tone for tone, tinted toward the wallpaper's first colour,

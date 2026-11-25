@@ -11,9 +11,9 @@ plugins {
 
 // What another module compiles against to read which theme the launcher is drawn in and
 // to change it: the themes module's keys and settings, the theme a module brings, and the
-// input the host feeds the wallpaper's tone through. A theme itself is the design
-// system's, so its type comes from :nx-ui, and the widget kernel carries the keys. The
-// module that answers is :look:colour-nx.
+// input the host feeds the wallpaper's tone through, and a theme itself with what its
+// colours answer the colour axis. The widget kernel carries the keys. The module that
+// answers is :look:colour-nx.
 kotlin {
     // KMP modules don't apply the `java` plugin, so the root's toolchain pin skips
     // them. Set here, org.gradle.jvm.version matches the JDK 27 modules.
@@ -44,10 +44,10 @@ kotlin {
         getByName("jvmSharedMain") {
             dependencies {
                 api(project(":widget-api"))
-                api(project(":nx-ui"))
                 // The colour axis's local, which a preview of a theme answers for what it wraps.
                 api(project(":look:colour-api"))
                 implementation(libs.compose.runtime)
+                implementation(libs.material.color.utilities)
             }
         }
 

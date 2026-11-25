@@ -17,7 +17,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
-import hivens.ui.theme.SchemeColours
+import hivens.themes.api.SchemeColours
 import hivens.ui.theme.Status
 
 /**

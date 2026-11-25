@@ -1,6 +1,8 @@
 package hivens.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import hivens.themes.api.Scheme
+import hivens.themes.api.Theme
 
 /**
  * What the drawing tests here draw with.

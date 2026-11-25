@@ -4,7 +4,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
 
 // Leaf design-system module (NxUI). Holds tokens, primitives and surfaces that the
 // rest of the UI builds on. Depends in-tree on ui-layers, which draws nothing, and on
-// the colour axis's contract, whose answers its colours are read from. client-ui
+// the contracts of the look's axes, whose answers it draws from. client-ui
 // depends on it one-way.
 // No application/packaging here, no puppet source-set, no client-core: this is
 // the bottom of the UI graph.
@@ -88,7 +88,6 @@ kotlin {
                 implementation(libs.compose.ui.tooling.preview)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
-                implementation(libs.material.color.utilities)
                 implementation(libs.androidx.graphics.shapes)
                 implementation(libs.slf4j.api)
             }
@@ -111,7 +110,8 @@ kotlin {
                 implementation(project(":look:feedback-nx"))
                 implementation(project(":look:type-nx"))
                 // What draws the previews and the tests, which this module answers no axis for itself.
-                runtimeOnly(project(":look:preview"))
+                implementation(project(":nx-ui-testing"))
+                implementation(libs.material.color.utilities)
             }
         }
     }

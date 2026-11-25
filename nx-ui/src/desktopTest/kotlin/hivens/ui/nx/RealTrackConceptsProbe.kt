@@ -36,13 +36,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import com.materialkolor.quantize.QuantizerCelebi
+import com.materialkolor.score.Score
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
-import hivens.ui.theme.seedFromImage
 import org.jetbrains.skia.EncodedImageFormat
 import java.io.File
 import kotlin.math.cos
@@ -176,7 +177,7 @@ class RealTrackConceptsProbe {
     @Composable
     private fun ConceptSeeded() {
         val c = probeInks()
-        val seed = cover?.let { seedFromImage(it) }
+        val seed = cover?.let { seedOf(it) }
         val body = if (seed != null) lerp(c.raised, Color(seed), 0.24f) else c.raised
         NxSurface(
             SurfaceKind.Card, Modifier.width(340.dp),
@@ -283,4 +284,10 @@ class RealTrackConceptsProbe {
         sheet("f-seeded", 380, 152) { ConceptSeeded() }
         sheet("g-record", 208, 208) { ConceptRecord() }
     }
+}
+
+/** The cover's most characteristic colour, by the quantizer the launcher seeds a player's card with. */
+private fun seedOf(cover: ImageBitmap): Int? {
+    val pixels = IntArray(cover.width * cover.height).also { cover.readPixels(it) }
+    return Score.score(QuantizerCelebi.quantize(pixels, 96), 1, null, true).firstOrNull()
 }

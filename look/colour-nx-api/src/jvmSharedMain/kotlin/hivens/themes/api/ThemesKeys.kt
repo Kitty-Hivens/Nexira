@@ -1,7 +1,5 @@
 package hivens.themes.api
 
-import hivens.ui.theme.Theme
-import hivens.ui.theme.WallpaperTone
 import hivens.widget.api.SettingsChange
 import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel

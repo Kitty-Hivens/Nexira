@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.unit.dp
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.WallpaperTone
+import hivens.themes.api.WallpaperTone
 import hivens.ui.widgets.toWidgetColorOrNull
 import kotlinx.coroutines.launch
 import java.io.File

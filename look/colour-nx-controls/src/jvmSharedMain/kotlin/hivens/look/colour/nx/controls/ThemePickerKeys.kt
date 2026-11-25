@@ -9,7 +9,7 @@ import hivens.i18n.api.strings
 import hivens.themes.api.ThemePreview
 import hivens.themes.api.ThemesApi
 import hivens.ui.theme.NxTheme
-import hivens.ui.theme.Theme
+import hivens.themes.api.Theme
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 

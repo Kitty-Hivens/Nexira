@@ -23,6 +23,9 @@ kotlin.sourceSets.named("jvmSharedMain") {
         implementation(project(":look:feedback-nx"))
         implementation(project(":look:type-api"))
         implementation(project(":look:type-nx"))
+        implementation(project(":look:colour-api"))
+        // The theme previews are drawn in, whose type the tests take too.
+        api(project(":look:colour-nx-api"))
         implementation(project(":look:icon-api"))
         implementation(project(":look:icon-google-rounded"))
         implementation(libs.compose.runtime)

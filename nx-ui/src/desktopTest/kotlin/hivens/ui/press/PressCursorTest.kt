@@ -25,7 +25,7 @@ import hivens.ui.cursor.cursor
 import hivens.ui.cursor.dragCursor
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.nxDraggable
-import hivens.ui.theme.NeutralTheme
+import hivens.look.preview.NeutralTheme
 import hivens.ui.theme.NxThemed
 import org.jetbrains.skia.Surface
 import androidx.compose.ui.graphics.asComposeCanvas

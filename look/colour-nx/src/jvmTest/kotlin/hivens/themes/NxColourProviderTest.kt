@@ -31,7 +31,7 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Plane
-import hivens.ui.theme.SchemeColours
+import hivens.themes.api.SchemeColours
 import hivens.widget.api.BootContext
 import hivens.widget.api.LevelServices
 import hivens.widget.api.SettingsDomain

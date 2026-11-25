@@ -117,7 +117,6 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.Status
-import hivens.ui.theme.Theme
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.nexiraBrailleFamily
 import hivens.ui.utils.ConsoleSettings

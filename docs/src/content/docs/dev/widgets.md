@@ -94,7 +94,8 @@ dependencies {
 These always come from the launcher, and a copy in your jar is ignored. That is what keeps your composables talking to the same Compose runtime as everything else, so declare them as dependencies and do not bundle them:
 
 - the widget kernel, `widget-api` and `widget-model` (`hivens.widget.api`, `hivens.widget.model`);
-- the launcher's design system, `nx-ui`: `NxTheme`, the `Nx` components and the colour, spacing and motion tokens. Its colour helpers use `com.materialkolor`, which is shared with it;
+- the launcher's design system, `nx-ui`: `NxTheme`, the `Nx` components and the names it asks the look's axes by;
+- `com.materialkolor`, a colour library;
 - Compose (`androidx.*`, `org.jetbrains.compose.*`) and Skia (`org.jetbrains.skia`, `org.jetbrains.skiko`);
 - the Kotlin standard library, kotlinx.coroutines, kotlinx.serialization and SLF4J;
 - the media engine, skinema (`dev.hivens.skinema`), whose native libraries a process can load only once.
@@ -106,7 +107,7 @@ These always come from the launcher, and a copy in your jar is ignored. That is 
 To use another module's API, for example the packs, the accounts, the catalogue or the language module, name it in the manifest beside the other attributes:
 
 ```kotlin
-"Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.themes=1.0, nexira.packs=2.0, nexira.accounts=1.0, nexira.catalogue=2.0",
+"Nexira-Module-Requires" to "nexira.i18n=1.0, nexira.themes=2.0, nexira.packs=2.0, nexira.accounts=1.0, nexira.catalogue=2.0",
 ```
 
 | API id                 | Artifact              | Package                    | What it is for                                                                            |
@@ -242,7 +243,7 @@ The launcher applies changes one at a time and writes the file whole. Where the 
 
 ## Themes
 
-A theme is drawn by the design system, `nx-ui`, and kept and chosen by the themes module. To bring one, name `nexira.themes` in the manifest, compile against `:look:colour-nx-api`, and implement `ThemeContribution`:
+A theme is kept, chosen and answered to the colour axis by the themes module. To bring one, name `nexira.themes` in the manifest, compile against `:look:colour-nx-api`, and implement `ThemeContribution`:
 
 ```kotlin
 class Dusk : ThemeContribution {
@@ -278,7 +279,7 @@ fun ThemeCount() {
 
 The launcher draws its windows with what modules answer, and names nothing of the modules behind it. It reads two keys at the app level, the way a widget reads any key: `LookKeys.Provide` (`look.provide`), the answers of every axis of the look as the look manager resolves them, which it wraps everything it draws in, and `I18nKeys.Words`, the words. It names no axis and no provider: an axis a module brings reaches every window through that one value, see [Axes of the look](#axes-of-the-look). Colour is such an axis, so the theme a window is drawn in, and whether it is dark, are what the colour provider answers, the themes module's for the default look. Where no look manager is brought in, every axis reads its base answers, colourless and dark, and where no language module is, every word is shown as its key.
 
-Inside the look, `NxTheme { }` is the bridge from the look to Compose and Material: it sets Material's colour scheme, the content colour, the indication, text selection and the right-click menu from the colour axis's answers, so a Material component and a foundation default draw in the look too. To draw something in one theme of the themes module on purpose, a preview of a component say, wrap it in `NxThemed(theme, dark) { }`, which provides that theme's answers for colour and the bridge over them.
+Inside the look, `NxTheme { }` is the bridge from the look to Compose and Material: it sets Material's colour scheme, the content colour, the indication, text selection and the right-click menu from the colour axis's answers, so a Material component and a foundation default draw in the look too. To draw something in one theme of the themes module on purpose, a preview of a component say, wrap it in `ThemePreview(theme, dark) { NxTheme { } }`: `ThemePreview`, of the themes module's API, provides that theme's answers for colour, and the bridge inside is set from them.
 
 The themes module and the language module make what answers those keys themselves, as app services: the theme manager over the module's settings and its theme file, the language engine over the person's own translations and the words every module ships. A module compiled into the launcher reaches what it needs for that through services the host keeps for the modules it trusts, and no jar sees: `HostFiles` for the data directory, the host's atomic, ordered writes inside it, and the name a file of the module's is told to the person as when a newer build wrote it, `TakenWords` for the words every owner ships, `TakenContributions` for what the modules brought in contribute, and `BringIn` to bring in a module compiled into the launcher that the document does not name, through the same checks as the ones it names.
 

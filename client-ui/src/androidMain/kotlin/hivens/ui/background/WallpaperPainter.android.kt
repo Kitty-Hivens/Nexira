@@ -12,8 +12,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalResources
-import hivens.ui.theme.WallpaperTone
-import hivens.ui.theme.wallpaperToneFromImage
+import hivens.themes.api.WallpaperTone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory

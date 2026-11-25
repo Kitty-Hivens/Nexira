@@ -7,7 +7,7 @@ import coil3.ComponentRegistry
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.background.CustomBackground
 import hivens.ui.background.rememberDeviceTilt
-import hivens.ui.theme.WallpaperTone
+import hivens.themes.api.WallpaperTone
 
 /**
  * The system's back, for as long as the composition draws: one step back in the

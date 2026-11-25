@@ -127,9 +127,10 @@ data class WidgetModuleScan(
  * - the design system, nx-ui, by artifact and not by package: its classes are shared
  *   one by one from the list its build writes ([SHARED_ARTIFACTS], [SharedClassList]),
  *   because `hivens.ui.theme` and `hivens.ui.nx` also hold classes of the launcher's
- *   own interface, which stay hidden. With it, `com.materialkolor`, which its public
- *   API names. nx-ui is therefore part of what modules compile against, as the kernel
- *   is: a change that breaks its public API breaks the modules built on it.
+ *   own interface, which stay hidden. nx-ui is therefore part of what modules compile
+ *   against, as the kernel is: a change that breaks its public API breaks the modules
+ *   built on it;
+ * - the colour library, `com.materialkolor`.
  *
  * Every other library stays hidden. A module that uses one, an HTTP client or an
  * image loader the launcher also carries, bundles it in its jar and gets its own copy.

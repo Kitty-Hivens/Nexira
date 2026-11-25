@@ -9,7 +9,7 @@ import hivens.themes.api.ThemeContribution
 import hivens.themes.api.ThemeMode
 import hivens.themes.api.ThemeScheme
 import hivens.themes.api.ThemeSettings
-import hivens.ui.theme.WallpaperTone
+import hivens.themes.api.WallpaperTone
 import hivens.widget.api.SettingsChange
 import hivens.widget.api.SettingsStore
 import kotlinx.coroutines.CoroutineScope

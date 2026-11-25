@@ -7,9 +7,9 @@ import hivens.widget.model.ApiVersion
  * launcher is drawn in and the themes on offer, to choose a theme and what decides dark
  * and light ([ThemesKeys]), and to bring themes of its own ([ThemeContribution]).
  *
- * A theme is drawn by the design system, nx-ui, which knows nothing of where a choice is
- * kept. This module keeps the library of themes and the choice, and hands the theme to
- * draw to whoever asks.
+ * The design system, nx-ui, draws from the colour axis's answers and knows no theme. This
+ * module keeps the library of themes and the choice, answers the colour axis from the theme
+ * in use, and hands the theme to whoever asks.
  *
  * A module built against it names [ID] and the version it was built against in its
  * manifest, and the loader refuses it where this launcher carries a version that does
@@ -28,10 +28,13 @@ object ThemesApi {
      * scheme, since the module reads the scheme itself. That breaks no jar: [ThemeInputs] is a
      * host service, which no jar reaches, and `SystemScheme` was only ever handed to it.
      *
+     * 2.0 holds [Theme], [Scheme], [SchemeColours], [colourAnswers] and [WallpaperTone] itself. They were the
+     * design system's, which no longer comes along with this API.
+     *
      * The module builds stamp their manifests from the `nexira.themesApi` Gradle property,
      * which a test holds equal to this.
      */
-    val VERSION: ApiVersion = ApiVersion(1, 1)
+    val VERSION: ApiVersion = ApiVersion(2, 0)
 
     /**
      * The family this module answers the look's colour axis as. What the look's state names while

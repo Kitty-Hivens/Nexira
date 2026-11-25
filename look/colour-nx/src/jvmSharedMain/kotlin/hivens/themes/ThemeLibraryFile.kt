@@ -2,9 +2,8 @@ package hivens.themes
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
-import hivens.ui.nx.parseHexOrNull
-import hivens.ui.theme.Scheme
-import hivens.ui.theme.Theme
+import hivens.themes.api.Scheme
+import hivens.themes.api.Theme
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -205,6 +204,13 @@ internal data class SchemeRecord(
     companion object {
         fun of(scheme: Scheme) = SchemeRecord(scheme.steps.map(::hex), scheme.inks.map(::hex), scheme.colors.map(::hex))
     }
+}
+
+/** What [hex] wrote, and a colour a person wrote by hand: `#RRGGBB` or `#AARRGGBB`, the `#` optional. Null for anything else. */
+private fun parseHexOrNull(hex: String): Color? {
+    val digits = hex.trim().removePrefix("#")
+    if (digits.length != 6 && digits.length != 8) return null
+    return (if (digits.length == 6) "FF$digits" else digits).toLongOrNull(16)?.let { Color(it) }
 }
 
 private fun hex(color: Color): String {

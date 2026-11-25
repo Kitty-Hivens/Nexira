@@ -344,7 +344,7 @@ kotlin {
         getByName("desktopTest") {
             dependencies {
                 // What the tests draw with where no look is around.
-                runtimeOnly(project(":look:preview"))
+                implementation(project(":nx-ui-testing"))
                 // The root applies this to every `java` module; a KMP module has
                 // no such plugin, so it pins the same JUnit here -- otherwise the
                 // one kotlin("test") brings along wins and this module drifts off

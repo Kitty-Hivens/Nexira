@@ -1,3 +1,62 @@
+public final class hivens/themes/api/Scheme {
+	public static final field $stable I
+	public fun <init> (Ljava/util/List;Ljava/util/List;Ljava/util/List;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/util/List;Ljava/util/List;Ljava/util/List;)Lhivens/themes/api/Scheme;
+	public static synthetic fun copy$default (Lhivens/themes/api/Scheme;Ljava/util/List;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lhivens/themes/api/Scheme;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getColors ()Ljava/util/List;
+	public final fun getInks ()Ljava/util/List;
+	public final fun getSteps ()Ljava/util/List;
+	public fun hashCode ()I
+	public final fun isDark ()Z
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/themes/api/SchemeAnswersKt {
+	public static final fun colourAnswers (Lhivens/themes/api/Scheme;)Lhivens/look/colour/api/ColourAnswers;
+}
+
+public final class hivens/themes/api/SchemeColours {
+	public static final field $stable I
+	public fun <init> (Lhivens/themes/api/Scheme;)V
+	public final fun distinct (I)Ljava/util/List;
+	public final fun getInkMain-0d7_KjU ()J
+	public final fun getInkQuiet-0d7_KjU ()J
+	public final fun getLead-0d7_KjU ()J
+	public final fun getScheme ()Lhivens/themes/api/Scheme;
+	public final fun getTopStep ()I
+	public final fun hashed-vNxB06k (Ljava/lang/String;)J
+	public final fun isDark ()Z
+	public final fun line-l2rxGTc (J)J
+	public final fun on-l2rxGTc (J)J
+	public final fun status-vNxB06k (Lhivens/look/manager/api/Status;)J
+	public final fun step-vNxB06k (I)J
+}
+
+public final class hivens/themes/api/Theme {
+	public static final field $stable I
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Lhivens/themes/api/Scheme;Lhivens/themes/api/Scheme;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lhivens/themes/api/Scheme;Lhivens/themes/api/Scheme;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Lhivens/themes/api/Scheme;
+	public final fun component4 ()Lhivens/themes/api/Scheme;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Lhivens/themes/api/Scheme;Lhivens/themes/api/Scheme;)Lhivens/themes/api/Theme;
+	public static synthetic fun copy$default (Lhivens/themes/api/Theme;Ljava/lang/String;Ljava/lang/String;Lhivens/themes/api/Scheme;Lhivens/themes/api/Scheme;ILjava/lang/Object;)Lhivens/themes/api/Theme;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDark ()Lhivens/themes/api/Scheme;
+	public final fun getHasLight ()Z
+	public final fun getId ()Ljava/lang/String;
+	public final fun getLight ()Lhivens/themes/api/Scheme;
+	public final fun getName ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun scheme (Z)Lhivens/themes/api/Scheme;
+	public fun toString ()Ljava/lang/String;
+}
+
 public abstract interface class hivens/themes/api/ThemeContribution : hivens/widget/api/ModuleContribution {
 	public abstract fun getDark ()Lhivens/themes/api/ThemeScheme;
 	public fun getLight ()Lhivens/themes/api/ThemeScheme;
@@ -9,7 +68,7 @@ public final class hivens/themes/api/ThemeContribution$DefaultImpls {
 }
 
 public abstract interface class hivens/themes/api/ThemeInputs {
-	public abstract fun wallpaper (Lhivens/ui/theme/WallpaperTone;)V
+	public abstract fun wallpaper (Lhivens/themes/api/WallpaperTone;)V
 }
 
 public final class hivens/themes/api/ThemeMode : java/lang/Enum {
@@ -27,7 +86,7 @@ public final class hivens/themes/api/ThemeMode$Companion {
 }
 
 public final class hivens/themes/api/ThemePreviewKt {
-	public static final fun ThemePreview (Lhivens/ui/theme/Theme;ZLkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
+	public static final fun ThemePreview (Lhivens/themes/api/Theme;ZLkotlin/jvm/functions/Function2;Landroidx/compose/runtime/Composer;I)V
 }
 
 public final class hivens/themes/api/ThemeScheme {
@@ -116,5 +175,25 @@ public final class hivens/themes/api/ThemesKeys {
 	public final fun getSettings ()Lhivens/widget/model/SourceKey;
 	public final fun getSystemSchemeAvailable ()Lhivens/widget/model/SourceKey;
 	public final fun getUpdateSettings ()Lhivens/widget/model/CommandKey;
+}
+
+public final class hivens/themes/api/WallpaperTone {
+	public static final field $stable I
+	public static final field Companion Lhivens/themes/api/WallpaperTone$Companion;
+	public fun <init> (Ljava/util/List;Ljava/lang/Float;)V
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/lang/Float;
+	public final fun copy (Ljava/util/List;Ljava/lang/Float;)Lhivens/themes/api/WallpaperTone;
+	public static synthetic fun copy$default (Lhivens/themes/api/WallpaperTone;Ljava/util/List;Ljava/lang/Float;ILjava/lang/Object;)Lhivens/themes/api/WallpaperTone;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getAvgLuminance ()Ljava/lang/Float;
+	public final fun getColours ()Ljava/util/List;
+	public final fun getSeedArgb ()Ljava/lang/Integer;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/themes/api/WallpaperTone$Companion {
+	public final fun getNONE ()Lhivens/themes/api/WallpaperTone;
 }
 

@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke as DrawStyle
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.look.preview.NeutralTheme
 import hivens.look.stroke.api.Stroke
 import hivens.look.stroke.api.StrokeAnswers
 import hivens.look.stroke.api.StrokeRole

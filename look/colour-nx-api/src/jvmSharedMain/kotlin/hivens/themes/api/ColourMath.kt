@@ -1,4 +1,4 @@
-package hivens.ui.theme
+package hivens.themes.api
 
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -9,7 +9,7 @@ import kotlin.math.cbrt
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-// The colour arithmetic nx-ui does beside a theme: comparing its colours and making
+// The colour arithmetic done beside a theme: comparing its colours and making
 // new ones next to them. HCT tone is CIE L*, so every lightness and contrast question
 // here is asked of one number. Nothing here changes a colour the theme gave.
 

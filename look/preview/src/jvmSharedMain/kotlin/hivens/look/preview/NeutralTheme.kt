@@ -1,13 +1,14 @@
-package hivens.ui.theme
+package hivens.look.preview
 
 import androidx.compose.ui.graphics.Color
+import hivens.themes.api.Scheme
+import hivens.themes.api.Theme
 
 /**
- * The theme nx-ui's own previews and renders are drawn in ([NxThemed]), and what stands in for a theme
- * where one is asked for and none is there.
+ * The theme previews are drawn in ([LauncherPreviewLook]), and what stands in for a theme in a test that
+ * asks for one and means none in particular.
  *
- * nx-ui ships no theme a person chooses, those are the themes module's. This one is neutral on
- * purpose: a grey ladder, grey inks and one grey colour, so a component drawn in it reads as drawn in
+ * The themes a person chooses are the themes module's. This one is neutral on purpose: a grey ladder, grey inks and one grey colour, so a component drawn in it reads as drawn in
  * no theme rather than in one somebody picked. Both modes, so a preview shows either. A window drawn
  * with no colour provider is drawn in the colour axis's base answers instead, not in this.
  */

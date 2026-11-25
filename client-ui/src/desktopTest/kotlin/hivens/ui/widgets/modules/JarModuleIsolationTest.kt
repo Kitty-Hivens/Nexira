@@ -147,7 +147,7 @@ class JarModuleIsolationTest {
     @Test
     fun `the design system is shared by artifact, and the launcher's classes in its packages are not`() {
         val loader = load(fixtureJar).loader
-        // Out of nx-ui, the one by package and the other by the type its public API names.
+        // One out of nx-ui, one out of the colour library shared beside it.
         assertSame(NxInk::class.java, loader.loadClass(NxInk::class.java.name))
         assertSame(Hct::class.java, loader.loadClass(Hct::class.java.name))
         assertSame(javaClass.classLoader.loadClass(NX_BUTTON), loader.loadClass(NX_BUTTON))

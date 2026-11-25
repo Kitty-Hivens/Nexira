@@ -31,7 +31,7 @@ import kotlin.test.Ignore
 import kotlin.test.Test
 import hivens.ui.theme.NxInk
 import hivens.ui.surface.SurfaceKind
-import hivens.ui.theme.Theme
+import hivens.themes.api.Theme
 import hivens.ui.theme.NxColor
 
 /**

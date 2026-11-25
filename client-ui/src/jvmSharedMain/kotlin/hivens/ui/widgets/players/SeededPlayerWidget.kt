@@ -55,7 +55,7 @@ import hivens.ui.theme.LocalPlane
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.familyForText
-import hivens.ui.theme.seedFromImage
+import hivens.ui.background.seedFromImage
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel

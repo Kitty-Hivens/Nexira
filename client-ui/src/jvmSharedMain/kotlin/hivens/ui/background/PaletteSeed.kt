@@ -1,8 +1,9 @@
-package hivens.ui.theme
+package hivens.ui.background
 
 import androidx.compose.ui.graphics.ImageBitmap
 import com.materialkolor.quantize.QuantizerCelebi
 import com.materialkolor.score.Score
+import hivens.themes.api.WallpaperTone
 
 // Pixels fed to the quantizer / colours it reduces to. A wallpaper is subsampled
 // to the budget first, so a 4K image (or video frame) doesn't stall extraction.
@@ -72,20 +73,6 @@ private fun ranked(argb: IntArray): List<Int> {
     val scored = Score.score(quantized, RANKED_COLOURS, null, true)
     if (scored.isNotEmpty()) return scored
     return listOfNotNull(quantized.maxByOrNull { it.value }?.key)
-}
-
-/**
- * What a wallpaper tells the launcher: its characteristic [colours], best first, and
- * its overall [avgLuminance] (0..1 average brightness, below about 0.5 reads as a dark
- * image). The two are distinct: a dark image with a bright accent has a bright first
- * colour but a low average.
- */
-data class WallpaperTone(val colours: List<Int>, val avgLuminance: Float?) {
-    val seedArgb: Int? get() = colours.firstOrNull()
-
-    companion object {
-        val NONE = WallpaperTone(emptyList(), null)
-    }
 }
 
 /**

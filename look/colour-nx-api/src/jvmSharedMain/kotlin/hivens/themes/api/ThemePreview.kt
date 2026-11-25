@@ -4,8 +4,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import hivens.look.colour.api.Colour
-import hivens.ui.theme.Theme
-import hivens.ui.theme.colourAnswers
 
 /**
  * [content] with the look's colour axis answering [theme], in its dark scheme or its light one by

@@ -3,6 +3,7 @@ package hivens.ui.theme
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
+import hivens.look.preview.NeutralTheme
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

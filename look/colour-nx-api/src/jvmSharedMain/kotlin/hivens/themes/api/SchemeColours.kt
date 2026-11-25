@@ -1,14 +1,15 @@
-package hivens.ui.theme
+package hivens.themes.api
 
 import androidx.compose.runtime.Stable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import com.materialkolor.hct.Hct
+import hivens.look.manager.api.Status
 import kotlin.math.abs
 import kotlin.math.max
 
 /**
- * Answers the requests nx-ui makes of a [Scheme]. The scheme is the author's and is
+ * Answers what is asked of a [Scheme]. The scheme is the author's and is
  * never changed. Everything here is read from it or computed beside it.
  *
  * One instance per scheme drawn, held by its colour answers ([Scheme.colourAnswers]), so

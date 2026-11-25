@@ -5,7 +5,7 @@ package hivens.look.colour.nx.controls
 
 import hivens.themes.Themes
 import hivens.themes.api.ThemesKeys
-import hivens.ui.theme.NeutralTheme
+import hivens.look.preview.NeutralTheme
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.HostApi
 import hivens.widget.api.LevelServices

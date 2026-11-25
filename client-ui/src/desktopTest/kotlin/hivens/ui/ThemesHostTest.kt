@@ -23,7 +23,7 @@ import hivens.ui.bootstrap.documentModules
 import hivens.ui.host.launcherServices
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.settings.SettingsDomainFiles
-import hivens.ui.theme.Theme
+import hivens.themes.api.Theme
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.modules.WidgetModules.Contributed

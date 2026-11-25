@@ -1,9 +1,9 @@
-package hivens.ui.theme
+package hivens.themes.api
 
 import hivens.look.colour.api.ColourAnswers
 
 /**
- * This scheme as the colour axis's answers: every role nx-ui draws, answered from the scheme the way
+ * This scheme as the colour axis's answers: every role nx draws, answered from the scheme the way
  * [SchemeColours] answers it, and every other role left to the axis's own rule over these.
  *
  * What the nx colour provider answers for the theme in use, and what a preview draws a theme in. The
@@ -34,5 +34,5 @@ fun Scheme.colourAnswers(): ColourAnswers {
     }
 }
 
-/** How faded `NxInk.off` draws the quiet ink. */
+/** How faded the ink of what is off draws the quiet ink. */
 private const val OFF_ALPHA = 0.45f

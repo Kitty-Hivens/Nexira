@@ -118,7 +118,7 @@ import hivens.ui.packs.withdrawNoticesOfInstalledPacks
 import hivens.ui.reportedTo
 import hivens.ui.settings.SettingsDomainFiles
 import hivens.ui.settle
-import hivens.ui.theme.WallpaperTone
+import hivens.themes.api.WallpaperTone
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.ui.utils.GameConsoleService

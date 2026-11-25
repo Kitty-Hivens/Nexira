@@ -2,8 +2,8 @@ package hivens.themes
 
 import androidx.compose.ui.graphics.Color
 import hivens.themes.api.ThemesApi.WALLPAPER_THEME_ID
-import hivens.ui.theme.Scheme
-import hivens.ui.theme.Theme
+import hivens.themes.api.Scheme
+import hivens.themes.api.Theme
 import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path

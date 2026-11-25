@@ -17,7 +17,7 @@ import hivens.ui.chrome.resendAsSidewaysWheel
 import hivens.ui.layers.LocalWindowLayers
 import hivens.ui.layers.WindowLayers
 import hivens.ui.render.SvgImageDecoder
-import hivens.ui.theme.WallpaperTone
+import hivens.themes.api.WallpaperTone
 import java.awt.AWTEvent
 import java.awt.Toolkit
 import java.awt.event.AWTEventListener

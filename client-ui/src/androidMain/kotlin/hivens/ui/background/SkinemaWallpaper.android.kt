@@ -20,9 +20,7 @@ import dev.hivens.skinema.libav.HwAccel
 import dev.hivens.skinema.libav.MediaInput
 import dev.hivens.skinema.player.VideoPlayer
 import dev.hivens.skinema.player.WhenUnwatched
-import hivens.ui.theme.WallpaperTone
-import hivens.ui.theme.coloursFromRgba
-import hivens.ui.theme.luminanceOfArgb
+import hivens.themes.api.WallpaperTone
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob

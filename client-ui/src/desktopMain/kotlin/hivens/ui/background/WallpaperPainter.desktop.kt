@@ -13,9 +13,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import dev.hivens.skinema.libav.VideoDecoder
 import hivens.ui.diag.SkinemaGate
-import hivens.ui.theme.WallpaperTone
-import hivens.ui.theme.luminanceOfArgb
-import hivens.ui.theme.wallpaperToneFromImage
+import hivens.themes.api.WallpaperTone
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.jetbrains.skia.Bitmap

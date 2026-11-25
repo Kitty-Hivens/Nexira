@@ -3,10 +3,10 @@ package hivens.themes
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import com.materialkolor.hct.Hct
-import hivens.ui.theme.Scheme
-import hivens.ui.theme.SchemeColours
+import hivens.themes.api.Scheme
+import hivens.themes.api.SchemeColours
 import hivens.ui.theme.Status
-import hivens.ui.theme.Theme
+import hivens.themes.api.Theme
 import kotlin.math.abs
 import kotlin.math.cbrt
 import kotlin.math.pow
@@ -18,15 +18,15 @@ import kotlin.test.assertTrue
 /**
  * What a theme promises, held for every theme that ships, in every mode it has.
  *
- * Measured with the colour arithmetic nx-ui keeps to itself, written out again below: the
+ * Measured with the colour arithmetic the API keeps to itself, written out again below: the
  * floors here are the promise, and they do not move when the design system's internals do.
  *
  * These assert the intent rather than the arithmetic: the author's ladder reads as
- * separate planes, the colours nx-ui makes beside a theme stay apart, and what is drawn
+ * separate planes, the colours made beside a theme stay apart, and what is drawn
  * is what the author wrote. The pipeline this replaced had tests that held the mechanism
  * to its own numbers, and passed while every preset drew the same ground.
  *
- * nx-ui draws a theme's inks as authored and corrects nothing, so the reading held here
+ * A theme's inks are drawn as authored and nothing corrects them, so the reading held here
  * is a floor for the authored inks on the authored steps, measured in APCA. It judges no
  * taste: a theme that passes is not thereby good. A theme's colours drawn as text are not
  * checked, since which colour a component sets its words in is the component's choice,
@@ -178,7 +178,7 @@ class ThemeIntentTest {
         return if (d > 180.0) 360.0 - d else d
     }
 
-    /** CIE76 difference, the measure nx-ui keeps its colours apart by. */
+    /** CIE76 difference, the measure the made colours are kept apart by. */
     private fun deltaE(a: Color, b: Color): Double {
         val p = lab(a)
         val q = lab(b)

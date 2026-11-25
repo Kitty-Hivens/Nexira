@@ -26,7 +26,7 @@ import hivens.ui.pictures.PictureRechecks
 import hivens.ui.pictures.WarmLibrary
 import hivens.ui.pictures.pictureLoader
 import hivens.ui.theme.NxColor
-import hivens.ui.theme.WallpaperTone
+import hivens.themes.api.WallpaperTone
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.host.launcherServices
 import hivens.widget.api.LocalLayoutGraph
