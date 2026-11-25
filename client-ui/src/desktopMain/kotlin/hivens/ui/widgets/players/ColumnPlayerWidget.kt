@@ -28,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -54,6 +53,7 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.LocalMonoFamily
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxMedia
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
@@ -326,7 +326,7 @@ internal fun ColumnPlayerCard(
                     Modifier
                         .then(
                             if (showCover) {
-                                Modifier.clip(CircleShape).background(Color.Black.copy(alpha = OVERFLOW_SCRIM))
+                                Modifier.clip(CircleShape).background(NxMedia.scrim.copy(alpha = OVERFLOW_SCRIM))
                             } else {
                                 Modifier
                             },
@@ -336,7 +336,7 @@ internal fun ColumnPlayerCard(
                         icon               = NxIcon.MoreVert,
                         contentDescription = s.text("packCardMore"),
                         onClick            = { menuOpen = true },
-                        tint               = if (showCover) Color.White else NxInk.main,
+                        tint               = if (showCover) NxMedia.ink else NxInk.main,
                     )
                 }
                 NxPopoverPanel(

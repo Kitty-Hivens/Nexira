@@ -54,6 +54,7 @@ import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxMedia
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
@@ -218,7 +219,7 @@ internal fun TilePlayerCard(
 
         if (reveal > 0f && transport) {
             Box(
-                Modifier.fillMaxSize().alpha(reveal).background(Color.Black.copy(alpha = 0.42f)),
+                Modifier.fillMaxSize().alpha(reveal).background(NxMedia.scrim.copy(alpha = 0.42f)),
             )
             Row(
                 Modifier.align(Alignment.Center).alpha(reveal),
@@ -230,7 +231,7 @@ internal fun TilePlayerCard(
                         icon               = NxIcon.SkipPrevious,
                         contentDescription = s.text("audioSkipPrevious"),
                         onClick            = onSkipPrev,
-                        tint               = Color.White.copy(alpha = 0.85f),
+                        tint               = NxMedia.ink.copy(alpha = 0.85f),
                         enabled            = loaded,
                         iconSize           = 20.dp,
                         fill               = 1f,
@@ -241,7 +242,7 @@ internal fun TilePlayerCard(
                     icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
                     contentDescription = if (state is PlaybackState.Playing) s.text("audioPause") else s.text("audioPlay"),
                     onClick            = onPlayPause,
-                    tint               = Color.White,
+                    tint               = NxMedia.ink,
                     enabled            = loaded,
                     iconSize           = 30.dp,
                     fill               = 1f,
@@ -252,7 +253,7 @@ internal fun TilePlayerCard(
                         icon               = NxIcon.SkipNext,
                         contentDescription = s.text("audioSkipNext"),
                         onClick            = onSkipNext,
-                        tint               = Color.White.copy(alpha = 0.85f),
+                        tint               = NxMedia.ink.copy(alpha = 0.85f),
                         enabled            = loaded,
                         iconSize           = 20.dp,
                         fill               = 1f,
@@ -269,7 +270,7 @@ internal fun TilePlayerCard(
         // artwork and lost it against half the covers there are.
         Box(
             Modifier.fillMaxSize().background(
-                Brush.verticalGradient(0.55f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.72f)),
+                Brush.verticalGradient(0.55f to Color.Transparent, 1f to NxMedia.scrim.copy(alpha = 0.72f)),
             ),
         )
 
@@ -279,7 +280,7 @@ internal fun TilePlayerCard(
                 Text(
                     text       = name,
                     style      = MaterialTheme.typography.bodyMedium,
-                    color      = Color.White,
+                    color      = NxMedia.ink,
                     fontWeight = FontWeight.SemiBold,
                     maxLines   = 2,
                     overflow   = TextOverflow.Ellipsis,
@@ -290,7 +291,7 @@ internal fun TilePlayerCard(
                     Text(
                         text       = under,
                         style      = MaterialTheme.typography.labelSmall,
-                        color      = Color.White.copy(alpha = 0.75f),
+                        color      = NxMedia.quiet,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
                         fontFamily = familyForText(under),
@@ -320,7 +321,7 @@ internal fun TilePlayerCard(
             Box(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                 Box(
                     Modifier.fillMaxWidth().height(3.dp).clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.26f)),
+                        .background(NxMedia.ink.copy(alpha = 0.26f)),
                 )
                 Box(
                     Modifier
@@ -337,7 +338,7 @@ internal fun TilePlayerCard(
                 icon               = NxIcon.MoreVert,
                 contentDescription = s.text("packCardMore"),
                 onClick            = { menuOpen = true },
-                tint               = Color.White.copy(alpha = 0.85f),
+                tint               = NxMedia.ink.copy(alpha = 0.85f),
             )
             NxPopoverPanel(
                 expanded         = menuOpen,

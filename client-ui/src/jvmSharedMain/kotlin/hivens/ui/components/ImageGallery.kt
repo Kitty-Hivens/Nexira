@@ -71,6 +71,7 @@ import hivens.ui.theme.Motion
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxMedia
 
 /**
  * One gallery item: a still [Image] or a [Video]. The strip shows the light
@@ -269,10 +270,10 @@ private fun GalleryCell(item: GalleryMedia, modifier: Modifier, onClick: () -> U
                         }
                         Box(
                             modifier         = Modifier.align(Alignment.Center).size(48.dp).clip(CircleShape)
-                                .background(Color.Black.copy(alpha = 0.5f)),
+                                .background(NxMedia.scrim.copy(alpha = 0.5f)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                            Symbol(NxIcon.PlayArrow, contentDescription = null, tint = NxMedia.ink, modifier = Modifier.size(28.dp))
                         }
                     }
                 }
@@ -433,7 +434,7 @@ private fun GalleryLightbox(
                     Text(
                         text       = it,
                         style      = MaterialTheme.typography.titleMedium,
-                        color      = Color.White,
+                        color      = NxMedia.ink,
                         fontWeight = FontWeight.SemiBold,
                         textAlign  = TextAlign.Center,
                     )
@@ -442,7 +443,7 @@ private fun GalleryLightbox(
                     Text(
                         text      = it,
                         style     = MaterialTheme.typography.bodyMedium,
-                        color     = Color.White.copy(alpha = 0.8f),
+                        color     = NxMedia.ink.copy(alpha = 0.8f),
                         textAlign = TextAlign.Center,
                     )
                 }
@@ -450,7 +451,7 @@ private fun GalleryLightbox(
                     Text(
                         text  = "${index + 1} / ${images.size}",
                         style = MaterialTheme.typography.labelMedium,
-                        color = Color.White.copy(alpha = 0.85f),
+                        color = NxMedia.ink.copy(alpha = 0.85f),
                     )
                 }
             }
@@ -465,10 +466,10 @@ private fun OverlayButton(icon: IconKey, onClick: () -> Unit, modifier: Modifier
         modifier         = modifier
             .size(40.dp)
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.Black.copy(alpha = 0.45f))
+            .background(NxMedia.scrim.copy(alpha = 0.45f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Symbol(icon, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+        Symbol(icon, contentDescription = null, tint = NxMedia.ink, modifier = Modifier.size(22.dp))
     }
 }

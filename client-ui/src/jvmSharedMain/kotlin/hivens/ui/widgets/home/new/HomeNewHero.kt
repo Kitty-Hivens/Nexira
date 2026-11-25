@@ -19,7 +19,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -39,6 +38,7 @@ import hivens.ui.screens.library.PendingUpdateBadge
 import hivens.ui.screens.library.lastPlayedLabel
 import hivens.ui.screens.library.rememberPackArt
 import androidx.compose.ui.zIndex
+import hivens.ui.theme.NxMedia
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
 import hivens.ui.widgets.Commands
@@ -124,8 +124,8 @@ fun HomeNewHero(instance: WidgetInstance) {
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
-                        0f to Color.Black.copy(alpha = 0.10f),
-                        1f to Color.Black.copy(alpha = 0.72f),
+                        0f to NxMedia.scrim.copy(alpha = 0.10f),
+                        1f to NxMedia.scrim.copy(alpha = 0.72f),
                     ),
                 ),
             )
@@ -150,14 +150,14 @@ fun HomeNewHero(instance: WidgetInstance) {
                     Text(
                         text       = eyebrow,
                         style      = MaterialTheme.typography.labelSmall,
-                        color      = Color.White.copy(alpha = 0.75f),
+                        color      = NxMedia.quiet,
                         fontWeight = FontWeight.Medium,
                     )
                     Text(
                         text       = target.name,
                         fontFamily = familyForText(target.name),
                         style      = if (tall) MaterialTheme.typography.headlineMedium else MaterialTheme.typography.titleLarge,
-                        color      = Color.White,
+                        color      = NxMedia.ink,
                         fontWeight = FontWeight.SemiBold,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
@@ -173,7 +173,7 @@ fun HomeNewHero(instance: WidgetInstance) {
                             Text(
                                 text     = meta.joinToString(" · "),
                                 style    = MaterialTheme.typography.bodySmall,
-                                color    = Color.White.copy(alpha = 0.8f),
+                                color    = NxMedia.ink.copy(alpha = 0.8f),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )

@@ -59,6 +59,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.Layer
 import hivens.ui.press.clickable
+import hivens.ui.theme.NxMedia
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -204,7 +205,7 @@ fun VideoPlayer(
 
         when (state) {
             SkinemaPlayer.State.Opening, SkinemaPlayer.State.Seeking ->
-                CircularProgressIndicator(Modifier.align(Alignment.Center).size(36.dp), color = Color.White)
+                CircularProgressIndicator(Modifier.align(Alignment.Center).size(36.dp), color = NxMedia.ink)
             is SkinemaPlayer.State.Failed -> VideoUnavailable(Modifier.fillMaxSize())
             else -> {}
         }
@@ -307,7 +308,7 @@ private fun VideoUnavailable(modifier: Modifier) {
     Box(modifier, contentAlignment = Alignment.Center) {
         Text(
             text  = nexiraStrings().text("videoError"),
-            color = Color.White.copy(alpha = 0.85f),
+            color = NxMedia.ink.copy(alpha = 0.85f),
             style = MaterialTheme.typography.bodyMedium,
         )
     }
@@ -391,7 +392,7 @@ private fun VideoControls(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.6f))))
+            .background(Brush.verticalGradient(listOf(Color.Transparent, NxMedia.scrim.copy(alpha = 0.6f))))
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
@@ -410,7 +411,7 @@ private fun VideoControls(
             VideoIconButton(icon = NxIcon.Forward10, desc = s.text("videoSkipForward"), onClick = onSkipForward, size = 30.dp)
             Text(
                 text  = "${formatTime(positionNanos)} / ${formatTime(durationNanos)}",
-                color = Color.White.copy(alpha = 0.9f),
+                color = NxMedia.ink.copy(alpha = 0.9f),
                 style = MaterialTheme.typography.labelSmall,
             )
             Spacer(Modifier.weight(1f))
@@ -483,14 +484,14 @@ private fun MediaSlider(
             },
         contentAlignment = Alignment.CenterStart,
     ) {
-        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(Color.White.copy(alpha = 0.25f)))
-        Box(Modifier.fillMaxWidth(fraction).height(4.dp).clip(RoundedCornerShape(50)).background(Color.White))
+        Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(NxMedia.ink.copy(alpha = 0.25f)))
+        Box(Modifier.fillMaxWidth(fraction).height(4.dp).clip(RoundedCornerShape(50)).background(NxMedia.ink))
         if (widthPx > 1) {
             val handle: Dp = 10.dp
             val half = with(LocalDensity.current) { handle.toPx() / 2f }
             val xPx = (fraction * widthPx - half).toInt()
             Box(
-                Modifier.offset { IntOffset(xPx, 0) }.size(handle).clip(CircleShape).background(Color.White),
+                Modifier.offset { IntOffset(xPx, 0) }.size(handle).clip(CircleShape).background(NxMedia.ink),
             )
         }
     }
@@ -508,11 +509,11 @@ private fun VideoIconButton(
         modifier = modifier
             .size(size)
             .clip(CircleShape)
-            .background(Color.Black.copy(alpha = 0.45f))
+            .background(NxMedia.scrim.copy(alpha = 0.45f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        Symbol(icon, contentDescription = desc, tint = Color.White, modifier = Modifier.size(size * 0.5f))
+        Symbol(icon, contentDescription = desc, tint = NxMedia.ink, modifier = Modifier.size(size * 0.5f))
     }
 }
 

@@ -30,7 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.text.font.FontWeight
@@ -57,6 +56,7 @@ import hivens.ui.screens.library.lastPlayedLabel
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxMedia
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.Commands
@@ -158,7 +158,7 @@ private fun Spine(
         }
         Box(
             Modifier.fillMaxSize().background(
-                Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.05f), 1f to Color.Black.copy(alpha = 0.85f)),
+                Brush.verticalGradient(0f to NxMedia.scrim.copy(alpha = 0.05f), 1f to NxMedia.scrim.copy(alpha = 0.85f)),
             ),
         )
         if (face < 1f) ClosedFace(pack, Modifier.align(Alignment.BottomCenter).alpha(1f - face))
@@ -172,7 +172,7 @@ private fun Spine(
                     Text(
                         text  = if (pack.lastPlayedEpochSecond > 0L) s.text("homeQuickContinue") else s.text("homeQuickStart"),
                         style = MaterialTheme.typography.labelLarge,
-                        color = Color.White.copy(alpha = 0.7f),
+                        color = NxMedia.ink.copy(alpha = 0.7f),
                     )
                     PendingUpdateBadge(pack.id)
                 }
@@ -182,7 +182,7 @@ private fun Spine(
                     fontSize   = 48.sp,
                     lineHeight = 50.sp,
                     fontWeight = FontWeight.Bold,
-                    color      = Color.White,
+                    color      = NxMedia.ink,
                     maxLines   = 2,
                     overflow   = TextOverflow.Ellipsis,
                     modifier   = Modifier.clickable(onClick = onOpenPage),
@@ -215,7 +215,7 @@ private fun ClosedFace(pack: PackView, modifier: Modifier) {
             fontFamily = familyForText(pack.name),
             style      = MaterialTheme.typography.titleLarge,
             fontWeight = FontWeight.SemiBold,
-            color      = Color.White,
+            color      = NxMedia.ink,
             maxLines   = 1,
             overflow   = TextOverflow.Ellipsis,
             modifier   = Modifier.upTheSpine(),
@@ -223,7 +223,7 @@ private fun ClosedFace(pack: PackView, modifier: Modifier) {
         val hours = pack.playtimeSeconds / 3600
         if (hours > 0) {
             Spacer(Modifier.height(12.dp))
-            Text(s.text("homeFactHours", hours), style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.75f))
+            Text(s.text("homeFactHours", hours), style = MaterialTheme.typography.labelMedium, color = NxMedia.quiet)
         }
         PendingDot(pack.id)
     }
@@ -241,8 +241,8 @@ private fun PendingDot(packId: String) {
 @Composable
 private fun OnArtNumeral(value: String, label: String) {
     Column {
-        Text(value, fontSize = 30.sp, lineHeight = 32.sp, fontWeight = FontWeight.SemiBold, color = Color.White, maxLines = 1)
-        Text(label, style = MaterialTheme.typography.labelMedium, color = Color.White.copy(alpha = 0.7f), maxLines = 1)
+        Text(value, fontSize = 30.sp, lineHeight = 32.sp, fontWeight = FontWeight.SemiBold, color = NxMedia.ink, maxLines = 1)
+        Text(label, style = MaterialTheme.typography.labelMedium, color = NxMedia.ink.copy(alpha = 0.7f), maxLines = 1)
     }
 }
 

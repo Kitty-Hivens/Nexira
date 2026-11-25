@@ -40,6 +40,7 @@ import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.press.clickable
 import hivens.ui.theme.Dimens
+import hivens.ui.theme.NxMedia
 import hivens.ui.theme.decorativePair
 
 /**
@@ -82,7 +83,7 @@ fun BrowsePackCard(
             )
         }
         // Banners can be bright, so they get a heavier wash than the dark art.
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (pack.bannerUrl != null) 0.45f else 0.32f)))
+        Box(Modifier.fillMaxSize().background(NxMedia.scrim.copy(alpha = if (pack.bannerUrl != null) 0.45f else 0.32f)))
 
         BoxWithConstraints(Modifier.fillMaxSize()) {
         // On a phone held upright the badge and the author beside the title left it three letters.
@@ -105,7 +106,7 @@ fun BrowsePackCard(
                     Text(
                         text       = pack.title,
                         style      = MaterialTheme.typography.titleMedium,
-                        color      = Color.White,
+                        color      = NxMedia.ink,
                         fontWeight = FontWeight.SemiBold,
                         maxLines   = 1,
                         overflow   = TextOverflow.Ellipsis,
@@ -117,7 +118,7 @@ fun BrowsePackCard(
                             Text(
                                 text     = s.text("browseByAuthor", author),
                                 style    = MaterialTheme.typography.bodySmall,
-                                color    = Color.White.copy(alpha = 0.75f),
+                                color    = NxMedia.quiet,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                             )
@@ -130,7 +131,7 @@ fun BrowsePackCard(
                         Text(
                             text     = s.text("browseByAuthor", author),
                             style    = MaterialTheme.typography.bodySmall,
-                            color    = Color.White.copy(alpha = 0.75f),
+                            color    = NxMedia.quiet,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis,
                         )
@@ -141,7 +142,7 @@ fun BrowsePackCard(
                     Text(
                         text     = pack.tagline,
                         style    = MaterialTheme.typography.bodySmall,
-                        color    = Color.White.copy(alpha = 0.80f),
+                        color    = NxMedia.ink.copy(alpha = 0.80f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
@@ -175,7 +176,7 @@ fun BrowsePackCard(
                 Symbol(
                     NxIcon.ArrowForwardIos,
                     contentDescription = null,
-                    tint               = Color.White.copy(alpha = 0.75f),
+                    tint               = NxMedia.quiet,
                     modifier           = Modifier.size(20.dp),
                 )
                 Spacer(Modifier.width(4.dp))

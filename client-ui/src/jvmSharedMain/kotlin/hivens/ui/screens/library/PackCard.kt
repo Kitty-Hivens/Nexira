@@ -58,6 +58,7 @@ import java.time.Instant
 import kotlin.math.roundToInt
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxMedia
 import hivens.ui.theme.Status
 
 /**
@@ -104,7 +105,7 @@ fun PackCard(
                 modifier           = Modifier.fillMaxSize(),
             )
         }
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (art.bannerUrl != null) 0.45f else 0.32f)))
+        Box(Modifier.fillMaxSize().background(NxMedia.scrim.copy(alpha = if (art.bannerUrl != null) 0.45f else 0.32f)))
 
         BoxWithConstraints(Modifier.fillMaxSize()) {
             // Tight card (right panel open + narrow window): drop the source badge
@@ -130,7 +131,7 @@ fun PackCard(
                             text       = instance.name,
                             fontFamily = familyForText(instance.name),
                             style      = MaterialTheme.typography.titleMedium,
-                            color      = Color.White,
+                            color      = NxMedia.ink,
                             fontWeight = FontWeight.SemiBold,
                             maxLines   = 1,
                             overflow   = TextOverflow.Ellipsis,
@@ -179,7 +180,7 @@ fun PackCard(
                 // where launch + every setting live. Card keeps only the overflow
                 // (open folder / delete) as out-of-the-way quick actions.
                 val deleteBlock = rememberPackDeleteBlock(instance.id)
-                NxKebabButton(contentDescription = s.text("packCardMore"), tint = Color.White) { dismiss ->
+                NxKebabButton(contentDescription = s.text("packCardMore"), tint = NxMedia.ink) { dismiss ->
                     NxMenuItem(
                         label   = s.text("serverSettingsOpenFolder"),
                         icon    = NxIcon.FolderOpen,

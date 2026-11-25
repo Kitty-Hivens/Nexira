@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.lerp
 import hivens.look.colour.api.Colour
 import hivens.look.colour.api.ColourAnswers
 
-// NxInk and NxColor are nx-ui's names for what the colour axis answers (hivens.look.colour.api), read
+// NxInk, NxColor and NxMedia are nx-ui's names for what the colour axis answers (hivens.look.colour.api), read
 // from the answers provided where they are asked and over the plane they are asked on.
 
 /**
@@ -101,6 +101,39 @@ object NxColor {
     val floating: Int
         @Composable @ReadOnlyComposable
         get() = answers().groundFloating
+}
+
+/**
+ * Colours over a picture: a banner, a cover, a video, a screenshot. A picture is no plane of the look and
+ * its own colours are anything, so these are the look's answers for all of them and hold in its dark and
+ * its light alike. How strong a [scrim] lies is the component's, by the picture it covers and the text it
+ * carries.
+ */
+object NxMedia {
+    /** Text and glyphs. */
+    val ink: Color
+        @Composable @ReadOnlyComposable
+        get() = answers().mediaInk
+
+    /** Secondary text. */
+    val quiet: Color
+        @Composable @ReadOnlyComposable
+        get() = answers().mediaQuiet
+
+    /** A chip or a plate, as strong as the look has it. */
+    val fill: Color
+        @Composable @ReadOnlyComposable
+        get() = answers().mediaFill
+
+    /** An edge. */
+    val line: Color
+        @Composable @ReadOnlyComposable
+        get() = answers().mediaLine
+
+    /** What a scrim is made of, opaque: the component says how strong it lies. */
+    val scrim: Color
+        @Composable @ReadOnlyComposable
+        get() = answers().mediaScrim
 }
 
 /**

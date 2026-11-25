@@ -19,6 +19,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxMedia
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Previewed
 import hivens.ui.theme.Status
@@ -58,8 +59,8 @@ fun NxMetaChip(
     // is what keeps a muted fact legible on a card: without the line the chip and the
     // card are two fills a shade apart and the chip stops having an edge.
     //
-    // Over media the inks are fixed light-on-dark on purpose: the picture is under a
-    // scrim whatever the theme, so a theme ink there would read on nothing.
+    // Over media the inks are the look's for a picture and not the theme's: the picture is
+    // under a scrim whatever the theme, so a theme ink there would read on nothing.
     val statusOf: Status? = when (tone) {
         NxMetaChipTone.Success -> Status.Success
         NxMetaChipTone.Warning -> Status.Warning
@@ -67,14 +68,14 @@ fun NxMetaChip(
         else -> null
     }
     val container = when {
-        tone == NxMetaChipTone.OnMedia -> Color.Black.copy(alpha = 0.35f)
+        tone == NxMetaChipTone.OnMedia -> NxMedia.fill
         tone == NxMetaChipTone.OnMediaAccent -> NxColor.lead().copy(alpha = 0.85f)
         statusOf != null -> NxColor.wash(NxColor.status(statusOf), 0.15f)
         else -> NxColor.wash(NxInk.quiet, 0.12f)
     }
     OnFill(container) {
         val (label, border) = when {
-            tone == NxMetaChipTone.OnMedia -> Color.White to Color.White.copy(alpha = 0.25f)
+            tone == NxMetaChipTone.OnMedia -> NxMedia.ink to NxMedia.line
             tone == NxMetaChipTone.OnMediaAccent -> NxColor.on(NxColor.lead()) to Color.Transparent
             statusOf != null -> NxColor.status(statusOf) to NxColor.status(statusOf).copy(alpha = 0.4f)
             else -> NxInk.quiet to NxInk.line

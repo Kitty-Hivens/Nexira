@@ -46,7 +46,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -75,6 +74,7 @@ import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxMedia
 
 @Serializable
 data class RecentProps(
@@ -230,8 +230,8 @@ private fun PackTile(pack: PackView, appState: SessionState?, onClick: () -> Uni
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = 0.05f),
-                    1f to Color.Black.copy(alpha = 0.72f),
+                    0f to NxMedia.scrim.copy(alpha = 0.05f),
+                    1f to NxMedia.scrim.copy(alpha = 0.72f),
                 ),
             ),
         )
@@ -256,7 +256,7 @@ private fun PackTile(pack: PackView, appState: SessionState?, onClick: () -> Uni
                 text       = pack.name,
                 fontFamily = familyForText(pack.name),
                 style      = if (roomy) MaterialTheme.typography.titleLarge else MaterialTheme.typography.titleSmall,
-                color      = Color.White,
+                color      = NxMedia.ink,
                 fontWeight = FontWeight.SemiBold,
                 maxLines   = 1,
                 overflow   = TextOverflow.Ellipsis,
@@ -264,7 +264,7 @@ private fun PackTile(pack: PackView, appState: SessionState?, onClick: () -> Uni
             Text(
                 text     = caption,
                 style    = if (roomy) MaterialTheme.typography.bodySmall else MaterialTheme.typography.labelSmall,
-                color    = Color.White.copy(alpha = 0.75f),
+                color    = NxMedia.quiet,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

@@ -49,6 +49,7 @@ import hivens.look.stroke.api.stroke
 import kotlinx.serialization.Serializable
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxMedia
 import hivens.ui.theme.Previewed
 import hivens.ui.theme.Status
 
@@ -73,8 +74,8 @@ enum class PlayTone {
 /**
  * What the control is drawn over.
  *
- * A picture under a scrim is dark whatever the theme, so the inks there are fixed
- * light-on-dark. A plain surface belongs to the theme, and the inks come from it: the
+ * A picture under a scrim is dark whatever the theme, so the inks there are the look's for a
+ * picture. A plain surface belongs to the theme, and the inks come from it: the
  * old control assumed a darkened picture everywhere, which left its refusals as a white
  * outline on a light-grey card, next to invisible.
  */
@@ -308,13 +309,13 @@ private fun playInks(ground: PlayGround): PlayInks {
         PlayGround.Media -> PlayInks(
             plate     = if (dark) DARK_INK else Color.White,
             onPlate   = if (dark) Color.White else Color.Black,
-            quiet     = Color.White.copy(alpha = 0.72f),
-            quietLine = Color.White.copy(alpha = 0.38f),
+            quiet     = NxMedia.ink.copy(alpha = 0.72f),
+            quietLine = NxMedia.ink.copy(alpha = 0.38f),
             // The dark palette's warning, whatever the theme: the ground under it is
             // a darkened picture either way, and the light palette's amber is chosen
             // for a light ground and sinks into this one.
             warn      = MEDIA_WARN,
-            caption   = Color.White.copy(alpha = 0.82f),
+            caption   = NxMedia.ink.copy(alpha = 0.82f),
         )
         // The look turned over: the plate is the inverse fill and the word on it the
         // inverse ink, which for nx is its main ink and its page, so the control is the
@@ -355,7 +356,7 @@ private fun PlayButtonGrounds(dark: Boolean) {
                 modifier            = Modifier
                     .clip(RoundedCornerShape(12.dp))
                     .pixelArtBackground("play-button", Color(0xFF2E4A6B), Color(0xFF6B3E5C))
-                    .background(Color.Black.copy(alpha = 0.45f))
+                    .background(NxMedia.scrim.copy(alpha = 0.45f))
                     .padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {

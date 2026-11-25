@@ -119,6 +119,7 @@ import org.koin.compose.koinInject
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxMedia
 import hivens.ui.theme.Status
 import hivens.ui.theme.originColor
 
@@ -547,7 +548,7 @@ private fun Hero(
                 )
             }
         }
-        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (bannerUrl != null) 0.5f else 0.4f)))
+        Box(Modifier.fillMaxSize().background(NxMedia.scrim.copy(alpha = if (bannerUrl != null) 0.5f else 0.4f)))
 
         val actions: @Composable () -> Unit = {
             Row {
@@ -613,7 +614,7 @@ private fun Hero(
                             playOnTop -> MaterialTheme.typography.titleLarge
                             else      -> MaterialTheme.typography.headlineMedium
                         },
-                        color      = Color.White,
+                        color      = NxMedia.ink,
                         fontWeight = FontWeight.Bold,
                         maxLines   = if (compact) 1 else 2,
                         overflow   = TextOverflow.Ellipsis,
@@ -654,7 +655,7 @@ private fun Hero(
 @Composable
 internal fun HeroAction(icon: IconKey, contentDescription: String?, onClick: () -> Unit) {
     IconButton(onClick = onClick, modifier = Modifier.layerTrigger()) {
-        Symbol(icon, contentDescription = contentDescription, tint = Color.White)
+        Symbol(icon, contentDescription = contentDescription, tint = NxMedia.ink)
     }
 }
 
@@ -739,10 +740,10 @@ private fun HeroChip(text: String) {
     Box(
         modifier = Modifier
             .clip(MaterialTheme.shapes.extraSmall)
-            .background(Color.Black.copy(alpha = 0.4f))
+            .background(NxMedia.scrim.copy(alpha = 0.4f))
             .padding(horizontal = 8.dp, vertical = 3.dp),
     ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = Color.White.copy(alpha = 0.9f), maxLines = 1)
+        Text(text, style = MaterialTheme.typography.labelSmall, color = NxMedia.ink.copy(alpha = 0.9f), maxLines = 1)
     }
 }
 

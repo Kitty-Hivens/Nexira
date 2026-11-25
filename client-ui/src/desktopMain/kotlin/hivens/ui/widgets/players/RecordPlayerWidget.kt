@@ -31,7 +31,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
@@ -56,6 +55,7 @@ import hivens.ui.nx.NxSlider
 import hivens.ui.nx.NxTooltip
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxMedia
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
@@ -231,14 +231,14 @@ internal fun RecordPlayerCard(
                             .size(side * BUTTON_SHARE)
                             .clip(CircleShape)
                             .alpha(reveal)
-                            .background(Color.Black.copy(alpha = TRANSPORT_SCRIM)),
+                            .background(NxMedia.scrim.copy(alpha = TRANSPORT_SCRIM)),
                         contentAlignment = Alignment.Center,
                     ) {
                         NxIconButton(
                             icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
                             contentDescription = if (state is PlaybackState.Playing) s.text("audioPause") else s.text("audioPlay"),
                             onClick            = onPlayPause,
-                            tint               = Color.White,
+                            tint               = NxMedia.ink,
                             enabled            = loaded,
                             iconSize           = side * BUTTON_SHARE / 2f,
                             fill               = 1f,

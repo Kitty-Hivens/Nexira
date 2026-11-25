@@ -57,6 +57,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxMedia
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
 import hivens.widget.model.PropLabel
@@ -251,9 +252,9 @@ internal fun TokenPlayerCard(
                     if (reveal > 0f) {
                         Box(
                             Modifier.size(middle).clip(CircleShape).alpha(reveal)
-                                .background(Color.Black.copy(alpha = 0.46f)),
+                                .background(NxMedia.scrim.copy(alpha = 0.46f)),
                             contentAlignment = Alignment.Center,
-                        ) { Transport(state, loaded, Color.White, side, s, onPlayPause) }
+                        ) { Transport(state, loaded, NxMedia.ink, side, s, onPlayPause) }
                     }
                 } else {
                     Transport(state, loaded, NxInk.main, side, s, onPlayPause)

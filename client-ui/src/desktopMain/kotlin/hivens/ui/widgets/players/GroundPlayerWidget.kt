@@ -27,7 +27,6 @@ import androidx.compose.ui.draw.BlurredEdgeTreatment
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +47,7 @@ import hivens.ui.nx.NxPopoverPanel
 import hivens.ui.nx.NxSlider
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
+import hivens.ui.theme.NxMedia
 import hivens.ui.theme.familyForText
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.widget.api.rememberProps
@@ -175,9 +175,9 @@ internal fun GroundPlayerCard(
         Box(
             Modifier.fillMaxSize().background(
                 Brush.verticalGradient(
-                    0f to Color.Black.copy(alpha = TEXT_COVER),
-                    0.5f to Color.Black.copy(alpha = lerpAlpha(MIDDLE_OPEN, MIDDLE_CLOSED, clamped)),
-                    1f to Color.Black.copy(alpha = WAVE_COVER),
+                    0f to NxMedia.scrim.copy(alpha = TEXT_COVER),
+                    0.5f to NxMedia.scrim.copy(alpha = lerpAlpha(MIDDLE_OPEN, MIDDLE_CLOSED, clamped)),
+                    1f to NxMedia.scrim.copy(alpha = WAVE_COVER),
                 ),
             ),
         )
@@ -194,7 +194,7 @@ internal fun GroundPlayerCard(
                         Text(
                             text       = name,
                             style      = MaterialTheme.typography.titleMedium,
-                            color      = Color.White,
+                            color      = NxMedia.ink,
                             fontWeight = FontWeight.SemiBold,
                             maxLines   = 1,
                             overflow   = TextOverflow.Ellipsis,
@@ -204,7 +204,7 @@ internal fun GroundPlayerCard(
                         Text(
                             text       = under,
                             style      = MaterialTheme.typography.bodySmall,
-                            color      = Color.White.copy(alpha = 0.75f),
+                            color      = NxMedia.quiet,
                             maxLines   = 1,
                             overflow   = TextOverflow.Ellipsis,
                             fontFamily = familyForText(under),
@@ -215,7 +215,7 @@ internal fun GroundPlayerCard(
                             icon               = NxIcon.SkipPrevious,
                             contentDescription = s.text("audioSkipPrevious"),
                             onClick            = onSkipPrev,
-                            tint               = Color.White.copy(alpha = 0.8f),
+                            tint               = NxMedia.ink.copy(alpha = 0.8f),
                             enabled            = loaded,
                             iconSize           = 18.dp,
                             fill               = 1f,
@@ -226,7 +226,7 @@ internal fun GroundPlayerCard(
                         icon               = if (state is PlaybackState.Playing) NxIcon.Pause else NxIcon.PlayArrow,
                         contentDescription = if (state is PlaybackState.Playing) s.text("audioPause") else s.text("audioPlay"),
                         onClick            = onPlayPause,
-                        tint               = Color.White,
+                        tint               = NxMedia.ink,
                         enabled            = loaded,
                         iconSize           = 24.dp,
                         fill               = 1f,
@@ -237,7 +237,7 @@ internal fun GroundPlayerCard(
                             icon               = NxIcon.SkipNext,
                             contentDescription = s.text("audioSkipNext"),
                             onClick            = onSkipNext,
-                            tint               = Color.White.copy(alpha = 0.8f),
+                            tint               = NxMedia.ink.copy(alpha = 0.8f),
                             enabled            = loaded,
                             iconSize           = 18.dp,
                             fill               = 1f,
@@ -250,10 +250,10 @@ internal fun GroundPlayerCard(
                     waveform       = waveform,
                     fraction       = progressFraction(state),
                     played         = NxColor.lead(),
-                    // White rather than the tonal secondary: the ink under this
+                    // The ink over a picture rather than the tonal secondary: what is under this
                     // strip is a photograph, and a palette grey disappears into it
                     // on half the covers there are.
-                    remaining      = Color.White.copy(alpha = 0.34f),
+                    remaining      = NxMedia.ink.copy(alpha = 0.34f),
                     onSeekFraction = if (loaded && duration > 0L) {
                         { onSeek((it * duration).toLong()) }
                     } else {
@@ -268,7 +268,7 @@ internal fun GroundPlayerCard(
                     icon               = NxIcon.MoreVert,
                     contentDescription = s.text("packCardMore"),
                     onClick            = { menuOpen = true },
-                    tint               = Color.White.copy(alpha = 0.8f),
+                    tint               = NxMedia.ink.copy(alpha = 0.8f),
                 )
                 NxPopoverPanel(
                     expanded         = menuOpen,

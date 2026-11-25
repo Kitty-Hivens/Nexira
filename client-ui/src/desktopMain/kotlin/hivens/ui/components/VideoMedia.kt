@@ -35,6 +35,7 @@ import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxProgressBar
 import hivens.ui.press.clickable
 import hivens.ui.render.openInBrowser
+import hivens.ui.theme.NxMedia
 import hivens.ui.utils.humanSize
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.currentCoroutineContext
@@ -164,7 +165,7 @@ fun VideoMedia(
             PlaceholderBox(modifier, thumbUrl) {
                 if (showControls) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Text(s.text("videoCancelled"), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+                        Text(s.text("videoCancelled"), color = NxMedia.ink.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
                         LinkText(s.text("videoRetry"), resolution.retry)
                     }
                 }
@@ -173,7 +174,7 @@ fun VideoMedia(
         VideoLoad.Failed -> PlaceholderBox(modifier, thumbUrl) {
             if (showControls) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(s.text("videoError"), color = Color.White.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
+                    Text(s.text("videoError"), color = NxMedia.ink.copy(alpha = 0.85f), style = MaterialTheme.typography.bodySmall)
                     LinkText(s.text("videoRetry"), resolution.retry)
                     LinkText(s.text("videoOpenInBrowser")) { openInBrowser(url) }
                 }
@@ -196,14 +197,14 @@ internal fun FetchStatus(fetch: MediaFetch, onCancel: () -> Unit) {
     ) {
         Text(
             text  = fetchLabel(fetch, s),
-            color = Color.White.copy(alpha = 0.85f),
+            color = NxMedia.ink.copy(alpha = 0.85f),
             style = MaterialTheme.typography.bodySmall,
         )
         NxProgressBar(progress = fetch.fraction, modifier = Modifier.width(180.dp))
         byteLabel(fetch, s)?.let {
             Text(
                 text  = it,
-                color = Color.White.copy(alpha = 0.6f),
+                color = NxMedia.ink.copy(alpha = 0.6f),
                 style = MaterialTheme.typography.labelSmall,
             )
         }
@@ -215,7 +216,7 @@ internal fun FetchStatus(fetch: MediaFetch, onCancel: () -> Unit) {
 private fun LinkText(label: String, onClick: () -> Unit) {
     Text(
         text     = label,
-        color    = Color.White,
+        color    = NxMedia.ink,
         style    = MaterialTheme.typography.labelMedium.copy(textDecoration = TextDecoration.Underline),
         modifier = Modifier.clickable(onClick = onClick).padding(4.dp),
     )

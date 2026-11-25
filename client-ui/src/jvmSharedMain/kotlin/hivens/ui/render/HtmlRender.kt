@@ -103,12 +103,13 @@ import hivens.ui.platform.SystemActions
 import java.net.URI
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxMedia
 
 /**
- * In-launcher HTML renderer -- the velocipede before the standalone lib extraction
- * (see ~/.claude/plans/reflective-napping-pizza.md). jsoup parses; a recursive
- * tag-map paints a known subset to Compose composables, and Compose owns text
- * layout. Unknown markup degrades to its text content -- never a misleading guess.
+ * In-launcher HTML renderer, the velocipede before the standalone lib extraction.
+ * jsoup parses, a recursive tag-map paints a known subset to Compose composables,
+ * and Compose owns text layout. Unknown markup degrades to its text content, never
+ * a misleading guess.
  *
  * Deliberately block-flow only: no CSS box model, flex or grid (those land in the
  * extracted Compose-MP engine). Honoured CSS is the inline subset that maps 1:1 to
@@ -982,16 +983,16 @@ private fun EmbedBlock(el: Element, onLink: (String) -> Unit) {
                 )
             },
         )
-        // Ours, not theirs: a neutral plate and a white triangle is the universal
+        // Ours, not theirs: a neutral plate and a plain triangle is the universal
         // mark for this, and wearing another product's badge would be claiming to
         // BE their player rather than to link to it.
         Box(
             Modifier.size(width = 64.dp, height = 46.dp)
                 .clip(MaterialTheme.shapes.small)
-                .background(Color.Black.copy(alpha = 0.62f)),
+                .background(NxMedia.scrim.copy(alpha = 0.62f)),
             contentAlignment = Alignment.Center,
         ) {
-            Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, size = 30.dp)
+            Symbol(NxIcon.PlayArrow, contentDescription = null, tint = NxMedia.ink, size = 30.dp)
         }
     }
 }
@@ -1173,10 +1174,10 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
                 if (href != null && isPlayableVideoUrl(href)) {
                     Box(
                         modifier         = Modifier.size(48.dp).clip(CircleShape)
-                            .background(Color.Black.copy(alpha = 0.5f)),
+                            .background(NxMedia.scrim.copy(alpha = 0.5f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                        Symbol(NxIcon.PlayArrow, contentDescription = null, tint = NxMedia.ink, modifier = Modifier.size(28.dp))
                     }
                 }
             }
@@ -1211,10 +1212,10 @@ private fun ImageRunBlock(items: List<ImgItem>, onLink: (String) -> Unit, center
                 )
                 if (href != null && isPlayableVideoUrl(href)) {
                     Box(
-                        modifier         = Modifier.size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.5f)),
+                        modifier         = Modifier.size(48.dp).clip(CircleShape).background(NxMedia.scrim.copy(alpha = 0.5f)),
                         contentAlignment = Alignment.Center,
                     ) {
-                        Symbol(NxIcon.PlayArrow, contentDescription = null, tint = Color.White, modifier = Modifier.size(28.dp))
+                        Symbol(NxIcon.PlayArrow, contentDescription = null, tint = NxMedia.ink, modifier = Modifier.size(28.dp))
                     }
                 }
             }
