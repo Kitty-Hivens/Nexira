@@ -1,6 +1,7 @@
 package hivens.widget.api
 
 import hivens.widget.model.CommandKey
+import hivens.widget.model.CompositionName
 import hivens.widget.model.History
 import hivens.widget.model.HistoryEntry
 import hivens.widget.model.PageValue
@@ -42,6 +43,20 @@ object CompositionKeys {
 
     /** Rewrites values of the entry shown, see [hivens.widget.model.History.rewrite]. A null takes one out. */
     val Rewrite = CommandKey<Map<String, JsonElement?>>("nav.rewrite", ScopeLevel.Composition)
+
+    /** The compositions shown in a window this composition opened, which go when it goes. */
+    val Windows = SourceKey<Set<CompositionName>>("nav.windows", ScopeLevel.Composition)
+
+    /**
+     * Shows a composition of the document in a window this composition owns, a picker say, or brings the one it is
+     * shown in to the front. The window goes when this composition goes, so nothing it opened is left behind with
+     * nowhere to answer. One the document does not have opens nothing. A host with one window shows it over that
+     * window instead. A window apart from any composition is [WindowKeys.Show]'s.
+     */
+    val ShowWindow = CommandKey<CompositionName>("nav.window.show", ScopeLevel.Composition)
+
+    /** Closes a window this composition opened. */
+    val CloseWindow = CommandKey<CompositionName>("nav.window.close", ScopeLevel.Composition)
 }
 
 /** What every page answers for the widgets drawn in it: the place in the history it is drawn for. */

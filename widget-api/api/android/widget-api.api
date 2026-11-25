@@ -76,10 +76,13 @@ public final class hivens/widget/api/CompositionKeys {
 	public static final field INSTANCE Lhivens/widget/api/CompositionKeys;
 	public final fun getBack ()Lhivens/widget/model/CommandKey;
 	public final fun getBackTo ()Lhivens/widget/model/CommandKey;
+	public final fun getCloseWindow ()Lhivens/widget/model/CommandKey;
 	public final fun getForward ()Lhivens/widget/model/CommandKey;
 	public final fun getHistory ()Lhivens/widget/model/SourceKey;
 	public final fun getRewrite ()Lhivens/widget/model/CommandKey;
 	public final fun getShow ()Lhivens/widget/model/CommandKey;
+	public final fun getShowWindow ()Lhivens/widget/model/CommandKey;
+	public final fun getWindows ()Lhivens/widget/model/SourceKey;
 }
 
 public final class hivens/widget/api/CompositionKeysKt {

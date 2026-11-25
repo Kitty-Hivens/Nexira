@@ -19,6 +19,7 @@ import hivens.ui.background.BackgroundManager
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.components.SignOutPrompt
 import hivens.ui.customization.CustomizationSettings
+import hivens.ui.host.CompositionWindows
 import hivens.ui.navigation.CompositionHistories
 import hivens.ui.navigation.CompositionHistory
 import hivens.ui.navigation.LauncherConfigs
@@ -34,6 +35,7 @@ import hivens.ui.host.launcherServices
 import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.model.ConfigId
+import hivens.widget.model.Document
 import hivens.widget.model.History
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.Show
@@ -69,6 +71,13 @@ internal expect fun WallpaperLayer(
     onTone: (WallpaperTone) -> Unit,
     onAudioVolume: (Float) -> Unit,
 )
+
+/**
+ * The windows a composition owns, which [windows] has open: each a window of its own on a host that shows several,
+ * or over the one window a phone has. Drawn inside the composition, so they go when it goes.
+ */
+@Composable
+internal expect fun OwnedWindows(document: Document, windows: CompositionWindows)
 
 /** The image decoders the host adds on top of the common ones. */
 internal expect fun ComponentRegistry.Builder.addPlatformDecoders()

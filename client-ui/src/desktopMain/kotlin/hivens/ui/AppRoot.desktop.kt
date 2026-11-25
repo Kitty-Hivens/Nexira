@@ -14,11 +14,14 @@ import hivens.ui.chrome.awtOnX11
 import hivens.ui.chrome.extraButton
 import hivens.ui.chrome.isFrom
 import hivens.ui.chrome.resendAsSidewaysWheel
+import hivens.ui.host.CompositionWindows
+import hivens.ui.host.OwnedCompositionWindows
 import hivens.ui.layers.LocalWindowLayers
 import hivens.ui.layers.WindowLayers
 import hivens.ui.navigation.CompositionHistory
 import hivens.ui.render.SvgImageDecoder
 import hivens.themes.api.WallpaperTone
+import hivens.widget.model.Document
 import java.awt.AWTEvent
 import java.awt.Toolkit
 import java.awt.event.AWTEventListener
@@ -89,6 +92,9 @@ internal actual fun WallpaperLayer(
         onAudioVolume    = onAudioVolume,
     )
 }
+
+@Composable
+internal actual fun OwnedWindows(document: Document, windows: CompositionWindows) = OwnedCompositionWindows(document, windows)
 
 internal actual fun ComponentRegistry.Builder.addPlatformDecoders() {
     add(SvgImageDecoder.Factory())

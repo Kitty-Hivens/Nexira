@@ -6,6 +6,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
@@ -15,6 +16,7 @@ import hivens.ui.chrome.rememberWindowClass
 import hivens.ui.background.hasUsableImage
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.EditorSurfaceHost
+import hivens.ui.host.CompositionWindows
 import hivens.ui.navigation.CompositionHistory
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.screens.screenKind
@@ -50,7 +52,9 @@ import hivens.widget.api.rememberLatestCommand
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
+import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
+import hivens.widget.model.Document
 import hivens.widget.model.History
 import hivens.widget.model.HistoryEntry
 import hivens.widget.model.ScopeLevel
@@ -61,6 +65,7 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
+import org.koin.compose.koinInject
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -145,7 +150,9 @@ internal fun ConfigBody(config: ConfigId) {
 /**
  * Puts the composition's [history] over its level for [content]: where it stands and
  * the commands that move it, the keys only the owner of a history can answer. [show] is
- * the history's own, refusing a config the composition does not have.
+ * the history's own, refusing a config the composition does not have. With them the
+ * windows the composition owns: which are open, and the commands that open and close
+ * them, drawn here so that they go when the composition goes.
  * Each command is one object for the composition's life that runs the latest
  * lambda it was handed, so a reader does not recompose because the shell did.
  *
@@ -154,13 +161,26 @@ internal fun ConfigBody(config: ConfigId) {
  */
 @Composable
 internal fun ProvideComposition(history: CompositionHistory, show: (Show) -> Unit, content: @Composable () -> Unit) {
+    val document: Document = koinInject()
+    // The composition the launcher starts in has its window already.
+    val owned = remember(document) { CompositionWindows { it in document.compositions && it != document.start } }
+    val openOwned by owned.open.collectAsState()
     ProvideScoped(CompositionKeys.History, history.now) {
     ProvideScopedCommand(CompositionKeys.Show, rememberLatestCommand(show)) {
     ProvideScopedCommand(CompositionKeys.Back, rememberLatestCommand<Unit> { history.back() }) {
     ProvideScopedCommand(CompositionKeys.Forward, rememberLatestCommand<Unit> { history.forward() }) {
     ProvideScopedCommand(CompositionKeys.BackTo, rememberLatestCommand(history::backTo)) {
     ProvideScopedCommand(CompositionKeys.Rewrite, rememberLatestCommand(history::rewrite)) {
-        CompositionLocalProvider(LocalMisplacedWidget provides MisplacedWidget, content = content)
+    ProvideScoped(CompositionKeys.Windows, openOwned) {
+    ProvideScopedCommand(CompositionKeys.ShowWindow, rememberLatestCommand<CompositionName> { owned.show(it) }) {
+    ProvideScopedCommand(CompositionKeys.CloseWindow, rememberLatestCommand(owned::close)) {
+        CompositionLocalProvider(LocalMisplacedWidget provides MisplacedWidget) {
+            content()
+            OwnedWindows(document, owned)
+        }
+    }
+    }
+    }
     }
     }
     }

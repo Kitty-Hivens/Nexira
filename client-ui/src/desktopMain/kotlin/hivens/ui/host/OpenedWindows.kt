@@ -69,21 +69,50 @@ fun OpenedWindows(document: Document, look: ShellLook, koin: KoinApplication) {
         val open by windows.open.collectAsState()
         open.forEach { name ->
             val composition = document.compositions[name] ?: return@forEach
-            key(name) { CompositionWindow(name, composition, look, windows) }
+            key(name) {
+                CompositionWindow(name, composition, WindowId(name.value), WindowOwner.Launcher, windows, look)
+            }
         }
     }
 }
 
 /**
- * The window [composition] is shown in. An independent window in the host's registry, with its own [WindowHost], its
- * own window level, its own layers and dismiss stack, and the window locals of its own window. It draws in the
- * answers of every axis of the look, read off the app level as the main window reads them, and in the words, the face
- * and the customization the main shell decided, read through [look]. The frame is what the composition asks of the
- * window. Nothing of the main window's frame is offered in it, so a composition that asks for no system frame draws
- * its own.
+ * A window for each composition [windows] has open, owned by the composition this is drawn in: a window of its own
+ * for each, which goes when that composition goes, whether it closes or the window showing it does. Drawn inside the
+ * owner, so the window reads what the owner reads and its level stands under the owner's.
  */
 @Composable
-private fun CompositionWindow(name: CompositionName, composition: Composition, look: ShellLook, windows: CompositionWindows) {
+fun OwnedCompositionWindows(document: Document, windows: CompositionWindows) {
+    val open by windows.open.collectAsState()
+    if (open.isEmpty()) return
+    // A composition drawn where the host has no window for it, a test say, owns nothing it could be held to.
+    val opener = LocalHostWindow.current ?: return
+    open.forEach { name ->
+        val composition = document.compositions[name] ?: return@forEach
+        key(name) {
+            CompositionWindow(name, composition, WindowId("${opener.composition}/${name.value}"), WindowOwner.Composition(opener.composition), windows, look = null)
+        }
+    }
+}
+
+/**
+ * The window [composition] is shown in, [id] in the host's registry and held by [owner], with its own [WindowHost],
+ * its own window level, its own layers and dismiss stack, and the window locals of its own window. It draws in the
+ * answers of every axis of the look, read off the app level as the main window reads them. A window apart from any
+ * composition is drawn beside the main window and takes the words, the face and the customization the main shell
+ * decided through [look], and the kernel's locals. One a composition owns is drawn inside it, has a null [look], and
+ * takes all of that from where it is drawn. The frame is what the composition asks of the window. Nothing of the main
+ * window's frame is offered in it, so a composition that asks for no system frame draws its own.
+ */
+@Composable
+private fun CompositionWindow(
+    name: CompositionName,
+    composition: Composition,
+    id: WindowId,
+    owner: WindowOwner,
+    windows: CompositionWindows,
+    look: ShellLook?,
+) {
     val frame = composition.frame
     val appLevel: WidgetScope = koinInject()
     val windowState = rememberWindowState(
@@ -95,7 +124,7 @@ private fun CompositionWindow(name: CompositionName, composition: Composition, l
     val close = remember(windows, name) { { windows.close(name) } }
     val ownFrame = !frame.systemChrome && WindowManagerProbe.allowsCustomFrame
 
-    CompositionLocalProvider(LocalTranslator provides look.words) {
+    Apart(look) {
         Window(
             onCloseRequest    = close,
             state             = windowState,
@@ -143,11 +172,11 @@ private fun CompositionWindow(name: CompositionName, composition: Composition, l
             val hostState = backend.state.collectAsState()
             val capabilities by remember(hostState) { derivedStateOf { hostState.value.allowed } }
 
-            // The kernel's locals around the window's level: the app level among them is
-            // what the window's own level is made under.
-            KernelLocals {
+            // Apart from any composition, the kernel's locals around the window's level: the
+            // app level among them is what the window's own level is made under. One a
+            // composition owns stands under the owner's level, which it has from where it is.
+            Kernel(look) {
             CompositionLocalProvider(
-                LocalCustomization         provides look.customization,
                 LocalComposeWindow         provides window,
                 LocalWindowHost            provides host,
                 LocalWindowState           provides windowState,
@@ -159,11 +188,11 @@ private fun CompositionWindow(name: CompositionName, composition: Composition, l
                 LocalWindowCapabilities    provides capabilities,
             ) {
                 appLevel.read(ShellLookValues.Look).Provide {
-                    HostedWindow(WindowId(name.value), WindowOwner.Launcher, backend) {
+                    HostedWindow(id, owner, backend) {
                         // Around the theme, as in the main window: the layers belong to the
                         // window, and a layer takes its theme from where it is opened.
                         LayerHost(layers, Modifier.fillMaxSize()) {
-                            NxTheme(interfaceText = look.interfaceText) {
+                            Themed(look) {
                                 NxSurface(SurfaceKind.Page, Modifier.fillMaxSize(), shape = RectangleShape) {
                                     CompositionContent(name, composition.start)
                                 }
@@ -172,7 +201,28 @@ private fun CompositionWindow(name: CompositionName, composition: Composition, l
                     }
                 }
             }
-            } // end KernelLocals
+            } // end Kernel
         }
     }
+}
+
+/** The words and the customization the main shell decided, for a window apart from any composition. One drawn inside a composition has them already. */
+@Composable
+private fun Apart(look: ShellLook?, content: @Composable () -> Unit) {
+    if (look == null) {
+        content()
+    } else {
+        CompositionLocalProvider(LocalTranslator provides look.words, LocalCustomization provides look.customization, content = content)
+    }
+}
+
+/** The bridge to the look for a window apart. One a composition owns is drawn in the bridge of its owner already. */
+@Composable
+private fun Themed(look: ShellLook?, content: @Composable () -> Unit) {
+    if (look == null) content() else NxTheme(interfaceText = look.interfaceText, content = content)
+}
+
+@Composable
+private fun Kernel(look: ShellLook?, content: @Composable () -> Unit) {
+    if (look == null) content() else KernelLocals(content)
 }

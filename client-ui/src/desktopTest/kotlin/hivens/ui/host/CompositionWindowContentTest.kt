@@ -34,6 +34,7 @@ import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.generated.GeneratedWidgetRegistry
+import hivens.widget.model.Document
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.StandardDocument
 import kotlin.test.AfterTest
@@ -79,6 +80,7 @@ class CompositionWindowContentTest {
                 single { console }
                 single { ConsoleSettingsStore(dir.resolve("console.json"), json, scope) }
                 single { CompositionHistories() }
+                single<Document> { StandardDocument.load() }
                 single { WidgetModules(dir.resolve("widgets"), dir.resolve("widget-modules.json"), json, GeneratedWidgetRegistry, scope, NoWidgetModuleHost) }
                 single { LayoutGraphRepository(dir.resolve("layout-graph.json"), json, scope) { LayoutGraph.EMPTY } }
                 single { WidgetServiceRegistry() }
