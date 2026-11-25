@@ -72,9 +72,11 @@ class DocumentStoreTest {
     fun `a document of one's own is not taken again over itself`() {
         val mine = standard.copy(modules = emptyList())
         file.writeText(DocumentCodec.write(mine))
-        val store = store()
+        val writes = ArrayList<String>()
+        val store = DocumentStore(file, { standard }) { what, _ -> writes += what }
         assertTrue(store.takeOwn())
         assertEquals(mine, store.document.value, "the person's modules stay theirs")
+        assertEquals(emptyList(), writes, "and nothing is written over the file")
     }
 
     @Test
