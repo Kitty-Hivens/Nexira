@@ -103,7 +103,8 @@ class WindowHostTest {
         frame: FakeFrame,
         backend: Backend = PlainBackend(WindowActions.Everything),
         firstRestore: Rectangle? = null,
-    ) = WindowHost(frame, backend, firstRestore).also { it.start() }
+        restoreSize: Dimension = RESTORE_WINDOW_SIZE,
+    ) = WindowHost(frame, backend, firstRestore, restoreSize).also { it.start() }
 
     @Test
     fun `where nothing else answers the frame's extended state is the state`() {
@@ -204,6 +205,15 @@ class WindowHostTest {
         host.restore()
         frame.drain()
         assertEquals(Rectangle(300, 300, 1000, 700), frame.frameBounds, "later restores are the system's")
+    }
+
+    @Test
+    fun `a window born maximised with nothing saved is restored to the size its frame asks for, centred`() {
+        val frame = FakeFrame(state = Frame.MAXIMIZED_BOTH)
+        val host = host(frame, restoreSize = Dimension(900, 500))
+        host.restore()
+        frame.drain()
+        assertEquals(restoredBounds(frame.workArea, Dimension(900, 500)), frame.frameBounds)
     }
 
     @Test
