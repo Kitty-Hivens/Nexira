@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -64,6 +63,7 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.nx.NxProgressBar
 import hivens.ui.nx.NxSideSheet
 import hivens.ui.nx.NxTabRow
 import hivens.ui.puppet.PuppetClick
@@ -411,12 +411,9 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
         val phase = operation?.phase
         when {
             phase is PackOperationPhase.Running -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (phase.total > 0) {
-                    LinearProgressIndicator(
-                        progress = { phase.current.toFloat() / phase.total },
-                        modifier = Modifier.width(140.dp),
-                        color    = NxColor.lead(),
-                    )
+                val measured = phase.total > 0
+                NxProgressBar(if (measured) phase.current.toFloat() / phase.total else null, Modifier.width(140.dp))
+                if (measured) {
                     Text(
                         text     = when (operation.kind) {
                             PackOperationKind.Update -> s.text("packVersionsApplying", phase.current, phase.total, phase.path)
@@ -428,8 +425,6 @@ private fun FooterStatus(operation: PackOperation?, notice: String?) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                } else {
-                    LinearProgressIndicator(modifier = Modifier.width(140.dp), color = NxColor.lead())
                 }
             }
             phase is PackOperationPhase.Updated -> Text(

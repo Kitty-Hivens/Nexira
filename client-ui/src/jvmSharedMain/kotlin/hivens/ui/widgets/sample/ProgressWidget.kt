@@ -9,21 +9,19 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityPhase
 import hivens.ui.i18n.nexiraStrings
+import hivens.ui.nx.NxProgressBar
 import hivens.ui.widgets.Sources
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberSource
@@ -32,7 +30,6 @@ import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
 import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxColor
 
 @Serializable
 data class ProgressProps(
@@ -92,7 +89,7 @@ private fun InProgressBody(activity: Activity) {
     val measured = phase.total > 0L
     val fraction = if (measured) {
         (phase.done.toFloat() / phase.total.toFloat()).coerceIn(0f, 1f)
-    } else 0f
+    } else null
     Row(
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -123,21 +120,7 @@ private fun InProgressBody(activity: Activity) {
         )
     }
     Spacer(Modifier.height(6.dp))
-    val barModifier = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp))
-    if (measured) {
-        LinearProgressIndicator(
-            progress   = { fraction },
-            modifier   = barModifier,
-            color      = NxColor.lead(),
-            trackColor = NxInk.line.copy(alpha = 0.15f),
-        )
-    } else {
-        LinearProgressIndicator(
-            modifier   = barModifier,
-            color      = NxColor.lead(),
-            trackColor = NxInk.line.copy(alpha = 0.15f),
-        )
-    }
+    NxProgressBar(fraction, height = 3.dp)
 }
 
 @Composable

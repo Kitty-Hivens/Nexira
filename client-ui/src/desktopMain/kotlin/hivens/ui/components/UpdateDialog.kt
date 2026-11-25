@@ -23,6 +23,7 @@ import hivens.ui.chrome.LocalWindowHide
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxDialog
+import hivens.ui.nx.NxProgressBar
 import hivens.ui.platform.SystemActions
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetScreen
@@ -488,20 +489,12 @@ private fun DownloadProgress(state: DownloadState.Downloading) {
 
         Spacer(Modifier.height(8.dp))
 
-        val progress = if (state.total > 0)
-            (state.downloaded.toFloat() / state.total).coerceIn(0f, 1f)
-        else 0f
+        // Null while the server has not named the size, which the bar sweeps for.
+        val progress = if (state.total > 0) (state.downloaded.toFloat() / state.total).coerceIn(0f, 1f) else null
 
-        LinearProgressIndicator(
-            progress        = { progress },
-            modifier        = Modifier.fillMaxWidth().height(8.dp),
-            color           = NxColor.lead(),
-            trackColor      = NxColor.wash(NxInk.quiet, 0.25f),
-            gapSize         = 0.dp,
-            drawStopIndicator = {}
-        )
+        NxProgressBar(progress, height = 8.dp)
 
-        if (state.total > 0) {
+        if (progress != null) {
             Spacer(Modifier.height(4.dp))
             Text(
                 "${(progress * 100).roundToInt()}%",

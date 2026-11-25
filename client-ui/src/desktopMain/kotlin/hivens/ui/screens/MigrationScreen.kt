@@ -4,12 +4,10 @@ import hivens.ui.i18n.nexiraStrings
 import hivens.ui.theme.LocalMonoFamily
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -20,6 +18,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxProgressBar
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -174,17 +173,7 @@ private fun ProgressContent(source: DataDirMigration.Source, state: UiState.InPr
             textAlign = TextAlign.Center,
         )
     }
-    LinearProgressIndicator(
-        progress = { fraction },
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(8.dp)
-            .clip(RoundedCornerShape(4.dp)),
-        color = NxColor.lead(),
-        trackColor = NxColor.wash(NxInk.quiet, 0.25f),
-        gapSize = 0.dp,
-        drawStopIndicator = {},
-    )
+    NxProgressBar(fraction, height = 8.dp)
     Text(
         text = s.text("migrationProgressBytes", doneMb, totalMb),
         style = MaterialTheme.typography.bodySmall,

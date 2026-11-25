@@ -8,6 +8,9 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.ProgressBarRangeInfo
+import androidx.compose.ui.semantics.SemanticsProperties
+import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import org.jetbrains.skia.Bitmap
@@ -18,7 +21,6 @@ import kotlin.test.assertTrue
 import hivens.ui.theme.NxThemed
 import hivens.ui.theme.TestTheme
 import hivens.themes.api.SchemeColours
-import hivens.ui.theme.Status
 
 /**
  * Reads a measurement out of the frame rather than asserting the PNG is not
@@ -40,7 +42,7 @@ class NxProgressBarRenderTest {
     /** Accent run along one scanline, in pixels. */
     private fun accentRun(progress: Float?, row: Int): Int {
         val bmp = render(progress)
-        val accent = SchemeColours(TestTheme.dark).status(Status.Info)
+        val accent = SchemeColours(TestTheme.dark).lead
         var run = 0
         for (x in 0 until width) {
             if (isAccent(bmp.getColor(x, row), accent)) run++
@@ -105,5 +107,27 @@ class NxProgressBarRenderTest {
         val mid = accentRun(1f, barHeight / 2)
         val top = accentRun(1f, 0)
         assertTrue(top < mid - 4, "the ends should round: top $top vs middle $mid")
+    }
+
+    @OptIn(ExperimentalComposeUiApi::class)
+    private fun said(progress: Float?): ProgressBarRangeInfo? {
+        val scene = ImageComposeScene(width = width, height = barHeight, density = Density(density)) {
+            NxThemed(TestTheme, dark = true) { NxProgressBar(progress) }
+        }
+        try {
+            scene.render().close()
+            val nodes = scene.semanticsOwners.flatMap { listOf(it.rootSemanticsNode) + it.rootSemanticsNode.children }
+            return nodes.firstNotNullOfOrNull { it.config.getOrNull(SemanticsProperties.ProgressBarRangeInfo) }
+        } finally {
+            scene.close()
+        }
+    }
+
+    @Test
+    fun `the bar says its value aloud, and that it has none while the size is not known`() {
+        assertEquals(0.25f, said(0.25f)?.current)
+        assertEquals(1f, said(3f)?.current, "a value past the end is the end")
+        assertEquals(ProgressBarRangeInfo.Indeterminate, said(null))
+        assertEquals(ProgressBarRangeInfo.Indeterminate, said(Float.NaN))
     }
 }

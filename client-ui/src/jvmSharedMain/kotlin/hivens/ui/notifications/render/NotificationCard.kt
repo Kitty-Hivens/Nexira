@@ -26,8 +26,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -41,7 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
@@ -63,6 +60,7 @@ import hivens.ui.notifications.Severity
 import hivens.ui.press.IconButton
 import hivens.ui.press.TextButton
 import hivens.ui.theme.Motion
+import hivens.ui.nx.NxProgressBar
 import hivens.ui.nx.NxTooltip
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
@@ -283,23 +281,8 @@ private fun EventBody(event: NotificationEvent, accentColor: Color) {
     val progress = event.progress
     if (progress != null) {
         Spacer(Modifier.height(8.dp))
-        // The track is the quiet ink washed into the card: a track in the card's own
-        // fill was invisible, so the bar read as a bare sliver.
-        val trackColor = NxColor.wash(NxInk.quiet, 0.25f)
-        if (progress.isNaN()) {
-            LinearProgressIndicator(
-                modifier   = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
-                color      = accentColor,
-                trackColor = trackColor,
-            )
-        } else {
-            LinearProgressIndicator(
-                progress   = { progress.coerceIn(0f, 1f) },
-                modifier   = Modifier.fillMaxWidth().height(3.dp).clip(RoundedCornerShape(2.dp)),
-                color      = accentColor,
-                trackColor = trackColor,
-            )
-        }
+        // NaN is a job whose size is not known, which the bar sweeps for.
+        NxProgressBar(progress, height = 3.dp, color = accentColor)
     }
 }
 

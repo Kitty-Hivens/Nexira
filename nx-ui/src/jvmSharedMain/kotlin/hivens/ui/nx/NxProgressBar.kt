@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.progressSemantics
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -48,7 +49,7 @@ fun NxProgressBar(
     progress: Float?,
     modifier: Modifier = Modifier,
     height: Dp = 4.dp,
-    color: Color = NxColor.status(Status.Info),
+    color: Color = NxColor.lead(),
     trackColor: Color = NxColor.wash(NxInk.quiet, 0.25f),
 ) {
     val corner = CornerSize(50)
@@ -63,7 +64,7 @@ fun NxProgressBar(
     // the bar.
     val fraction by animateFloatAsState(
         targetValue    = target ?: 0f,
-        animationSpec  = Motion.colorShift,
+        animationSpec  = Motion.track,
         label          = "nxProgress",
     )
 
@@ -82,7 +83,8 @@ fun NxProgressBar(
         null
     }
 
-    Canvas(modifier.fillMaxWidth().height(height)) {
+    val semantics = if (target == null) Modifier.progressSemantics() else Modifier.progressSemantics(target)
+    Canvas(modifier.then(semantics).fillMaxWidth().height(height)) {
         val radiusPx = corner.toPx(Size(size.width, size.height), this)
         val radius = CornerRadius(radiusPx, radiusPx)
 

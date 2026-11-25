@@ -22,7 +22,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -89,6 +88,7 @@ import hivens.ui.nx.NxDiffRowKind
 import hivens.ui.nx.NxIconButton
 import hivens.ui.nx.NxMetaChip
 import hivens.ui.nx.NxMetaChipTone
+import hivens.ui.nx.NxProgressBar
 import hivens.ui.nx.NxRow
 import hivens.ui.nx.NxSection
 import hivens.ui.nx.NxSteadyText
@@ -898,12 +898,9 @@ private fun StatusRow(operation: PackOperation?) {
         when (val phase = operation?.phase) {
             null -> Unit
             is PackOperationPhase.Running -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (phase.total > 0) {
-                    LinearProgressIndicator(
-                        progress = { phase.current.toFloat() / phase.total },
-                        modifier = Modifier.width(160.dp),
-                        color    = NxColor.lead(),
-                    )
+                val measured = phase.total > 0
+                NxProgressBar(if (measured) phase.current.toFloat() / phase.total else null, Modifier.width(160.dp))
+                if (measured) {
                     Text(
                         text  = s.text("packVersionsApplying", phase.current, phase.total, phase.path),
                         style = MaterialTheme.typography.labelSmall,
@@ -911,8 +908,6 @@ private fun StatusRow(operation: PackOperation?) {
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                     )
-                } else {
-                    LinearProgressIndicator(modifier = Modifier.width(160.dp), color = NxColor.lead())
                 }
             }
             is PackOperationPhase.Updated -> Text(
