@@ -227,6 +227,29 @@ class DocumentTest {
         assertSame(document, document.withOwnNames { error("nothing to mint") })
     }
 
+    @Test
+    fun `a single given a name of its own goes by it wherever it stands`() {
+        val bar = WidgetKind("bar")
+        val box = node("rail", "rail", "top" to listOf(WidgetInstance(bar, "rail")))
+        val shared = document.copy(
+            compositions = mapOf(
+                launcher to document.launcher().copy(
+                    singles = mapOf(rail to box, bar to node("bar", "rail")),
+                    configs = mapOf(home to config(standing(), WidgetInstance(bar, "rail"), node("box", "box", "body" to listOf(WidgetInstance(bar, "rail"))))),
+                    residents = SlotContent(listOf(WidgetInstance(bar, "rail"))),
+                ),
+            ),
+        )
+        val named = shared.withOwnNames { "$it-own" }
+        assertEquals(listOf("rail", "rail-own"), named.launcher().singles.values.map { it.instanceId })
+        assertEquals(listOf("rail", "rail-own", "box"), named.ids(root(home)))
+        assertEquals(listOf("rail-own"), named.ids(root(home).child("box", SlotId("body"))))
+        assertEquals(listOf("rail-own"), named.ids(root(home).child("rail", SlotId("top"))))
+        assertEquals(listOf("rail-own"), named.ids(NodePath(launcher, NodeRoot.Residents)))
+        val raw = named.launcher().configs.getValue(home).layouts.single().root.widgets
+        assertEquals(listOf("rail", "rail-own", "box"), raw.map { it.instanceId }, "in the file too, which is what an edit's address goes by")
+    }
+
     // The file
 
     @Test
