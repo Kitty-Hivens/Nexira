@@ -136,7 +136,7 @@ class HostBoundaryTest {
         val layout = assertNotNull(all["hivens/ui/AppLayout.kt"], "AppLayout is gone")
         assertTrue(layout.lines().flatMap(::themesNames).isEmpty(), "AppLayout names a key of the themes module, whose controls are a module of their own")
         val drawing = listOf("ThemesKeys.Active", "ThemesKeys.Dark", "ThemesKeys.ACTIVE_ID", "ThemesKeys.DARK_ID")
-        val shells = listOf("hivens/ui/AppShell.kt", "hivens/ui/AndroidShell.kt", "hivens/ui/ShellHost.kt", "hivens/ui/ShellLook.kt", "hivens/ui/screens/ConsoleWindow.kt", "hivens/ui/LookValues.kt")
+        val shells = listOf("hivens/ui/AppShell.kt", "hivens/ui/AndroidShell.kt", "hivens/ui/ShellHost.kt", "hivens/ui/ShellLook.kt", "hivens/ui/host/OpenedWindows.kt", "hivens/ui/LookValues.kt")
         shells.forEach { path ->
             val text = assertNotNull(all[path], "$path is gone")
             drawing.forEach { name -> assertTrue(name !in text, "$path names $name, which the windows no longer draw with") }

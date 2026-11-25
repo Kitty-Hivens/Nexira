@@ -13,6 +13,7 @@ import hivens.widget.model.ConfigId
 import hivens.widget.model.History
 import hivens.widget.model.HistoryEntry
 import hivens.widget.model.Show
+import hivens.widget.model.StandardDocument
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -29,7 +30,14 @@ class LauncherConfigsTest {
     @Test
     fun `every config has its widget, and every screen widget its config`() {
         val screens = launcherAndControls.all().keys.map { it.value }.filter { it.startsWith("screen.") }.toSet()
-        assertEquals(LauncherConfigs.all.map { screenKind(it).value }.toSet(), screens)
+        assertEquals((LauncherConfigs.all + LauncherConfigs.Console).map { screenKind(it).value }.toSet(), screens)
+    }
+
+    @Test
+    fun `the console's composition starts on the console`() {
+        val console = StandardDocument.load().compositions.getValue(LauncherConfigs.ConsoleComposition)
+        assertEquals(LauncherConfigs.Console, console.start)
+        assertEquals(LauncherConfigs.Composition, StandardDocument.load().start)
     }
 
     @Test

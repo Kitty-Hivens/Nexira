@@ -22,6 +22,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -56,6 +57,7 @@ import hivens.ui.debug.IdentitySlotChromeModifier
 import hivens.ui.debug.IdentityWidgetDecorator
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetGraphReconciler
+import hivens.ui.host.CompositionWindows
 import hivens.ui.host.HostKoin
 import hivens.ui.host.HostedWindow
 import hivens.ui.host.MainWindowNavigation
@@ -68,14 +70,12 @@ import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.logic.LaunchLogCollector
-import hivens.ui.screens.ConsoleContent
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxTheme
 import hivens.ui.theme.ThemeRevealHost
 import hivens.ui.theme.rememberThemeReveal
-import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.utils.PreferenceWriter
 import hivens.ui.widgets.NxMapControls
@@ -103,6 +103,7 @@ import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetSurfaceRenderer
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.Document
 import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -119,7 +120,7 @@ import java.nio.file.Path
  *
  * What it leaves to the desktop: the tray and the system notifier, hiding the window while a
  * game runs, the custom window chrome, the wallpaper pipeline, the console as a window of its
- * own (it is an overlay here) and the quit question (the system owns the lifecycle).
+ * own (it is a layer here, as is any composition opened in a window of its own) and the quit question (the system owns the lifecycle).
  *
  * [koin] is the launcher's graph, which it is drawn inside (see [HostKoin]).
  */
@@ -155,6 +156,8 @@ private fun AndroidShellContent() {
     val updateRecovery: ApplyRecovery = koinInject()
     val packAutoUpdates: PackAutoUpdateService = koinInject()
     val editModeController: EditModeController = koinInject()
+    val windows: CompositionWindows = koinInject()
+    val openWindows by windows.open.collectAsState()
 
     val settings = remember { settingsService.getSettings() }
 
@@ -337,29 +340,33 @@ private fun AndroidShellContent() {
                         // gets the gesture only when nothing is open.
                         BackHandler(enabled = layers.dismiss.handlesBack) { layers.dismiss.dismissTop() }
 
-                        // The console over the whole window, as a modal layer: Escape and back close
-                        // it through the window's stack, and the keyboard goes back to the rail entry
-                        // that opened it. Drawn in place it had nowhere to give the keyboard back to.
-                        Layer(
-                            visible = gameConsole.shouldShowConsole,
-                            modal = true,
-                            onDismissRequest = { gameConsole.hide() },
-                            dismissOnOutsidePress = false,
-                        ) {
-                            val settingsStore: ConsoleSettingsStore = koinInject()
-                            val consoleSettings by settingsStore.settings.collectAsState()
-                            NxSurface(SurfaceKind.Page, Modifier.fillMaxSize()) {
-                                // The bars, the gesture bar among them, the strip along the bottom where a swipe is
-                                // the system's, and the keyboard: the status row at the bottom lay under the gesture
-                                // bar with its toggle cut off. Not safeDrawing, which also keeps out the cutout, and a
-                                // phone on its side reports its camera as a band the height of the screen.
-                                val clear = WindowInsets.statusBars
-                                    .union(WindowInsets.navigationBars)
-                                    .union(WindowInsets.mandatorySystemGestures.only(WindowInsetsSides.Bottom))
-                                    .union(WindowInsets.tappableElement)
-                                    .union(WindowInsets.ime)
-                                Box(Modifier.fillMaxSize().windowInsetsPadding(clear)) {
-                                    ConsoleContent(settings = consoleSettings, onSettingsChange = settingsStore::update)
+                        // A phone has one window, so a composition opened in a window of its own,
+                        // the console say, is shown over the whole window as a modal layer: Escape and
+                        // back close it through the window's stack, and the keyboard goes back to the
+                        // rail entry that opened it. Drawn in place it had nowhere to give the keyboard back to.
+                        val document: Document = koinInject()
+                        document.compositions.forEach { (name, composition) ->
+                            key(name) {
+                                Layer(
+                                    visible = name in openWindows,
+                                    modal = true,
+                                    onDismissRequest = { windows.close(name) },
+                                    dismissOnOutsidePress = false,
+                                ) {
+                                    NxSurface(SurfaceKind.Page, Modifier.fillMaxSize()) {
+                                        // The bars, the gesture bar among them, the strip along the bottom where a swipe is
+                                        // the system's, and the keyboard: the status row at the bottom lay under the gesture
+                                        // bar with its toggle cut off. Not safeDrawing, which also keeps out the cutout, and a
+                                        // phone on its side reports its camera as a band the height of the screen.
+                                        val clear = WindowInsets.statusBars
+                                            .union(WindowInsets.navigationBars)
+                                            .union(WindowInsets.mandatorySystemGestures.only(WindowInsetsSides.Bottom))
+                                            .union(WindowInsets.tappableElement)
+                                            .union(WindowInsets.ime)
+                                        Box(Modifier.fillMaxSize().windowInsetsPadding(clear)) {
+                                            CompositionContent(name, composition.start)
+                                        }
+                                    }
                                 }
                             }
                         }

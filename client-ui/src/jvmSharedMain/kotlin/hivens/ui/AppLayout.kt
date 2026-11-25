@@ -132,7 +132,7 @@ fun AppLayout(
  * somebody made, whose id the config is.
  */
 @Composable
-private fun ConfigBody(config: ConfigId) {
+internal fun ConfigBody(config: ConfigId) {
     val kind = screenKind(config)
     val screen = LocalWidgetRegistry.current[kind]
     if (screen == null) {
@@ -153,7 +153,7 @@ private fun ConfigBody(config: ConfigId) {
  * that stands where something it reads has no answer, which is also put here.
  */
 @Composable
-private fun ProvideComposition(history: CompositionHistory, show: (Show) -> Unit, content: @Composable () -> Unit) {
+internal fun ProvideComposition(history: CompositionHistory, show: (Show) -> Unit, content: @Composable () -> Unit) {
     ProvideScoped(CompositionKeys.History, history.now) {
     ProvideScopedCommand(CompositionKeys.Show, rememberLatestCommand(show)) {
     ProvideScopedCommand(CompositionKeys.Back, rememberLatestCommand<Unit> { history.back() }) {

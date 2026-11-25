@@ -28,14 +28,13 @@ import hivens.ui.chrome.size
 import hivens.ui.chrome.titleIn
 import hivens.ui.generated.resources.Res
 import hivens.ui.generated.resources.icon
+import hivens.ui.host.OpenedWindows
 import hivens.ui.i18n.NexiraStrings
-import hivens.ui.screens.ConsoleWindow
 import hivens.ui.theme.NxTheme
 import hivens.ui.threshold.BootOutcome
 import hivens.ui.threshold.BootStage
 import hivens.ui.threshold.ThresholdOverlay
 import hivens.ui.threshold.ThresholdPalette
-import hivens.widget.model.CompositionName
 import hivens.widget.model.Frame
 import hivens.window.SavedWindow
 import hivens.window.WindowManagerProbe
@@ -81,10 +80,11 @@ class WindowChromeHooks(defaultClose: () -> Unit) {
  * the shell and the console each draw themselves inside the boot's own Koin,
  * which is never registered globally.
  *
- * The console is a window of the application in its own right, a sibling of the
- * main window here rather than a part of its content: hiding the main window to
- * the tray leaves it open, and quitting ends the application and both windows with
- * it. It draws in the look the main shell publishes to [ShellLook].
+ * A composition opened in a window of its own, the console say, is a window of the
+ * application in its own right, a sibling of the main window here rather than a part
+ * of its content: hiding the main window to the tray leaves it open, and quitting ends
+ * the application and every window with it. It draws in the look the main shell
+ * publishes to [ShellLook].
  */
 @Composable
 fun ApplicationScope.ShellHost(
@@ -98,7 +98,6 @@ fun ApplicationScope.ShellHost(
     // What the composition asks of its window. The person's own choice of the system's
     // frame is stronger than a composition that would draw one.
     val frame = remember { pre.document.startComposition?.frame ?: Frame() }
-    val consoleFrame = remember { pre.document.compositions[CompositionName("console")]?.frame ?: Frame() }
     val undecorated = !frame.systemChrome && pre.peek.useCustomChrome && WindowManagerProbe.allowsCustomFrame
     // Opens the way it was left: maximised, or as a window with the frame it had.
     // A first run opens the way the frame asks, and under a window manager that places
@@ -228,6 +227,7 @@ fun ApplicationScope.ShellHost(
             }
         }
     }
-    // Koin is up once the boot is ready, and the console asks it for its service.
-    (outcome as? BootOutcome.Ready)?.let { ready -> ConsoleWindow(look, consoleFrame, ready.result.koin) }
+    // Koin is up once the boot is ready, and the windows the compositions are opened in
+    // beside this one, the console among them, are drawn inside it.
+    (outcome as? BootOutcome.Ready)?.let { ready -> OpenedWindows(pre.document, look, ready.result.koin) }
 }

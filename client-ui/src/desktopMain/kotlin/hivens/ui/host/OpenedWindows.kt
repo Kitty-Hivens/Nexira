@@ -1,12 +1,14 @@
-package hivens.ui.screens
+package hivens.ui.host
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
@@ -16,6 +18,7 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.rememberWindowState
 import hivens.i18n.api.LocalTranslator
+import hivens.ui.CompositionContent
 import hivens.ui.ShellLook
 import hivens.ui.ShellLookValues
 import hivens.ui.chrome.LocalChromeClose
@@ -31,12 +34,6 @@ import hivens.ui.chrome.minimum
 import hivens.ui.chrome.size
 import hivens.ui.chrome.titleIn
 import hivens.ui.customization.LocalCustomization
-import hivens.ui.host.DesktopWindowBackend
-import hivens.ui.host.HostKoin
-import hivens.ui.host.HostedWindow
-import hivens.ui.host.WindowCommand
-import hivens.ui.host.WindowId
-import hivens.ui.host.WindowOwner
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
@@ -44,11 +41,11 @@ import hivens.ui.read
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxTheme
-import hivens.ui.utils.ConsoleSettingsStore
-import hivens.ui.utils.GameConsoleService
 import hivens.widget.api.LocalScope
 import hivens.widget.api.WidgetScope
-import hivens.widget.model.Frame
+import hivens.widget.model.Composition
+import hivens.widget.model.CompositionName
+import hivens.widget.model.Document
 import hivens.window.WindowHost
 import hivens.window.WindowManagerProbe
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,45 +55,45 @@ import java.awt.event.WindowAdapter
 import java.awt.event.WindowEvent
 
 /**
- * The console in a window of its own: the same [ConsoleContent] the pack page embeds,
- * open while the console service says it is.
+ * A window for each composition of [document] that [CompositionWindows] has open, beside the main window: the
+ * console, say. Each is a window of the application in its own right, so it lives until it is closed or the launcher
+ * quits, whatever the main window does meanwhile, and hiding the main window to the tray leaves it open.
  *
- * A window of the application beside the main one, not inside the main window's
- * composition, so it lives until it is closed or the launcher quits, whatever the
- * main window does meanwhile: hiding the main window to the tray leaves it open.
- * It is an independent window in the host's registry, with its own [WindowHost], its
- * own window level, its own layers and dismiss stack, and the window locals of its
- * own window. It draws in the answers of every axis of the look, read off the app level
- * as the main window reads them, and in the words, the face and the customization the
- * main shell decided, read through [look]. [frame] is what its composition asks of the
- * window. Nothing of the main window's frame is offered in it, so a composition that asks
- * for no system frame draws its own.
- *
- * [koin] is the launcher's graph, which it is drawn inside (see [HostKoin]).
+ * [koin] is the launcher's graph, which they are drawn inside (see [HostKoin]).
  */
 @Composable
-fun ConsoleWindow(look: ShellLook, frame: Frame, koin: KoinApplication) {
+fun OpenedWindows(document: Document, look: ShellLook, koin: KoinApplication) {
     // Inside the launcher's graph here rather than by the caller, so no caller can open
-    // the console without the graph it injects from.
-    HostKoin(koin) { ConsoleWindowContent(look, frame) }
+    // a window without the graph it injects from.
+    HostKoin(koin) {
+        val windows: CompositionWindows = koinInject()
+        val open by windows.open.collectAsState()
+        open.forEach { name ->
+            val composition = document.compositions[name] ?: return@forEach
+            key(name) { CompositionWindow(name, composition, look, windows) }
+        }
+    }
 }
 
+/**
+ * The window [composition] is shown in. An independent window in the host's registry, with its own [WindowHost], its
+ * own window level, its own layers and dismiss stack, and the window locals of its own window. It draws in the
+ * answers of every axis of the look, read off the app level as the main window reads them, and in the words, the face
+ * and the customization the main shell decided, read through [look]. The frame is what the composition asks of the
+ * window. Nothing of the main window's frame is offered in it, so a composition that asks for no system frame draws
+ * its own.
+ */
 @Composable
-private fun ConsoleWindowContent(look: ShellLook, frame: Frame) {
-    val console: GameConsoleService = koinInject()
-    if (!console.shouldShowConsole) return
+private fun CompositionWindow(name: CompositionName, composition: Composition, look: ShellLook, windows: CompositionWindows) {
+    val frame = composition.frame
     val appLevel: WidgetScope = koinInject()
-    // Collected here rather than by the main shell: the store publishes on every
-    // reported slider value, and nothing else should repaint for it.
-    val settingsStore: ConsoleSettingsStore = koinInject()
-    val settings by settingsStore.settings.collectAsState()
     val windowState = rememberWindowState(
         placement = if (frame.opensMaximized) WindowPlacement.Maximized else WindowPlacement.Floating,
         width     = frame.size.width.dp,
         height    = frame.size.height.dp,
     )
     val layers = rememberWindowLayers()
-    val close = remember(console) { { console.hide() } }
+    val close = remember(windows, name) { { windows.close(name) } }
     val ownFrame = !frame.systemChrome && WindowManagerProbe.allowsCustomFrame
 
     CompositionLocalProvider(LocalTranslator provides look.words) {
@@ -108,8 +105,8 @@ private fun ConsoleWindowContent(look: ShellLook, frame: Frame) {
             undecorated       = ownFrame,
             resizable         = frame.resizable,
             // The window's own dismiss stack hears every key first and last, as the
-            // main window's does. Escape that nothing in the console used closes
-            // the topmost of its layers.
+            // main window's does. Escape that nothing in it used closes the topmost
+            // of its layers.
             onPreviewKeyEvent = layers.dismiss::onPreviewKeyEvent,
             onKeyEvent        = layers.dismiss::onKeyEvent,
         ) {
@@ -140,6 +137,10 @@ private fun ConsoleWindowContent(look: ShellLook, frame: Frame) {
             val backend = remember(hosts) {
                 DesktopWindowBackend(hosts, scope, WindowCommand.entries.toSet(), onClose = close)
             }
+            // Asked for again while it is open: it comes to the front.
+            LaunchedEffect(windows, name, backend) {
+                windows.raises.collect { raised -> if (raised == name) backend.raise() }
+            }
             val hostState = backend.state.collectAsState()
             val capabilities by remember(hostState) { derivedStateOf { hostState.value.allowed } }
 
@@ -157,13 +158,13 @@ private fun ConsoleWindowContent(look: ShellLook, frame: Frame) {
                 LocalWindowCapabilities    provides capabilities,
             ) {
                 appLevel.read(ShellLookValues.Look).Provide {
-                    HostedWindow(WindowId.Console, WindowOwner.Launcher, backend) {
+                    HostedWindow(WindowId(name.value), WindowOwner.Launcher, backend) {
                         // Around the theme, as in the main window: the layers belong to the
                         // window, and a layer takes its theme from where it is opened.
                         LayerHost(layers, Modifier.fillMaxSize()) {
                             NxTheme(interfaceText = look.interfaceText) {
                                 NxSurface(SurfaceKind.Page, Modifier.fillMaxSize(), shape = RectangleShape) {
-                                    ConsoleContent(settings = settings, onSettingsChange = settingsStore::update)
+                                    CompositionContent(name, composition.start)
                                 }
                             }
                         }

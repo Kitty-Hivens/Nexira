@@ -57,6 +57,10 @@ data class ConsoleSnapshot(
  * are kept; older entries drop off the front but remain on disk and page back
  * via [loadHistoryBefore].
  *
+ * Whether the console is on screen is not this: it is a composition of the
+ * document, open in a window of its own while
+ * [hivens.ui.host.CompositionWindows] says so.
+ *
  * Constructor-injected [paths] (not a static `PlatformPaths.system()`) so the
  * singleton honors a mid-session data-dir migration. One Koin singleton shared
  * across composables; the snapshot StateFlow + the low-rate Compose flags below
@@ -69,24 +73,6 @@ class GameConsoleService(
 
     /** Coalesced, off-thread view of the buffer. Consumed via `collectAsState`. */
     val snapshot: StateFlow<ConsoleSnapshot> = _snapshot.asStateFlow()
-
-    private var shown by mutableStateOf(false)
-
-    private val _visible = MutableStateFlow(false)
-
-    /**
-     * Whether the console is asked to be on screen, for a reader outside the
-     * composition, which a source is. The same value as [shouldShowConsole].
-     */
-    val visible: StateFlow<Boolean> = _visible.asStateFlow()
-
-    /** Whether the console is asked to be on screen. Compose state, so a window drawing it hears the change. */
-    var shouldShowConsole: Boolean
-        get() = shown
-        set(value) {
-            shown = value
-            _visible.value = value
-        }
 
     /**
      * Command sink: set by the [hivens.ui.notifications.drivers.LaunchDriver]
@@ -502,9 +488,6 @@ class GameConsoleService(
             file
         } catch (_: Exception) { null }
     }
-
-    fun show() { shouldShowConsole = true }
-    fun hide() { shouldShowConsole = false }
 
     fun attachCommandSink(sink: (String) -> Unit) { _commandSink = sink }
     fun detachCommandSink() { _commandSink = null }

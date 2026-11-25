@@ -19,6 +19,10 @@ object LauncherConfigs {
     /** The composition they are configs of. */
     val Composition = CompositionName("launcher")
 
+    /** The console's composition, in a window of its own, and its one config. */
+    val ConsoleComposition = CompositionName("console")
+    val Console = ConfigId("console")
+
     val Home = ConfigId("home")
     val Library = ConfigId("library")
     val Browse = ConfigId("browse")

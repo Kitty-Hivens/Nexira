@@ -52,6 +52,8 @@ class LaunchDriver(
     private val activities: ActivityRegistry,
     private val sessions: SessionRegistry,
     private val gameConsole: GameConsoleService,
+    /** Puts the console on screen. */
+    private val showConsole: () -> Unit,
     private val appScope: CoroutineScope,
     // Offer-offline-on-failure: mint the fallback identity + resolve its name.
     private val offlineProvider: OfflineAuthProvider,
@@ -265,7 +267,7 @@ class LaunchDriver(
             packDisplayName = target.displayName,
             packIconUrl     = target.iconUrl,
             abort           = { controller.abort(target.id) },
-            showConsole     = { gameConsole.show() },
+            showConsole     = showConsole,
         )
         // Wire command-input -> process stdin while the game is alive.
         // The console UI surfaces an input row once canSendCommands is
@@ -328,7 +330,7 @@ class LaunchDriver(
             title     = s.text("notifPackFailed", target.displayName),
             body      = humanReason(reason, s),
             actions   = buildList {
-                add(NotifAction("show_console", s.text("notifActionShowConsole")) { gameConsole.show() })
+                add(NotifAction("show_console", s.text("notifActionShowConsole")) { showConsole() })
                 // Offer offline for a pack whose online auth failed: offline runs
                 // the modpack in singleplayer (an SC-bound pack still can't join
                 // its server offline). Only when an offline identity is resolvable.

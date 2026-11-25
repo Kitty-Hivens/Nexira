@@ -184,7 +184,7 @@ internal enum class SpanRole { Divider, Info, Warn, Error, Marker, Search }
  *
  * [Live] -- the running GameConsoleService buffer: tailing append,
  * sliding-window history paging, command input, clear / save. The
- * standalone ConsoleWindow and the PackDetail Logs tab's "current
+ * console window and the PackDetail Logs tab's "current
  * session" view use this.
  *
  * [FileBacked] -- a static, read-only snapshot parsed from a past

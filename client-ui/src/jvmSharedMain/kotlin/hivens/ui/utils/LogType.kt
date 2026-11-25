@@ -6,7 +6,7 @@ import java.util.Locale
 
 /**
  * Classification of a game-process log line. Drives colour + filter UX in
- * [hivens.ui.screens.ConsoleWindow]; [DIVIDER] is a synthetic entry the
+ * the console; [DIVIDER] is a synthetic entry the
  * launcher inserts itself (session boundaries), not a real game line.
  */
 enum class LogType { INFO, ERROR, WARN, DIVIDER }

@@ -1,6 +1,8 @@
 package hivens.ui.screens
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import hivens.accounts.api.AccountKeys
 import hivens.accounts.api.SessionState
 import hivens.accounts.api.SessionView
@@ -21,6 +23,7 @@ import hivens.ui.screens.detail.settings.PackSettingsCategory
 import hivens.ui.screens.detail.versions.PackVersionsScreen
 import hivens.ui.screens.library.LibraryScreen
 import hivens.ui.screens.settings.SettingsScreen
+import hivens.ui.utils.ConsoleSettingsStore
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.about.AboutSurface
@@ -39,6 +42,7 @@ import hivens.widget.model.PageValue
 import hivens.widget.model.Show
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetKind
+import org.koin.compose.koinInject
 
 // Each of the launcher's own screens as the one widget its config holds, until the screens are made of widgets
 // themselves. None is an argument's: what an opening sets is a value of the page, and the rest is a source or a
@@ -184,4 +188,13 @@ fun BuildScreenWidget() {
     val target = pageValue(CataloguePages.Project) ?: return
     val build = pageValue(CataloguePages.Build) ?: return
     ModVersionScreen(target = target, versionId = build.versionId)
+}
+
+// The console's own config. What it is drawn on is its window's, or its layer's on a phone.
+@Widget(id = "screen.console", enter = "none", removable = false)
+@Composable
+fun ConsoleScreenWidget() {
+    val store: ConsoleSettingsStore = koinInject()
+    val settings by store.settings.collectAsState()
+    ConsoleContent(settings = settings, onSettingsChange = store::update)
 }

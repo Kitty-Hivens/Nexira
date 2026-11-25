@@ -73,6 +73,7 @@ import hivens.ui.diag.probe
 import hivens.ui.editor.EditModeController
 import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.generated.resources.Res
+import hivens.ui.host.CompositionWindows
 import hivens.ui.host.DesktopWindowBackend
 import hivens.ui.host.HostKoin
 import hivens.ui.host.HostedWindow
@@ -88,6 +89,7 @@ import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.legacy.RetiredClientsGate
 import hivens.ui.logic.PostLaunchGate
 import hivens.ui.logic.PostLaunchMove
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.Severity
@@ -289,6 +291,7 @@ private fun FrameWindowScope.ShellContent(
     }
     DisposableEffect(windowHost) { onDispose { windowHost.close() } }
     val windowRegistry: WindowRegistry = koinInject()
+    val windows: CompositionWindows = koinInject()
     val windowStatus by windowHost.status.collectAsState()
     val windowActions = windowHost.actions.collectAsState()
     val windowCapabilities = remember(windowActions) { derivedStateOf { windowActions.value.toCapabilities() } }
@@ -731,7 +734,7 @@ private fun FrameWindowScope.ShellContent(
             }
 
             tray.onShowConsole = {
-                SwingUtilities.invokeLater { gameConsole.show() }
+                SwingUtilities.invokeLater { windows.show(LauncherConfigs.ConsoleComposition) }
             }
         }
 

@@ -32,6 +32,7 @@ class WidgetRegistryConsistencyTest {
         "screen.catalogue.pack",
         "screen.project",
         "screen.project.build",
+        "screen.console",
     )
 
     @Test

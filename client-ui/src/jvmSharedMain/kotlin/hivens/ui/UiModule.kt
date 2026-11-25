@@ -32,6 +32,7 @@ import hivens.ui.feature.catalogue.browse.CataloguePackPageSource
 import hivens.ui.feature.catalogue.browse.sampleCataloguePackPage
 import hivens.ui.feature.catalogue.project.ProjectPageSource
 import hivens.ui.feature.catalogue.project.sampleProjectPage
+import hivens.ui.host.CompositionWindows
 import hivens.ui.host.HostWindowState
 import hivens.ui.host.HostWords
 import hivens.ui.host.LauncherFiles
@@ -112,6 +113,7 @@ import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
+import hivens.widget.api.WindowKeys
 import hivens.widget.api.command
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
@@ -119,10 +121,12 @@ import hivens.widget.api.hostServices
 import hivens.widget.api.read
 import hivens.widget.api.registerModuleKeys
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.Document
 import hivens.widget.model.History
 import hivens.widget.model.HistoryEntry
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
+import hivens.widget.model.StandardDocument
 import hivens.widget.model.WidgetDataSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -190,6 +194,15 @@ fun uiCoreModule(
     single { WindowRegistry(windowPolicy) }
     // Where each composition stands, for an interface that starts over to go on from.
     single { CompositionHistories() }
+    // The document the windows are opened from, and the compositions shown in a window
+    // of their own. Kept for the process, so a window stays open while the interface
+    // starts over.
+    single<Document> { StandardDocument.load() }
+    single {
+        val document: Document = get()
+        // The composition the launcher starts in has its window already.
+        CompositionWindows { it in document.compositions && it != document.start }
+    }
     // Notification actions and drivers navigate here, into the main window.
     single { MainWindowRequests() }
 
@@ -566,6 +579,7 @@ fun uiCoreModule(
     single {
         val settingsService: ISettingsService = get()
         val words: HostWords = get()
+        val windows: CompositionWindows = get()
         LaunchDriver(
             controller      = get(),
             notifications   = get(),
@@ -573,6 +587,7 @@ fun uiCoreModule(
             activities      = get(),
             sessions        = get(),
             gameConsole     = get(),
+            showConsole     = { windows.show(LauncherConfigs.ConsoleComposition) },
             appScope        = get(),
             offlineProvider = get(),
             settingsService = settingsService,
@@ -681,8 +696,11 @@ internal fun uiDataRegistry(
     // where no level of its kind is above: display data, never handed to a widget
     // drawn for use. How the launcher looks is the themes module's keys.
     registerFactory(Sources.ConsoleVisible, sample = { false }) { app ->
-        flowSource(app.hostServices.get<GameConsoleService>().visible)
+        val open = app.hostServices.get<CompositionWindows>().open
+        val console = LauncherConfigs.ConsoleComposition
+        flowSource(open.map { console in it }.stateIn(app.coroutineScope, SharingStarted.Eagerly, console in open.value))
     }
+    registerFactory(WindowKeys.Open, sample = { emptySet() }) { app -> flowSource(app.hostServices.get<CompositionWindows>().open) }
     // What the composition's owner provides around every surface it draws, with the
     // sample in the sense above.
     declare(CompositionKeys.History) { History(LauncherConfigs.Home) }
@@ -708,9 +726,12 @@ internal fun uiCommandRegistry(
     register(Commands.SetDoNotDisturb, command(setDoNotDisturb))
     register(Commands.UpdateBackground, command(updateBackground))
     registerFactory(Commands.SetConsoleVisible) { app ->
-        val console = app.hostServices.get<GameConsoleService>()
-        command { visible -> if (visible) console.show() else console.hide() }
+        val windows = app.hostServices.get<CompositionWindows>()
+        val console = LauncherConfigs.ConsoleComposition
+        command { visible -> if (visible) windows.show(console) else windows.close(console) }
     }
+    registerFactory(WindowKeys.Show) { app -> command(app.hostServices.get<CompositionWindows>()::show) }
+    registerFactory(WindowKeys.Close) { app -> command(app.hostServices.get<CompositionWindows>()::close) }
     // What the composition's owner provides: its history.
     declare(CompositionKeys.Show)
     declare(CompositionKeys.Back)

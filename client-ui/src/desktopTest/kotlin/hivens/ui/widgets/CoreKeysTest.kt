@@ -97,6 +97,7 @@ import hivens.themes.api.ThemesKeys
 import hivens.ui.HostKeys
 import hivens.ui.accounts.ClientAccountsHost
 import hivens.ui.background.BackgroundSettings
+import hivens.ui.host.CompositionWindows
 import hivens.ui.host.HostWords
 import hivens.ui.host.LauncherFiles
 import hivens.ui.host.LauncherHostAccess
@@ -104,6 +105,7 @@ import hivens.ui.host.launcherServices
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.levelServicesModule
 import hivens.ui.moduleKeys
+import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.notifications.CorePart
 import hivens.ui.notifications.CoreProblem
 import hivens.ui.notifications.CoreProblems
@@ -142,6 +144,7 @@ import hivens.widget.api.TakenContribution
 import hivens.widget.api.TakenContributions
 import hivens.widget.api.TakenWords
 import hivens.widget.api.WidgetScope
+import hivens.widget.api.WindowKeys
 import hivens.widget.api.current
 import hivens.widget.api.find
 import hivens.widget.api.flowSource
@@ -152,6 +155,7 @@ import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.CommandKey
+import hivens.widget.model.CompositionName
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 import kotlinx.coroutines.CoroutineScope
@@ -506,6 +510,7 @@ class CoreKeysTest {
             env = { name -> if (name == "NEXIRA_DATA_DIR") dir.toString() else null },
         )
         val console = GameConsoleService(paths).also { consoles += it }
+        val windows = CompositionWindows { it == LauncherConfigs.ConsoleComposition }
 
         val application: KoinApplication = koinApplication {
             modules(
@@ -535,6 +540,7 @@ class CoreKeysTest {
                     single<PacksHost> { ClientPacksHost({}, indications, reporter, scope) }
                     single<AccountsHost> { ClientAccountsHost(reporter, preferences, CertificateTrustGate(Grants()), "smartycraft.example") }
                     single { console }
+                    single { windows }
                     single<SettingsStores> { domains }
                     single<HostFiles> { LauncherFiles(dir, preferences::write) }
                     single<TakenWords> { fixedTakenWords(launcherWords(compiled)) }
@@ -1357,14 +1363,32 @@ class CoreKeysTest {
     }
 
     @Test
-    fun `the console source follows the console, and the command shows and hides it`() {
+    fun `the console source follows the window of the console, and the command opens and closes it`() {
         val launcher = Launcher()
+        val console = LauncherConfigs.ConsoleComposition
         assertFalse(launcher.source(launcher.app, Sources.ConsoleVisible))
         launcher.fire(launcher.app, Commands.SetConsoleVisible, true)
-        assertTrue(launcher.console.shouldShowConsole)
+        assertEquals(setOf(console), launcher.windows.open.value)
         assertTrue(launcher.source(launcher.app, Sources.ConsoleVisible))
-        launcher.console.hide()
+        launcher.windows.close(console)
         assertFalse(launcher.source(launcher.app, Sources.ConsoleVisible))
+        launcher.fire(launcher.app, Commands.SetConsoleVisible, true)
+        launcher.fire(launcher.app, Commands.SetConsoleVisible, false)
+        assertEquals(emptySet(), launcher.windows.open.value)
+    }
+
+    @Test
+    fun `the kernel's window keys open, follow and close the window of a composition the document has`() {
+        val launcher = Launcher()
+        val console = LauncherConfigs.ConsoleComposition
+        assertEquals(emptySet(), launcher.source(launcher.app, WindowKeys.Open))
+        launcher.fire(launcher.app, WindowKeys.Show, console)
+        assertEquals(setOf(console), launcher.source(launcher.app, WindowKeys.Open))
+        assertTrue(launcher.source(launcher.app, Sources.ConsoleVisible), "the console's own key reads the same window")
+        launcher.fire(launcher.app, WindowKeys.Show, CompositionName("nowhere"))
+        assertEquals(setOf(console), launcher.source(launcher.app, WindowKeys.Open), "a composition the document lacks opens nothing")
+        launcher.fire(launcher.app, WindowKeys.Close, console)
+        assertEquals(emptySet(), launcher.source(launcher.app, WindowKeys.Open))
     }
 
     // ── Read and fired by a widget ────────────────────────────────────
@@ -1421,6 +1445,6 @@ class CoreKeysTest {
         assertNotNull(stop).invoke(pack.id)
         assertEquals(listOf(pack.id), launcher.actions.stopped)
         assertNotNull(show).invoke()
-        assertTrue(launcher.console.shouldShowConsole)
+        assertTrue(LauncherConfigs.ConsoleComposition in launcher.windows.open.value)
     }
 }

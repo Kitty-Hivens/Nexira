@@ -6,14 +6,14 @@ import androidx.compose.ui.unit.Density
 import hivens.launcher.platform.PlatformPaths
 import hivens.ui.ShellLook
 import hivens.ui.i18n.NexiraStrings
-import hivens.ui.screens.ConsoleWindow
 import hivens.ui.uiCommandRegistry
 import hivens.ui.utils.GameConsoleService
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.LevelHost
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
-import hivens.widget.model.Frame
+import hivens.widget.model.StandardDocument
+import kotlin.test.assertTrue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.koin.compose.getKoin
@@ -24,7 +24,6 @@ import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import java.nio.file.Files
 import kotlin.test.Test
-import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertSame
 
@@ -40,13 +39,13 @@ class HostKoinTest {
     private class Service
 
     /**
-     * The console window as the shell opens it, handed the graph and nothing around it.
-     * It injects its service before it opens a window, and with the console hidden it
-     * opens none, so it draws off screen: a console that took its Koin from the caller
-     * would find none here.
+     * The windows of the compositions opened beside the main one, as the shell draws them,
+     * handed the graph and nothing around it. They inject the list of open ones before they
+     * open a window, and with none open they open none, so they draw off screen: windows that
+     * took their Koin from the caller would find none here.
      */
     @Test
-    fun `the console window resolves from the graph it is handed, with nothing around it`() {
+    fun `the opened windows resolve from the graph they are handed, with nothing around them`() {
         val dir = Files.createTempDirectory("host-koin-console-")
         val paths = PlatformPaths(
             osName = "linux",
@@ -55,11 +54,12 @@ class HostKoinTest {
             env = { name -> if (name == "NEXIRA_DATA_DIR") dir.toString() else null },
         )
         val console = GameConsoleService(paths)
-        val graph = koinApplication { modules(module { single { console } }) }
+        val windows = CompositionWindows { true }
+        val graph = koinApplication { modules(module { single { console }; single { windows } }) }
         try {
-            assertFalse(console.shouldShowConsole, "the premise: a hidden console opens no window")
+            assertTrue(windows.open.value.isEmpty(), "the premise: nothing open opens no window")
             val scene = ImageComposeScene(40, 40, density = Density(1f)) {
-                ConsoleWindow(ShellLook(words = NexiraStrings.translator("en")), Frame(), graph)
+                OpenedWindows(StandardDocument.load(), ShellLook(words = NexiraStrings.translator("en")), graph)
             }
             try {
                 scene.render()

@@ -915,3 +915,11 @@ public final class hivens/widget/api/WidgetStateKt {
 	public static final fun widgetStateRefused (Lhivens/widget/model/WidgetInstance;Landroidx/compose/runtime/Composer;I)Z
 }
 
+public final class hivens/widget/api/WindowKeys {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/widget/api/WindowKeys;
+	public final fun getClose ()Lhivens/widget/model/CommandKey;
+	public final fun getOpen ()Lhivens/widget/model/SourceKey;
+	public final fun getShow ()Lhivens/widget/model/CommandKey;
+}
+
