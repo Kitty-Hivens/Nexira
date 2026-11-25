@@ -50,6 +50,7 @@ import hivens.ui.identity.SkinManager
 import hivens.ui.layout.LayoutGraphFlushHook
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.legacy.RetiredClientsGate
+import hivens.ui.navigation.CompositionHistories
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
@@ -384,8 +385,9 @@ fun runLauncher(args: Array<String>) {
  * Swing crash dialog.
  *
  * The data dirs and the Koin singletons are created by [GuiBootstrap.preWindow] and [GuiBootstrap.completeBoot]
- * -- outside this loop -- so a restart keeps the user's data, session and audio
- * playback; only transient composition state (current screen, scroll) is lost.
+ * -- outside this loop -- so a restart keeps the user's data, session, audio
+ * playback and history, one step back from the page that was shown. Only transient
+ * composition state, scroll say, is lost.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 private fun runShellWithRecovery(
@@ -469,10 +471,13 @@ private fun runShellWithRecovery(
         // the same crash would only count down to safe mode. The crash still counts:
         // if the module was not the whole story, safe mode is still the floor.
         if (!safe) {
+            val koin = (bootOutcome.value as? BootOutcome.Ready)?.result?.koin?.koin
             runCatching {
-                val modules = (bootOutcome.value as? BootOutcome.Ready)?.result?.koin?.koin?.getOrNull<WidgetModules>()
+                val modules = koin?.getOrNull<WidgetModules>()
                 modules?.culpritOf(crash)?.let { modules.switchOffAfterCrash(it, crash) }
             }.onFailure { log.warn("Could not trace the crash to a widget module", it) }
+            runCatching { koin?.getOrNull<CompositionHistories>()?.stepBackAfterCrash() }
+                .onFailure { log.warn("Could not step back from the page shown", it) }
         }
 
         val saved = runCatching {

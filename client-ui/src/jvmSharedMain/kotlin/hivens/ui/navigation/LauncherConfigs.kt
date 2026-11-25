@@ -5,6 +5,7 @@ import hivens.catalogue.api.CataloguePackRef
 import hivens.catalogue.api.CataloguePages
 import hivens.catalogue.api.ProjectTarget
 import hivens.packs.api.PackPages
+import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
 import hivens.widget.model.PageValue
 import hivens.widget.model.Show
@@ -15,6 +16,9 @@ import kotlinx.serialization.builtins.serializer
  * the id it has in the layout graph.
  */
 object LauncherConfigs {
+    /** The composition they are configs of. */
+    val Composition = CompositionName("launcher")
+
     val Home = ConfigId("home")
     val Library = ConfigId("library")
     val Browse = ConfigId("browse")

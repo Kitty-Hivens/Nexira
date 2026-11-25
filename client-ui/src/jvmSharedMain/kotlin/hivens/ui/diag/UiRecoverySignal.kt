@@ -24,9 +24,9 @@ enum class ShellRecovery {
  * with a brand-new composition. This is the "reload the shell" model (a crashed
  * panel comes back), not a frozen window.
  *
- * Persisted state (layout graph, settings, theme, session, audio) lives in Koin
- * singletons and files that outlive the composition, so a restart loses only
- * transient composition state (current screen, scroll), never user data.
+ * Persisted state (layout graph, settings, theme, session, audio) and the history
+ * live in Koin singletons and files that outlive the composition, so a restart loses
+ * only transient composition state, scroll say, never user data.
  *
  * [recordShellCrash] bounds restarts with TWO windows so both failure shapes
  * latch [safeMode] (after which the loop launches a standalone quit-only window
@@ -90,8 +90,8 @@ object UiRecoverySignal {
     /**
      * One-shot "the shell just reloaded after a crash" signal. Set before the
      * loop re-enters `application {}` on a retry; the fresh shell reads it once
-     * on first composition to surface a notification, so a reload that resets the
-     * current screen is never silent.
+     * on first composition to surface a notification, so a reload that steps back
+     * from the page shown is never silent.
      */
     @Volatile private var recovered: Boolean = false
 

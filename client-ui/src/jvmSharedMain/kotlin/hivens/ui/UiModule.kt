@@ -46,6 +46,7 @@ import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
 import hivens.ui.layout.LayoutGraphFlushHook
 import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.navigation.CompositionHistories
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.navigation.NavRequests
@@ -187,6 +188,8 @@ fun uiCoreModule(
     // The windows the launcher has open. One for the process: it outlives a shell
     // restarted after a crash, and each window leaves it as its shell goes.
     single { WindowRegistry(windowPolicy) }
+    // Where each composition stands, for an interface that starts over to go on from.
+    single { CompositionHistories() }
     // Notification actions and drivers navigate here, into the main window.
     single { MainWindowRequests() }
 

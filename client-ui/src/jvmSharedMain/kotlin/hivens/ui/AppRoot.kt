@@ -19,6 +19,7 @@ import hivens.ui.background.BackgroundManager
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.components.SignOutPrompt
 import hivens.ui.customization.CustomizationSettings
+import hivens.ui.navigation.CompositionHistories
 import hivens.ui.navigation.CompositionHistory
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.NavRequests
@@ -118,8 +119,10 @@ fun AppRoot(
 
     WarmLibrary()
 
-    // Where the composition has been, from Home. At Home back goes nowhere.
-    val history = remember { CompositionHistory(LauncherConfigs.Home) }
+    // Where the composition has been, from Home. At Home back goes nowhere. Kept for the
+    // run, so an interface that starts over goes on from where it was.
+    val histories: CompositionHistories = koinInject()
+    val history = remember(histories) { histories.of(LauncherConfigs.Composition, LauncherConfigs.Home) }
 
     NavigationInputs(history)
 
