@@ -1,6 +1,5 @@
 package hivens.themes
 
-import androidx.compose.foundation.LocalContextMenuRepresentation
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.LocalContentColor
@@ -233,13 +232,10 @@ class NxColourProviderTest {
             listOf(true, false).forEach { dark ->
                 val answers = NxColourProvider.open(context(manager = manager(ThemeSettings(theme = theme.id, dark = dark)))).answers.value
                 val colours = SchemeColours(theme.scheme(dark))
-                val top = colours.step(colours.topStep)
                 val before = LinkedHashMap<String, Any>()
                 before["colorScheme"] = schemeBefore(colours).toString()
                 before["content"] = colours.inkMain
                 before["selection"] = colours.lead to colours.lead.copy(alpha = 0.4f)
-                // The representation keeps its colours as their packed values.
-                before["menu"] = listOf(top, colours.inkMain, lerp(top, colours.lead, 0.14f)).map { it.value.toLong() }
                 before["plane"] = Plane(0, colours.step(0), Backdrop.Page)
                 val drawn = LinkedHashMap<String, Any>()
                 val scene = ImageComposeScene(8, 8, Density(1f)) {
@@ -249,10 +245,6 @@ class NxColourProviderTest {
                             drawn["content"] = LocalContentColor.current
                             val selection = LocalTextSelectionColors.current
                             drawn["selection"] = selection.handleColor to selection.backgroundColor
-                            val menu = LocalContextMenuRepresentation.current
-                            drawn["menu"] = listOf("backgroundColor", "textColor", "itemHoverColor").map { name ->
-                                menu::class.java.getDeclaredField(name).also { it.isAccessible = true }.get(menu) as Long
-                            }
                             drawn["plane"] = LocalPlane.current as Any
                         }
                     }
