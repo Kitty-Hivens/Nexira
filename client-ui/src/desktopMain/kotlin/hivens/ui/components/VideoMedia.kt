@@ -200,7 +200,11 @@ internal fun FetchStatus(fetch: MediaFetch, onCancel: () -> Unit) {
             color = NxMedia.ink.copy(alpha = 0.85f),
             style = MaterialTheme.typography.bodySmall,
         )
-        NxProgressBar(progress = fetch.fraction, modifier = Modifier.width(180.dp))
+        NxProgressBar(
+            progress   = fetch.fraction,
+            modifier   = Modifier.width(180.dp),
+            trackColor = NxMedia.ink.copy(alpha = 0.25f),
+        )
         byteLabel(fetch, s)?.let {
             Text(
                 text  = it,
