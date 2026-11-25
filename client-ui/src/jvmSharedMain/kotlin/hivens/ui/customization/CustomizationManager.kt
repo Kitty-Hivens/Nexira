@@ -1,16 +1,12 @@
 package hivens.ui.customization
 
+import hivens.core.io.readUtf8
 import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
-import hivens.ui.util.readUtf8
 import java.nio.file.Files
 import java.nio.file.Path
 
-/**
- * [publish] is supplied by the app root: this module has no project dependencies, and
- * a second copy of the atomic-write sequence would be a durability primitive
- * maintained in two places.
- */
+/** Reads and writes customization.json. [publish] is how a file is written whole, supplied by the app root. */
 class CustomizationManager(
     configPath: Path,
     private val json: Json,

@@ -2,8 +2,8 @@ package hivens.ui.theme
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.font.FontFamily
-import hivens.nx.ui.generated.resources.Res
-import hivens.nx.ui.generated.resources.dejavu_sans
+import hivens.ui.generated.resources.Res
+import hivens.ui.generated.resources.dejavu_sans
 import org.jetbrains.compose.resources.Font
 
 /**

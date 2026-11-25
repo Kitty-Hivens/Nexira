@@ -30,10 +30,6 @@ kotlin {
         namespace = "hivens.nx.ui"
         compileSdk { launcherApi(providers) }
         minSdk = 31
-        // Compose resources travel as assets of the Android library, which are only packaged when the library takes part in resource processing.
-        androidResources {
-            enable = true
-        }
         compilerOptions {
             jvmTarget.set(JvmTarget.JVM_25)
         }
@@ -83,13 +79,11 @@ kotlin {
                 implementation(libs.compose.foundation)
                 implementation(libs.compose.material3)
                 implementation(libs.compose.ui)
-                implementation(libs.compose.components.resources)
                 // The @Preview annotation the IDE draws components from. Annotation only.
                 implementation(libs.compose.ui.tooling.preview)
                 implementation(libs.kotlinx.coroutines.core)
                 implementation(libs.kotlinx.serialization.json)
                 implementation(libs.androidx.graphics.shapes)
-                implementation(libs.slf4j.api)
             }
         }
 
@@ -117,9 +111,6 @@ kotlin {
     }
 }
 
-// Own composeResources: the console's Braille face lives here. The generated
-// Res accessor uses a DIFFERENT package than client-ui's (hivens.ui.generated.resources)
-// so the two Res objects never collide on the classpath.
 // Every class this artifact holds, one binary name per line, for the widget module loader:
 // widget modules are shown the design system class by class from this list, because its
 // packages (hivens.ui.theme, hivens.ui.nx) also hold classes of the launcher's own
@@ -155,12 +146,6 @@ dependencies {
     "androidRuntimeClasspath"(libs.compose.ui.tooling)
     // The same for what draws the IDE's previews.
     "androidRuntimeClasspath"(project(":look:preview"))
-}
-
-compose.resources {
-    publicResClass = true
-    packageOfResClass = "hivens.nx.ui.generated.resources"
-    generateResClass = always
 }
 
 // jvmTarget is also forced project-wide by the root subprojects {} block; set it
