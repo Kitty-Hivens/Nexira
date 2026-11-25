@@ -53,8 +53,8 @@ val LocalHostWindow: ProvidableCompositionLocal<HostWindow?> = staticComposition
 
 /**
  * Draws [content] as the window [id]: registers it with the host while this call
- * stays composed, makes the window's level of the scope tree under the app level,
- * and puts there what lives per window. That is [Sources.Window] read from
+ * stays composed, makes the window's level of the scope tree under the level of its
+ * [owner], and puts there what lives per window. That is [Sources.Window] read from
  * [backend], the window commands [backend] takes, and the window's own services,
  * the surface families among them.
  *
@@ -75,8 +75,7 @@ fun HostedWindow(
     val host = remember(id, owner, composition, registry) { HostWindow(id, owner, composition, registry) }
     val scope = rememberCoroutineScope()
     val registered = remember(host, backend) { Registered(host, backend, scope) }
-    val app = LocalScope.current
-    val level = app?.let { rememberChildScope(it, ScopeLevel.Window) }
+    val level = LocalScope.current?.levelOf(owner)?.let { rememberChildScope(it, ScopeLevel.Window) }
     // In the composition, before LevelHost composes the content that reads the window.
     // An effect runs after that content, which would find no window on its first pass.
     @Suppress("RememberReturnType")
@@ -89,6 +88,17 @@ fun HostedWindow(
     ) {
         LevelHost(level, content)
     }
+}
+
+/**
+ * The level a window of [owner] stands under, for a caller drawn at this one. Not the
+ * caller's own: the launcher's window reads nothing of the composition that happened to
+ * open it, and a nested one reads its composition and not the page open in it. A nested
+ * window drawn under no composition, which the registry refuses, stands under the app.
+ */
+private fun WidgetScope.levelOf(owner: WindowOwner): WidgetScope? = when (owner) {
+    WindowOwner.Launcher -> nearest(ScopeLevel.App)
+    is WindowOwner.Composition -> nearest(ScopeLevel.Composition) ?: nearest(ScopeLevel.App)
 }
 
 /** Puts the window's state and its commands on its level, where they live until the level is closed. */

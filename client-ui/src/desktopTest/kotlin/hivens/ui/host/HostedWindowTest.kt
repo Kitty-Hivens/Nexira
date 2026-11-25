@@ -26,6 +26,7 @@ import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
+import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.Sources
@@ -40,6 +41,7 @@ import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.FamilyId
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -312,6 +314,49 @@ class HostedWindowTest {
                 assertEquals(WindowId.Main, inMain?.id)
                 assertNull(inSecond, "refused, so its pickers run without a hold")
                 assertEquals(listOf(WindowId.Main), registry.windows.value.map { it.id })
+            } finally {
+                scene.close()
+            }
+        }
+    }
+
+    /** Whoever draws the window, a widget on a page of the main window here, its level stands under its owner. */
+    @Test
+    fun `a window stands under its owner and not where it was opened from`() {
+        val koin = koin()
+        val registry = WindowRegistry()
+        val inMain = Seen()
+        val inPicker = Seen()
+        val inConsole = Seen()
+        var opener: WidgetScope? = null
+        onEventThread {
+            val scene = draw(koin) {
+                HostedWindow(WindowId.Main, WindowOwner.Launcher, FakeWindow(1000), registry) {
+                    Reader(inMain)
+                    val main = assertNotNull(LocalHostWindow.current).composition
+                    ChildLevel(ScopeLevel.Composition) {
+                        opener = LocalScope.current
+                        ChildLevel(ScopeLevel.Page) {
+                            HostedWindow(WindowId("picker"), WindowOwner.Composition(main), FakeWindow(500), registry) { Reader(inPicker) }
+                            HostedWindow(WindowId.Console, WindowOwner.Launcher, FakeWindow(640), registry) { Reader(inConsole) }
+                        }
+                    }
+                }
+            }
+            try {
+                val picker = assertNotNull(inPicker.level)
+                val console = assertNotNull(inConsole.level)
+                assertSame(opener, picker.parent, "the picker stands under the composition that opened it")
+                assertNull(picker.nearest(ScopeLevel.Page), "and not under the page it was opened from")
+                assertSame(koin.get<WidgetScope>(), console.parent, "the console stands under the app")
+
+                assertEquals(3, registry.windows.value.size, "none of them was refused")
+                assertEquals(1000, inMain.state?.width)
+                assertEquals(500, inPicker.state?.width)
+                assertEquals(640, inConsole.state?.width)
+                assertNotSame(inMain.nav, inPicker.nav)
+                assertNotSame(inMain.families, inPicker.families)
+                assertNotSame(inMain.openProject, inPicker.openProject)
             } finally {
                 scene.close()
             }

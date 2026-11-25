@@ -83,6 +83,25 @@ class KoinLevelServicesTest {
     }
 
     @Test
+    fun `a window under a composition has services of its own and sees the composition's`() {
+        val app = app(
+            module {
+                levelServices(ScopeLevel.Window) { scoped { PerWindow() } }
+                levelServices(ScopeLevel.Composition) { scoped { PerComposition() } }
+            },
+        )
+        val main = app.child(ScopeLevel.Window)
+        val opener = main.child(ScopeLevel.Composition)
+        val nested = opener.child(ScopeLevel.Window)
+        assertNotSame(main.services.get<PerWindow>(), nested.services.get<PerWindow>())
+        assertSame(opener.services.get<PerComposition>(), nested.services.get<PerComposition>())
+        assertNotSame(opener.services.get<PerComposition>(), nested.child(ScopeLevel.Composition).services.get<PerComposition>())
+        opener.close()
+        assertTrue(nested.koinScope.closed)
+        assertFalse(main.koinScope.closed)
+    }
+
+    @Test
     fun `the app level borrows the root scope and never closes it`() {
         val koin = koin(module { levelServices(ScopeLevel.Window) { scoped { PerWindow() } } })
         val app = koin.get<WidgetScope>()

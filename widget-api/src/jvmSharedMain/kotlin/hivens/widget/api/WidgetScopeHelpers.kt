@@ -288,9 +288,8 @@ fun ProvideSamples(ids: List<String>, content: @Composable () -> Unit) {
 private val sampleLog = LoggerFactory.getLogger("hivens.widget.api.ProvideSamples")
 
 /**
- * [scope], with a level of each of [kinds] made under it where none is above, in
- * the order the levels nest. A kind that would sit above the caller's own level and
- * is not there cannot be made, and its keys stay missing.
+ * [scope], with a level of each of [kinds] made under it where none is above, one
+ * inside the next in the order the levels usually stand.
  */
 @Composable
 private fun rememberSampleLevels(scope: WidgetScope, kinds: Set<ScopeLevel>): WidgetScope {
@@ -298,7 +297,7 @@ private fun rememberSampleLevels(scope: WidgetScope, kinds: Set<ScopeLevel>): Wi
     for (kind in ScopeLevel.entries) {
         val parent = at
         at = key(kind) {
-            if (kind in kinds && parent.nearest(kind) == null && kind > parent.level) rememberChildScope(parent, kind) else parent
+            if (kind in kinds && parent.nearest(kind) == null) rememberChildScope(parent, kind) else parent
         }
     }
     return at

@@ -11,6 +11,7 @@ import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetDataRegistry
+import hivens.widget.api.ProvideSamples
 import hivens.widget.api.ProvideScoped
 import hivens.widget.api.ScopedSource
 import hivens.widget.api.WidgetDataRegistry
@@ -30,6 +31,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
+import kotlin.test.assertSame
 import kotlin.test.assertTrue
 
 /**
@@ -43,7 +45,10 @@ class LevelsTest {
     private val pageKey = SourceKey<String>("test.page", ScopeLevel.Page)
     private val brokenKey = SourceKey<String>("test.broken", ScopeLevel.Page)
 
+    private val sampledWindowKey = SourceKey<String>("test.window.sampled", ScopeLevel.Window)
+
     private val registry = WidgetDataRegistry().apply {
+        declare(sampledWindowKey) { "sample" }
         register(appKey, flowSource(MutableStateFlow("app")))
         registerFactory(brokenKey) { error("this factory always fails") }
     }
@@ -96,6 +101,24 @@ class LevelsTest {
         assertEquals(ScopedSource.Present("mine"), below)
         assertEquals(ScopedSource.Missing(ScopeLevel.Page, levelFound = true), beside, "nothing was written to the level")
         assertEquals(ScopedSource.Missing(ScopeLevel.Page, levelFound = true), sibling)
+    }
+
+    @Test
+    fun `a sample stands in for a level of any kind that is not above the caller`() {
+        var page: WidgetScope? = null
+        var read: ScopedSource<String>? = null
+        var nearestPage: WidgetScope? = null
+        draw({
+            ChildLevel(ScopeLevel.Page) {
+                page = LocalScope.current
+                ProvideSamples(listOf(sampledWindowKey.id)) {
+                    read = rememberScopedSource(sampledWindowKey)
+                    nearestPage = LocalScope.current?.nearest(ScopeLevel.Page)
+                }
+            }
+        })
+        assertEquals(ScopedSource.Present("sample"), read)
+        assertSame(assertNotNull(page), nearestPage, "the level made for the sample hides nothing of what is there")
     }
 
     @Test

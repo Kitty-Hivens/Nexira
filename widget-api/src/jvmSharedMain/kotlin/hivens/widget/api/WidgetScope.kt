@@ -127,7 +127,8 @@ class HostAccess {
  * nearest one of the key's kind and reads it there: a source the owner provided to
  * that level, the app registry's value at the app level, or else a source made on
  * the spot from the registry's factory for the key. Two levels of one kind never
- * see each other's sources, so a page cannot read its sibling's. A value a widget
+ * see each other's sources, so a page cannot read its sibling's, nor a window the
+ * window above it. A value a widget
  * subtree put over a level with [ProvideScoped] lives in the composition and is
  * seen by [rememberScopedSource] only, not by [find].
  *
@@ -215,10 +216,14 @@ class WidgetScope private constructor(
     var closed: Boolean = false
         private set
 
-    /** Creates a level of kind [level] inside this one. Its owner closes it, and this level's own close does too. */
+    /**
+     * Creates a level of kind [level] owned by this one. Whoever asked closes it, and
+     * this level's own close does too. Any kind but the app can stand under any level:
+     * a window a composition opened stands under that composition and goes with it.
+     */
     @HostApi
     fun child(level: ScopeLevel): WidgetScope {
-        require(level > this.level) { "a $level level cannot sit inside a ${this.level} level" }
+        require(level != ScopeLevel.App) { "an App level is the root of a tree and cannot sit inside a ${this.level} level" }
         synchronized(lock) {
             check(!closed) { "a ${this.level} level that was disposed cannot take a $level level" }
             val own = host.child(level)
@@ -238,12 +243,15 @@ class WidgetScope private constructor(
             pageTable ?: PageLevels(this).also { pageTable = it }
         }
 
-    /** This level or the nearest one above it of kind [level], or null when there is none. */
+    /**
+     * This level or the nearest one above it of kind [level], or null when there is none.
+     * A nearer level of the kind hides the ones above it, so a window a composition
+     * opened is the window of everything below it.
+     */
     fun nearest(level: ScopeLevel): WidgetScope? {
         var at: WidgetScope? = this
         while (at != null) {
             if (at.level == level) return at
-            if (at.level < level) return null
             at = at.parent
         }
         return null

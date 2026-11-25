@@ -125,12 +125,40 @@ class WidgetScopeTest {
     }
 
     @Test
-    fun `a level sits only inside one declared before it`() {
-        val window = app().child(ScopeLevel.Window)
-        assertFailsWith<IllegalArgumentException> { window.child(ScopeLevel.Window) }
-        assertFailsWith<IllegalArgumentException> { window.child(ScopeLevel.App) }
-        // Skipping a level is allowed: an owner with no composition of its own can hold pages directly.
-        assertEquals(ScopeLevel.Page, window.child(ScopeLevel.Page).level)
+    fun `any level but the app stands under any other`() {
+        for (owner in ScopeLevel.entries) {
+            val above = app().let { if (owner == ScopeLevel.App) it else it.child(owner) }
+            assertFailsWith<IllegalArgumentException>("an app below $owner") { above.child(ScopeLevel.App) }
+            for (kind in ScopeLevel.entries - ScopeLevel.App) {
+                val level = above.child(kind)
+                assertEquals(kind, level.level)
+                assertSame(above, level.parent)
+            }
+        }
+    }
+
+    @Test
+    fun `a window a composition opened answers its own window keys and reads that composition`() {
+        val compositionKey = SourceKey<String>("test.composition", ScopeLevel.Composition)
+        val main = app().child(ScopeLevel.Window)
+        val opener = main.child(ScopeLevel.Composition)
+        opener.child(ScopeLevel.Page).provide(pageKey, "the opener's page")
+        opener.provide(compositionKey, "the opener")
+        val nested = opener.child(ScopeLevel.Window)
+
+        assertNotSame(main.find(windowKey), nested.find(windowKey))
+        assertSame(main, opener.nearest(ScopeLevel.Window))
+        assertEquals("the opener", nested.current(compositionKey))
+        assertEquals("app", nested.current(appKey))
+        assertNull(nested.current(pageKey), "a page beside it is not above it")
+
+        val shown = nested.child(ScopeLevel.Composition)
+        assertSame(nested.find(windowKey), shown.find(windowKey))
+        assertNull(shown.current(compositionKey), "the composition shown in it is nearer and was given nothing")
+
+        opener.close()
+        assertTrue(nested.closed && shown.closed, "it goes with the composition that opened it")
+        assertFalse(main.closed)
     }
 
     @Test
