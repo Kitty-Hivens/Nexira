@@ -22,12 +22,21 @@ import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.modules.NoWidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.state.WidgetStateStore
+import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalScope
+import hivens.widget.api.LocalWidgetCommandRegistry
+import hivens.widget.api.LocalWidgetDataRegistry
+import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.LocalWidgetServiceRegistry
+import hivens.widget.api.LocalWidgetStateHost
+import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.StandardDocument
+import kotlin.test.AfterTest
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,73 +60,110 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalComposeUiApi::class)
 class CompositionWindowContentTest {
 
+    private val dir = Files.createTempDirectory("composition-window-")
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
+    private val json = Json { ignoreUnknownKeys = true }
+    private val paths = PlatformPaths(
+        osName = "linux",
+        home = dir,
+        bootstrapDataDir = { null },
+        env = { name -> if (name == "NEXIRA_DATA_DIR") dir.toString() else null },
+    )
+    private val console = GameConsoleService(paths)
+
+    /** The launcher's graph as far as a window drawing widgets reaches into it. */
+    private val graph = koinApplication {
+        modules(
+            levelServicesModule,
+            module {
+                single { console }
+                single { ConsoleSettingsStore(dir.resolve("console.json"), json, scope) }
+                single { CompositionHistories() }
+                single { WidgetModules(dir.resolve("widgets"), dir.resolve("widget-modules.json"), json, GeneratedWidgetRegistry, scope, NoWidgetModuleHost) }
+                single { LayoutGraphRepository(dir.resolve("layout-graph.json"), json, scope) { LayoutGraph.EMPTY } }
+                single { WidgetServiceRegistry() }
+                single { WidgetDataRegistry() }
+                single { uiCommandRegistry({}, {}, {}) }
+                single { WidgetStateStore(dir.resolve("widget-state.json"), json, scope) }
+                single { WidgetScope.app(get(), KoinLevelServicesHost.app(this), Dispatchers.Unconfined, get()) }
+            },
+        )
+    }
+
+    @AfterTest
+    fun tearDown() {
+        graph.close()
+        runBlocking { console.close() }
+        scope.cancel()
+        dir.toFile().deleteRecursively()
+    }
+
+    @Test
+    fun `the kernel's locals are the graph's own`() {
+        val seen = ArrayList<Any?>()
+        onEventThread {
+            val scene = ImageComposeScene(10, 10, density = Density(1f)) {
+                HostKoin(graph) {
+                    KernelLocals {
+                        seen += LocalWidgetRegistry.current
+                        seen += LocalWidgetDataRegistry.current
+                        seen += LocalWidgetCommandRegistry.current
+                        seen += LocalWidgetServiceRegistry.current
+                        seen += LocalWidgetStateHost.current
+                        seen += LocalScope.current
+                        seen += LocalLayoutGraph.current
+                    }
+                }
+            }
+            try {
+                scene.render().close()
+            } finally {
+                scene.close()
+            }
+        }
+        val koin = graph.koin
+        assertEquals(
+            listOf<Any?>(
+                koin.get<WidgetModules>().state.value.registry, koin.get<WidgetDataRegistry>(), koin.get<WidgetCommandRegistry>(),
+                koin.get<WidgetServiceRegistry>(), koin.get<WidgetStateStore>(), koin.get<WidgetScope>(), LayoutGraph.EMPTY,
+            ),
+            seen,
+        )
+    }
+
     @Test
     fun `the console's composition draws the console inside the kernel's locals and nothing more`() {
-        val dir = Files.createTempDirectory("composition-window-")
-        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined)
-        val json = Json { ignoreUnknownKeys = true }
-        val paths = PlatformPaths(
-            osName = "linux",
-            home = dir,
-            bootstrapDataDir = { null },
-            env = { name -> if (name == "NEXIRA_DATA_DIR") dir.toString() else null },
-        )
-        val console = GameConsoleService(paths)
-        val graph = koinApplication {
-            modules(
-                levelServicesModule,
-                module {
-                    single { console }
-                    single { ConsoleSettingsStore(dir.resolve("console.json"), json, scope) }
-                    single { CompositionHistories() }
-                    single { WidgetModules(dir.resolve("widgets"), dir.resolve("widget-modules.json"), json, GeneratedWidgetRegistry, scope, NoWidgetModuleHost) }
-                    single { LayoutGraphRepository(dir.resolve("layout-graph.json"), json, scope) { LayoutGraph.EMPTY } }
-                    single { WidgetServiceRegistry() }
-                    single { WidgetDataRegistry() }
-                    single { uiCommandRegistry({}, {}, {}) }
-                    single { WidgetStateStore(dir.resolve("widget-state.json"), json, scope) }
-                    single { WidgetScope.app(get(), KoinLevelServicesHost.app(this), Dispatchers.Unconfined, get()) }
-                },
-            )
-        }
         val errors = ArrayList<Throwable>()
         var inked = 0
-        try {
-            val start = StandardDocument.load().compositions.getValue(LauncherConfigs.ConsoleComposition).start
-            onEventThread {
-                val scene = ImageComposeScene(600, 400, density = Density(1f), coroutineContext = Dispatchers.Unconfined + CoroutineExceptionHandler { _, e -> errors += e }) {
-                    HostKoin(graph) {
-                        KernelLocals {
-                            ShippedLanguageProvider("en") {
-                                NxThemed(Themes.default, dark = true) {
-                                    CompositionContent(LauncherConfigs.ConsoleComposition, start)
-                                }
+        val start = StandardDocument.load().compositions.getValue(LauncherConfigs.ConsoleComposition).start
+        onEventThread {
+            val scene = ImageComposeScene(600, 400, density = Density(1f), coroutineContext = Dispatchers.Unconfined + CoroutineExceptionHandler { _, e -> errors += e }) {
+                HostKoin(graph) {
+                    KernelLocals {
+                        ShippedLanguageProvider("en") {
+                            NxThemed(Themes.default, dark = true) {
+                                CompositionContent(LauncherConfigs.ConsoleComposition, start)
                             }
                         }
                     }
                 }
-                try {
-                    val image = scene.render(scene.settle(6))
-                    val bitmap = Bitmap.makeFromImage(image)
-                    try {
-                        val info = bitmap.imageInfo
-                        val pixels = checkNotNull(bitmap.readPixels(info, info.minRowBytes, 0, 0))
-                        inked = (pixels.indices step 4).count { pixels[it + 3] != 0.toByte() }
-                    } finally {
-                        bitmap.close()
-                        image.close()
-                    }
-                } finally {
-                    scene.close()
-                }
             }
-            assertEquals(emptyList(), errors.map { it.toString() })
-            assertTrue(inked > 2_000, "the console itself was drawn ($inked pixels)")
-        } finally {
-            graph.close()
-            runBlocking { console.close() }
-            scope.cancel()
-            dir.toFile().deleteRecursively()
+            try {
+                val image = scene.render(scene.settle(6))
+                val bitmap = Bitmap.makeFromImage(image)
+                try {
+                    val info = bitmap.imageInfo
+                    val pixels = checkNotNull(bitmap.readPixels(info, info.minRowBytes, 0, 0))
+                    inked = (pixels.indices step 4).count { pixels[it + 3] != 0.toByte() }
+                } finally {
+                    bitmap.close()
+                    image.close()
+                }
+            } finally {
+                scene.close()
+            }
         }
+        assertEquals(emptyList(), errors.map { it.toString() })
+        assertTrue(inked > 2_000, "the console itself was drawn ($inked pixels)")
     }
 }
