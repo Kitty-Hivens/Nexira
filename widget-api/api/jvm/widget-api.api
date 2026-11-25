@@ -75,7 +75,17 @@ public final class hivens/widget/api/CompositionKeys {
 	public static final field $stable I
 	public static final field INSTANCE Lhivens/widget/api/CompositionKeys;
 	public final fun getBack ()Lhivens/widget/model/CommandKey;
-	public final fun getShowConfig ()Lhivens/widget/model/CommandKey;
+	public final fun getBackTo ()Lhivens/widget/model/CommandKey;
+	public final fun getForward ()Lhivens/widget/model/CommandKey;
+	public final fun getHistory ()Lhivens/widget/model/SourceKey;
+	public final fun getRewrite ()Lhivens/widget/model/CommandKey;
+	public final fun getShow ()Lhivens/widget/model/CommandKey;
+}
+
+public final class hivens/widget/api/CompositionKeysKt {
+	public static final fun pageValue (Lhivens/widget/api/ModuleKeys;Lhivens/widget/model/PageValue;Lkotlin/jvm/functions/Function0;)V
+	public static synthetic fun pageValue$default (Lhivens/widget/api/ModuleKeys;Lhivens/widget/model/PageValue;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)V
+	public static final fun read (Lhivens/widget/api/LevelContext;Lhivens/widget/model/PageValue;)Lhivens/widget/model/WidgetDataSource;
 }
 
 public final class hivens/widget/api/ContributedLevelServices : hivens/widget/api/LevelServices {
@@ -448,6 +458,12 @@ public final class hivens/widget/api/ModuleValues$Companion {
 	public final fun encode (F)Ljava/lang/String;
 	public final fun encode (Z)Ljava/lang/String;
 	public final fun getNONE ()Lhivens/widget/api/ModuleValues;
+}
+
+public final class hivens/widget/api/PageKeys {
+	public static final field $stable I
+	public static final field INSTANCE Lhivens/widget/api/PageKeys;
+	public final fun getEntry ()Lhivens/widget/model/SourceKey;
 }
 
 public final class hivens/widget/api/PageLevels {

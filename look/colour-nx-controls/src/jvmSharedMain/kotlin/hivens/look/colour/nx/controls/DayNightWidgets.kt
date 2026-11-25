@@ -42,6 +42,8 @@ import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
+import hivens.widget.model.ConfigId
+import hivens.widget.model.Show
 import hivens.widget.model.Widget
 
 // The switches that steer the nx colour provider, each a widget a layout places where the host
@@ -52,7 +54,7 @@ import hivens.widget.model.Widget
 // absent. Already there when their page opens, as the rows around them are.
 
 /** The config the picker link shows: the theme picker's. */
-private const val PICKER_CONFIG = "theme.picker"
+private val PICKER_CONFIG = ConfigId("theme.picker")
 
 // Day or night by the person's own hand, which hands what decides it back to the manual mode. The
 // puppet id is the one the settings screen had, kept so a driver finds the switch where it was.
@@ -132,9 +134,9 @@ fun ThemeModeWidget() {
 @Widget(id = "theme.picker.link", displayName = "widget.theme.picker.link", enter = "none", shownWhen = NX_DRAWING_ID)
 @Composable
 fun ThemePickerLinkWidget() {
-    val show = rememberScopedCommand(CompositionKeys.ShowConfig)
+    val show = rememberScopedCommand(CompositionKeys.Show)
     val s = strings(ColourNxControls.ID)
-    val open: () -> Unit = { show?.invoke(PICKER_CONFIG) }
+    val open: () -> Unit = { show?.invoke(Show(PICKER_CONFIG)) }
     PuppetClick("settings.openThemePicker") { open() }
     NxRow(
         title    = s.text("settingsThemePicker"),

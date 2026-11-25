@@ -69,6 +69,7 @@ import hivens.widget.api.valueOrNull
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.screen
+import hivens.widget.model.Show
 import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import hivens.ui.theme.NxInk
@@ -281,7 +282,7 @@ fun AppLayout(
 /**
  * Puts the composition's history over its level for [content]: where it stands
  * and the commands that move it, the keys only the owner of the history can answer,
- * the kernel's [CompositionKeys.ShowConfig] among them, which shows the screen
+ * the kernel's [CompositionKeys.Show] among them, which shows the screen
  * [screenOfConfig] answers for the config named.
  * Each command is one object for the composition's life that runs the latest
  * lambda it was handed, so a reader does not recompose because the shell did.
@@ -305,14 +306,14 @@ private fun ProvideComposition(
     val forwardCommand = rememberLatestCommand<Unit> { forward() }
     val popToCommand = rememberLatestCommand(popTo)
     val graph = LocalLayoutGraph.current
-    val showCommand = rememberLatestCommand<String> { id -> screenOfConfig(id, graph)?.let(navigate) }
+    val showCommand = rememberLatestCommand<Show> { screenOfConfig(it.config.value, graph)?.let(navigate) }
     ProvideScoped(Sources.Navigation, nav) {
     ProvideScopedCommand(Commands.Navigate, navigateCommand) {
     ProvideScopedCommand(Commands.SwitchTab, switchTabCommand) {
     ProvideScopedCommand(Commands.Back, backCommand) {
     ProvideScopedCommand(Commands.Forward, forwardCommand) {
     ProvideScopedCommand(Commands.PopTo, popToCommand) {
-    ProvideScopedCommand(CompositionKeys.ShowConfig, showCommand) {
+    ProvideScopedCommand(CompositionKeys.Show, showCommand) {
         CompositionLocalProvider(LocalMisplacedWidget provides MisplacedWidget, content = content)
     }
     }

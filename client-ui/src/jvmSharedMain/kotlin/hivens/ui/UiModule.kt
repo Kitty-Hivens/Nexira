@@ -706,7 +706,7 @@ internal fun uiCommandRegistry(
     declare(Commands.Back)
     declare(Commands.Forward)
     declare(Commands.PopTo)
-    declare(CompositionKeys.ShowConfig)
+    declare(CompositionKeys.Show)
     // What the About page provides for its update panel.
     declare(OpenUpdateDialog)
     // What each window provides of the commands it takes.
