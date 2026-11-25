@@ -160,26 +160,13 @@ data class SlotAddress(val surface: SurfaceId, val slot: SlotId)
 // disk reloads, and a transform on a vanished slot must not crash.
 
 fun LayoutGraph.insertWidget(path: SlotPath, widget: WidgetInstance, index: Int): LayoutGraph =
-    mutate(path) { content ->
-        val coerced = index.coerceIn(0, content.widgets.size)
-        content.copy(widgets = content.widgets.toMutableList().apply { add(coerced, widget) })
-    }
+    mutate(path) { it.withWidget(widget, index) }
 
 fun LayoutGraph.removeWidget(path: SlotPath, instanceId: String): LayoutGraph =
-    mutate(path) { content ->
-        if (content.widgets.none { it.instanceId == instanceId }) content
-        else content.copy(widgets = content.widgets.filterNot { it.instanceId == instanceId })
-    }
+    mutate(path) { it.withoutWidget(instanceId) }
 
 fun LayoutGraph.reorderInSlot(path: SlotPath, fromIndex: Int, toIndex: Int): LayoutGraph =
-    mutate(path) { content ->
-        if (fromIndex !in content.widgets.indices) return@mutate content
-        val target = toIndex.coerceIn(0, content.widgets.size - 1)
-        if (fromIndex == target) return@mutate content
-        content.copy(
-            widgets = content.widgets.toMutableList().apply { add(target, removeAt(fromIndex)) },
-        )
-    }
+    mutate(path) { it.reordered(fromIndex, toIndex) }
 
 /**
  * Moves a widget from one slot to another, anywhere in the graph.
@@ -214,19 +201,7 @@ fun LayoutGraph.moveWidget(
     // Destination must exist (top-level slot or nested container slot).
     val target = traverse(to) ?: return this
 
-    // A widget arriving in a placement slot needs somewhere to be. It used to
-    // arrive with whatever it carried from a flow slot, which is nothing, and
-    // then drew at the slot's origin on top of whatever was already there. The
-    // seed is the same one a slot flipping into placement mode hands out, so a
-    // widget that walks in and a widget that was already there are placed by
-    // one rule.
-    val seeded = if (target.flow == null && widget.placement == null) {
-        widget.copy(placement = seedPlacement(target.widgets.size, target.grid, target.widgets, target.latticeTransposed))
-    } else {
-        widget
-    }
-
-    return removeWidget(from, instanceId).insertWidget(to, seeded, toIndex)
+    return removeWidget(from, instanceId).insertWidget(to, target.seated(widget), toIndex)
 }
 
 // Replaces the props JsonObject on a single widget addressed by
@@ -262,23 +237,11 @@ fun LayoutGraph.updateWidgetMotion(
     return updateInstance(path, instanceId) { it.copy(motion = normalized) }
 }
 
-// Every per-instance transform is the same three steps: find the instance in the
-// slot, leave the graph alone when [edit] returns what was already there, and
-// otherwise rebuild the list with that one widget replaced.
-//
-// Returning the same SlotContent is what makes a no-op a real one: [mutate]
-// decides by reference identity, so an edit that changes nothing has to hand the
-// same object back rather than an equal copy.
 private fun LayoutGraph.updateInstance(
     path: SlotPath,
     instanceId: String,
     edit: (WidgetInstance) -> WidgetInstance,
-): LayoutGraph = mutate(path) { content ->
-    val target = content.widgets.firstOrNull { it.instanceId == instanceId } ?: return@mutate content
-    val next = edit(target)
-    if (next == target) return@mutate content
-    content.copy(widgets = content.widgets.map { if (it.instanceId == instanceId) next else it })
-}
+): LayoutGraph = mutate(path) { it.withWidgetUpdated(instanceId, edit) }
 
 // ── Slot mode ────────────────────────────────────────────────────────
 
@@ -289,11 +252,7 @@ private fun LayoutGraph.updateInstance(
  * idempotent.
  */
 fun LayoutGraph.setFlow(path: SlotPath, flow: FlowSpec?): LayoutGraph =
-    mutate(path) { content ->
-        if (content.flow == flow) return@mutate content
-        if (flow != null) return@mutate content.copy(flow = flow)
-        content.copy(flow = null, widgets = seedPlacements(content.widgets, content.grid, content.latticeTransposed))
-    }
+    mutate(path) { it.withFlow(flow) }
 
 /**
  * Sets the unit a placement slot measures in: 0 for dp, N for an N-column
@@ -303,10 +262,7 @@ fun LayoutGraph.setFlow(path: SlotPath, flow: FlowSpec?): LayoutGraph =
  * under them.
  */
 fun LayoutGraph.setGrid(path: SlotPath, grid: Int): LayoutGraph =
-    mutate(path) { content ->
-        val coerced = grid.coerceIn(0, GRID_MAX)
-        if (content.grid == coerced) content else content.copy(grid = coerced)
-    }
+    mutate(path) { it.withGrid(grid) }
 
 /**
  * Sets how the slot shows what does not fit in it. A static record normalizes to
@@ -320,21 +276,7 @@ fun LayoutGraph.setGrid(path: SlotPath, grid: Int): LayoutGraph =
  * swapping back on the way out gives the arrangement back exactly.
  */
 fun LayoutGraph.setViewport(path: SlotPath, viewport: ViewportSpec?): LayoutGraph =
-    mutate(path) { content ->
-        val normalized = viewport?.takeUnless { it.mode == ViewportMode.Static }
-        if (content.viewport == normalized) return@mutate content
-        var next = content.copy(viewport = normalized)
-        val lattice = content.flow == null && content.grid > 0
-        if (lattice && next.latticeTransposed != content.latticeTransposed) next = next.transposedPlacements()
-        // A map holds placed widgets only, so a flow put on one becomes a placement
-        // slot in the same step, seeded the way flipping it by hand would seed it.
-        // The flow is kept as nothing rather than remembered: the two modes share
-        // the slot and a placement slot is what a map is.
-        if (next.viewportMode == ViewportMode.Map && next.flow != null) {
-            next = next.copy(flow = null, widgets = seedPlacements(next.widgets, 0))
-        }
-        next
-    }
+    mutate(path) { it.withViewport(viewport) }
 
 // ── Placement ────────────────────────────────────────────────────────
 
@@ -407,18 +349,7 @@ private fun LayoutGraph.updatePlacement(
     path: SlotPath,
     instanceId: String,
     edit: (Placement) -> Placement,
-): LayoutGraph = updateInstance(path, instanceId) { widget ->
-    val had = widget.placement
-    val next = edit(had ?: Placement())
-    // Nothing becomes nothing, but something never becomes nothing. Writing a
-    // field its own value on an unplaced widget has to stay a no-op, or the
-    // identity contract every transform rests on breaks. Going the other way and
-    // normalising a placed widget back to null would erase the difference between
-    // "at the origin" and "nowhere": a widget dragged to (0, 0) would read as
-    // unseeded, and the next flip, move or neighbour's drag would pick it up and
-    // put it somewhere else.
-    widget.copy(placement = if (had == null && next == Placement()) null else next)
-}
+): LayoutGraph = mutate(path) { it.withPlacement(instanceId, edit) }
 
 // ── Seeding ──────────────────────────────────────────────────────────
 
