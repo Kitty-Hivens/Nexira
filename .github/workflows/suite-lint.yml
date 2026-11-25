@@ -18,6 +18,7 @@ on:
       - "scripts/_modules.py"
       - "scripts/tests/**"
       - "scripts/merge-sarif.py"
+      - "scripts/check-android-api.py"
       - ".github/workflows/suite-lint.yml"
   push:
     branches: [dev, stable]
@@ -31,6 +32,7 @@ on:
       - "scripts/_modules.py"
       - "scripts/tests/**"
       - "scripts/merge-sarif.py"
+      - "scripts/check-android-api.py"
       - ".github/workflows/suite-lint.yml"
 
 permissions:
