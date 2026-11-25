@@ -95,7 +95,7 @@ fun PixelPlayerWidget(instance: WidgetInstance) {
     LaunchedEffect(props.folder, props.recursive, props.extensions) {
         // The folder is a text field, so this restarts per keystroke, and the
         // prefixes a person types on the way to a path are real directories:
-        // typing "/home/haru/Music" begins with "/", and a recursive walk from
+        // typing "/home/user/Music" begins with "/", and a recursive walk from
         // there is the whole filesystem. NIO walks do not answer cancellation
         // either, so an abandoned one runs to the end on an IO thread. The delay
         // is cancellable and is what keeps those walks from ever starting.
