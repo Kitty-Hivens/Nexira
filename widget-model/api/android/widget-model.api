@@ -41,6 +41,174 @@ public final class hivens/widget/model/CommandKey {
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class hivens/widget/model/Composition {
+	public static final field Companion Lhivens/widget/model/Composition$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lhivens/widget/model/Frame;Ljava/util/Map;Ljava/util/Map;Lhivens/widget/model/SlotContent;Lhivens/widget/model/WidgetInstance;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lhivens/widget/model/Frame;Ljava/util/Map;Ljava/util/Map;Lhivens/widget/model/SlotContent;Lhivens/widget/model/WidgetInstance;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-QOYOipY ()Ljava/lang/String;
+	public final fun component2 ()Lhivens/widget/model/Frame;
+	public final fun component3 ()Ljava/util/Map;
+	public final fun component4 ()Ljava/util/Map;
+	public final fun component5 ()Lhivens/widget/model/SlotContent;
+	public final fun component6 ()Lhivens/widget/model/WidgetInstance;
+	public final fun copy-nYMS49g (Ljava/lang/String;Lhivens/widget/model/Frame;Ljava/util/Map;Ljava/util/Map;Lhivens/widget/model/SlotContent;Lhivens/widget/model/WidgetInstance;)Lhivens/widget/model/Composition;
+	public static synthetic fun copy-nYMS49g$default (Lhivens/widget/model/Composition;Ljava/lang/String;Lhivens/widget/model/Frame;Ljava/util/Map;Ljava/util/Map;Lhivens/widget/model/SlotContent;Lhivens/widget/model/WidgetInstance;ILjava/lang/Object;)Lhivens/widget/model/Composition;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConfigs ()Ljava/util/Map;
+	public final fun getFrame ()Lhivens/widget/model/Frame;
+	public final fun getResidents ()Lhivens/widget/model/SlotContent;
+	public final fun getSingles ()Ljava/util/Map;
+	public final fun getStart-QOYOipY ()Ljava/lang/String;
+	public final fun getStartConfig ()Lhivens/widget/model/Config;
+	public final fun getTransition ()Lhivens/widget/model/WidgetInstance;
+	public fun hashCode ()I
+	public final fun standing (Lhivens/widget/model/WidgetInstance;)Lhivens/widget/model/WidgetInstance;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/Composition$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/Composition$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/Composition;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/Composition;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/Composition$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/CompositionName {
+	public static final field Companion Lhivens/widget/model/CompositionName$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lhivens/widget/model/CompositionName;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/CompositionName$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/CompositionName$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-0pJys-s (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-vhC1LNM (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/CompositionName$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/Config {
+	public static final field Companion Lhivens/widget/model/Config$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/util/List;)Lhivens/widget/model/Config;
+	public static synthetic fun copy$default (Lhivens/widget/model/Config;Ljava/lang/String;Ljava/lang/String;Ljava/util/List;ILjava/lang/Object;)Lhivens/widget/model/Config;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIcon ()Ljava/lang/String;
+	public final fun getLayouts ()Ljava/util/List;
+	public final fun getTitle ()Ljava/lang/String;
+	public fun hashCode ()I
+	public final fun layoutFor (FF)Lhivens/widget/model/ConfigLayout;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/Config$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/Config$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/Config;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/Config;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/Config$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/ConfigId {
+	public static final field Companion Lhivens/widget/model/ConfigId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lhivens/widget/model/ConfigId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/ConfigId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/ConfigId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-rx69ky4 (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-KhnCwZc (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/ConfigId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/ConfigLayout {
+	public static final field Companion Lhivens/widget/model/ConfigLayout$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lhivens/widget/model/SlotContent;FFILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lhivens/widget/model/SlotContent;FFLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-BeX4YH8 ()Ljava/lang/String;
+	public final fun component2 ()Lhivens/widget/model/SlotContent;
+	public final fun component3 ()F
+	public final fun component4 ()F
+	public final fun copy-gXK5hcg (Ljava/lang/String;Lhivens/widget/model/SlotContent;FF)Lhivens/widget/model/ConfigLayout;
+	public static synthetic fun copy-gXK5hcg$default (Lhivens/widget/model/ConfigLayout;Ljava/lang/String;Lhivens/widget/model/SlotContent;FFILjava/lang/Object;)Lhivens/widget/model/ConfigLayout;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getId-BeX4YH8 ()Ljava/lang/String;
+	public final fun getMinHeight ()F
+	public final fun getMinWidth ()F
+	public final fun getRoot ()Lhivens/widget/model/SlotContent;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/ConfigLayout$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/ConfigLayout$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/ConfigLayout;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/ConfigLayout;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/ConfigLayout$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class hivens/widget/model/DefaultLayout {
 	public static final field INSTANCE Lhivens/widget/model/DefaultLayout;
 	public final fun load (Lkotlinx/serialization/json/Json;)Lhivens/widget/model/LayoutGraph;
@@ -51,6 +219,96 @@ public final class hivens/widget/model/DefaultLayout {
 
 public final class hivens/widget/model/DefaultLayoutKt {
 	public static final field LAYOUT_SCHEMA I
+}
+
+public final class hivens/widget/model/Document {
+	public static final field Companion Lhivens/widget/model/Document$Companion;
+	public synthetic fun <init> (ILjava/util/List;Ljava/lang/String;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (ILjava/util/List;Ljava/lang/String;Ljava/util/Map;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3-WT-zK7E ()Ljava/lang/String;
+	public final fun component4 ()Ljava/util/Map;
+	public final fun copy-1DxQGDo (ILjava/util/List;Ljava/lang/String;Ljava/util/Map;)Lhivens/widget/model/Document;
+	public static synthetic fun copy-1DxQGDo$default (Lhivens/widget/model/Document;ILjava/util/List;Ljava/lang/String;Ljava/util/Map;ILjava/lang/Object;)Lhivens/widget/model/Document;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getCompositions ()Ljava/util/Map;
+	public final fun getModules ()Ljava/util/List;
+	public final fun getSchema ()I
+	public final fun getStart-WT-zK7E ()Ljava/lang/String;
+	public final fun getStartComposition ()Lhivens/widget/model/Composition;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/Document$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/Document$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/Document;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/Document;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/Document$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/DocumentCodec {
+	public static final field INSTANCE Lhivens/widget/model/DocumentCodec;
+	public final fun read (Ljava/lang/String;)Lhivens/widget/model/DocumentRead;
+	public final fun write (Lhivens/widget/model/Document;)Ljava/lang/String;
+}
+
+public final class hivens/widget/model/DocumentEditsKt {
+	public static final fun contentAt (Lhivens/widget/model/Document;Lhivens/widget/model/NodePath;)Lhivens/widget/model/SlotContent;
+	public static final fun edit (Lhivens/widget/model/Document;Lhivens/widget/model/NodePath;Lkotlin/jvm/functions/Function1;)Lhivens/widget/model/Document;
+	public static final fun keepSingle-_zUv3TE (Lhivens/widget/model/Document;Ljava/lang/String;Lhivens/widget/model/WidgetInstance;)Lhivens/widget/model/Document;
+	public static final fun moveWidget (Lhivens/widget/model/Document;Lhivens/widget/model/NodePath;Lhivens/widget/model/NodePath;Ljava/lang/String;I)Lhivens/widget/model/Document;
+	public static final fun widgets (Lhivens/widget/model/Composition;)Lkotlin/sequences/Sequence;
+	public static final fun withOwnNames (Lhivens/widget/model/Document;Lkotlin/jvm/functions/Function1;)Lhivens/widget/model/Document;
+}
+
+public final class hivens/widget/model/DocumentKt {
+	public static final field DOCUMENT_SCHEMA I
+}
+
+public abstract interface class hivens/widget/model/DocumentRead {
+}
+
+public final class hivens/widget/model/DocumentRead$Broken : hivens/widget/model/DocumentRead {
+	public fun <init> (Ljava/lang/String;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;)Lhivens/widget/model/DocumentRead$Broken;
+	public static synthetic fun copy$default (Lhivens/widget/model/DocumentRead$Broken;Ljava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/DocumentRead$Broken;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getReason ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/DocumentRead$Newer : hivens/widget/model/DocumentRead {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lhivens/widget/model/DocumentRead$Newer;
+	public static synthetic fun copy$default (Lhivens/widget/model/DocumentRead$Newer;IILjava/lang/Object;)Lhivens/widget/model/DocumentRead$Newer;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSchema ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/DocumentRead$Whole : hivens/widget/model/DocumentRead {
+	public fun <init> (Lhivens/widget/model/Document;)V
+	public final fun component1 ()Lhivens/widget/model/Document;
+	public final fun copy (Lhivens/widget/model/Document;)Lhivens/widget/model/DocumentRead$Whole;
+	public static synthetic fun copy$default (Lhivens/widget/model/DocumentRead$Whole;Lhivens/widget/model/Document;ILjava/lang/Object;)Lhivens/widget/model/DocumentRead$Whole;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getDocument ()Lhivens/widget/model/Document;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class hivens/widget/model/Entrance : java/lang/Enum {
@@ -240,6 +498,55 @@ public final class hivens/widget/model/FlowSpec$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class hivens/widget/model/Frame {
+	public static final field Companion Lhivens/widget/model/Frame$Companion;
+	public static final field MAXIMIZED Ljava/lang/String;
+	public static final field NONE Ljava/lang/String;
+	public static final field NORMAL Ljava/lang/String;
+	public static final field SYSTEM Ljava/lang/String;
+	public fun <init> ()V
+	public fun <init> (IIIILjava/lang/String;Ljava/lang/String;ZLjava/lang/String;)V
+	public synthetic fun <init> (IIIILjava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()I
+	public final fun component2 ()I
+	public final fun component3 ()I
+	public final fun component4 ()I
+	public final fun component5 ()Ljava/lang/String;
+	public final fun component6 ()Ljava/lang/String;
+	public final fun component7 ()Z
+	public final fun component8 ()Ljava/lang/String;
+	public final fun copy (IIIILjava/lang/String;Ljava/lang/String;ZLjava/lang/String;)Lhivens/widget/model/Frame;
+	public static synthetic fun copy$default (Lhivens/widget/model/Frame;IIIILjava/lang/String;Ljava/lang/String;ZLjava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/Frame;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getChrome ()Ljava/lang/String;
+	public final fun getHeight ()I
+	public final fun getMinHeight ()I
+	public final fun getMinWidth ()I
+	public final fun getOpensMaximized ()Z
+	public final fun getResizable ()Z
+	public final fun getState ()Ljava/lang/String;
+	public final fun getSystemChrome ()Z
+	public final fun getTitle ()Ljava/lang/String;
+	public final fun getWidth ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/Frame$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/Frame$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/widget/model/Frame;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/widget/model/Frame;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/Frame$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public abstract interface annotation class hivens/widget/model/InjectService : java/lang/annotation/Annotation {
 	public abstract fun services ()[Ljava/lang/Class;
 }
@@ -316,6 +623,36 @@ public final class hivens/widget/model/LayoutGraphKt {
 	public static final fun updateWidgetProps (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;Lkotlinx/serialization/json/JsonObject;)Lhivens/widget/model/LayoutGraph;
 	public static final fun updateWidgetSurface (Lhivens/widget/model/LayoutGraph;Lhivens/widget/model/SlotPath;Ljava/lang/String;Lhivens/widget/model/SurfaceSpec;)Lhivens/widget/model/LayoutGraph;
 	public static final fun walkInstances (Lhivens/widget/model/LayoutGraph;)Lkotlin/sequences/Sequence;
+}
+
+public final class hivens/widget/model/LayoutId {
+	public static final field Companion Lhivens/widget/model/LayoutId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lhivens/widget/model/LayoutId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/widget/model/LayoutId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/widget/model/LayoutId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-KuVN3u8 (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-T8LfMPo (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/LayoutId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
 public final class hivens/widget/model/ModuleGraph {
@@ -423,6 +760,47 @@ public final class hivens/widget/model/NestedSegment {
 	public fun equals (Ljava/lang/Object;)Z
 	public final fun getParentInstanceId ()Ljava/lang/String;
 	public final fun getSlot-L9LzkC8 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/NodePath {
+	public synthetic fun <init> (Ljava/lang/String;Lhivens/widget/model/NodeRoot;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Lhivens/widget/model/NodeRoot;Ljava/util/List;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun child-BYtZEss (Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/NodePath;
+	public final fun component1-WT-zK7E ()Ljava/lang/String;
+	public final fun component2 ()Lhivens/widget/model/NodeRoot;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy-xG9MDk8 (Ljava/lang/String;Lhivens/widget/model/NodeRoot;Ljava/util/List;)Lhivens/widget/model/NodePath;
+	public static synthetic fun copy-xG9MDk8$default (Lhivens/widget/model/NodePath;Ljava/lang/String;Lhivens/widget/model/NodeRoot;Ljava/util/List;ILjava/lang/Object;)Lhivens/widget/model/NodePath;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getComposition-WT-zK7E ()Ljava/lang/String;
+	public final fun getNested ()Ljava/util/List;
+	public final fun getParentPath ()Lhivens/widget/model/NodePath;
+	public final fun getRoot ()Lhivens/widget/model/NodeRoot;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public abstract interface class hivens/widget/model/NodeRoot {
+}
+
+public final class hivens/widget/model/NodeRoot$Layout : hivens/widget/model/NodeRoot {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-QOYOipY ()Ljava/lang/String;
+	public final fun component2-BeX4YH8 ()Ljava/lang/String;
+	public final fun copy-x5gl-ck (Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/NodeRoot$Layout;
+	public static synthetic fun copy-x5gl-ck$default (Lhivens/widget/model/NodeRoot$Layout;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/NodeRoot$Layout;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getConfig-QOYOipY ()Ljava/lang/String;
+	public final fun getLayout-BeX4YH8 ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/widget/model/NodeRoot$Residents : hivens/widget/model/NodeRoot {
+	public static final field INSTANCE Lhivens/widget/model/NodeRoot$Residents;
+	public fun equals (Ljava/lang/Object;)Z
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
 }
@@ -651,6 +1029,17 @@ public final synthetic class hivens/widget/model/SlotContent$$serializer : kotli
 
 public final class hivens/widget/model/SlotContent$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/widget/model/SlotEditsKt {
+	public static final fun reordered (Lhivens/widget/model/SlotContent;II)Lhivens/widget/model/SlotContent;
+	public static final fun withFlow (Lhivens/widget/model/SlotContent;Lhivens/widget/model/FlowSpec;)Lhivens/widget/model/SlotContent;
+	public static final fun withGrid (Lhivens/widget/model/SlotContent;I)Lhivens/widget/model/SlotContent;
+	public static final fun withPlacement (Lhivens/widget/model/SlotContent;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lhivens/widget/model/SlotContent;
+	public static final fun withViewport (Lhivens/widget/model/SlotContent;Lhivens/widget/model/ViewportSpec;)Lhivens/widget/model/SlotContent;
+	public static final fun withWidget (Lhivens/widget/model/SlotContent;Lhivens/widget/model/WidgetInstance;I)Lhivens/widget/model/SlotContent;
+	public static final fun withWidgetUpdated (Lhivens/widget/model/SlotContent;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lhivens/widget/model/SlotContent;
+	public static final fun withoutWidget (Lhivens/widget/model/SlotContent;Ljava/lang/String;)Lhivens/widget/model/SlotContent;
 }
 
 public final class hivens/widget/model/SlotId {
