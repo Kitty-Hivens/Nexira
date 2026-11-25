@@ -25,8 +25,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import hivens.i18n.api.Strings
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.nx.NxBasicTextField
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.MaterialTheme
@@ -84,10 +82,11 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
 import hivens.ui.nx.NxSteadyText
 import hivens.ui.press.IconButton
 import hivens.ui.press.clickable
-import hivens.ui.press.pressCursor
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.puppet.PuppetField
 import hivens.ui.puppet.PuppetScreen
@@ -976,32 +975,11 @@ private fun Toolbar(
                 IconButton(onClick = { gearOpen = true }, modifier = Modifier.size(32.dp)) {
                     Symbol(NxIcon.Settings, strings.text("consoleSettingsLabel"), tint = NxInk.quiet)
                 }
-                DropdownMenu(
-                    expanded         = gearOpen,
-                    onDismissRequest = { gearOpen = false },
-                ) {
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = if (showGutter) strings.text("consoleHideGutter") else strings.text("consoleShowGutter"),
-                                fontFamily = LocalMonoFamily.current,
-                                fontSize   = 11.sp,
-                            )
-                        },
-                        onClick = { onToggleGutter(); gearOpen = false },
-                        modifier = Modifier.pressCursor(),
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                text = if (showTimestamps) strings.text("consoleHideTimestamps") else strings.text("consoleShowTimestamps"),
-                                fontFamily = LocalMonoFamily.current,
-                                fontSize   = 11.sp,
-                            )
-                        },
-                        onClick = { onToggleTimestamps(); gearOpen = false },
-                        modifier = Modifier.pressCursor(),
-                    )
+                // Both are switches, so the menu stays for the next one and is closed
+                // by a press outside it.
+                NxContextMenu(expanded = gearOpen, onDismissRequest = { gearOpen = false }) {
+                    NxMenuItem(strings.text("consoleSecGutter"), selected = showGutter, onClick = onToggleGutter)
+                    NxMenuItem(strings.text("consoleSecTimestamps"), selected = showTimestamps, onClick = onToggleTimestamps)
                 }
             }
         }

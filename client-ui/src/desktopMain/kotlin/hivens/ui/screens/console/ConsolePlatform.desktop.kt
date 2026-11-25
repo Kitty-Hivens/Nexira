@@ -4,10 +4,8 @@ package hivens.ui.screens.console
 
 import androidx.compose.foundation.ContextMenuArea
 import androidx.compose.foundation.ContextMenuItem
-import androidx.compose.foundation.DefaultContextMenuRepresentation
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.HorizontalScrollbar
-import androidx.compose.foundation.LocalContextMenuRepresentation
 import androidx.compose.foundation.ScrollbarStyle
 import androidx.compose.foundation.VerticalScrollbar
 import androidx.compose.foundation.layout.BoxScope
@@ -16,12 +14,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.v2.ScrollbarAdapter
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
 import androidx.compose.ui.unit.dp
@@ -32,24 +27,10 @@ import java.io.File
 
 @Composable
 internal actual fun ConsoleContextMenu(entries: () -> List<ConsoleMenuEntry>, content: @Composable () -> Unit) {
-    // Themed right-click popup (Compose-drawn, not the dated Swing default),
-    // cut from the top step the way a popup is.
-    val top = NxColor.depth(NxColor.floating)
-    val text = NxInk.main
-    val lead = NxColor.lead()
-    val menuRepresentation = remember(top, text, lead) {
-        DefaultContextMenuRepresentation(
-            backgroundColor = top,
-            textColor       = text,
-            itemHoverColor  = lerp(top, lead, 0.14f),
-        )
-    }
-    CompositionLocalProvider(LocalContextMenuRepresentation provides menuRepresentation) {
-        ContextMenuArea(
-            items = { entries().map { ContextMenuItem(it.label, it.action) } },
-            content = content,
-        )
-    }
+    ContextMenuArea(
+        items = { entries().map { ContextMenuItem(it.label, it.action) } },
+        content = content,
+    )
 }
 
 @Composable

@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -38,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.key.Key
@@ -64,6 +66,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.AnchoredLayer
+import hivens.ui.layers.LocalResident
 import hivens.ui.layers.layerTrigger
 import hivens.ui.press.clickable
 import hivens.ui.surface.NxSurface
@@ -188,6 +191,31 @@ fun NxContextMenu(
     val provider = remember(x, y, gapPx, origin, parent) { MenuAtWindowOffset(x, y, gapPx, origin, parent) }
     NxMenuPopup(provider, origin, expanded, onDismissRequest) {
         NxMenuSurface(modifier, minWidth, maxWidth, maxHeight, footer, content)
+    }
+}
+
+/**
+ * [NxContextMenu] opening at [at], a point of the layout it is called in, for a right click on
+ * that layout's own content.
+ *
+ * A text field that holds the keyboard keeps it, through a press on a row too: a field drops its
+ * selection with the focus, and the selection is what the menu is asked to copy.
+ */
+@Composable
+internal fun NxPointMenu(
+    at: IntOffset,
+    expanded: Boolean,
+    onDismissRequest: () -> Unit,
+    content: @Composable () -> Unit,
+) {
+    val gapPx = with(LocalDensity.current) { MENU_GAP.roundToPx() }
+    val origin = remember { mutableStateOf(TransformOrigin(0f, 0f)) }
+    val corner = remember { mutableStateOf(IntOffset.Zero) }
+    val provider = remember(at, gapPx, origin, corner) { MenuAtWindowOffset(at.x, at.y, gapPx, origin, corner) }
+    NxMenuPopup(provider, origin, expanded, onDismissRequest, yieldsToField = true) {
+        val resident = LocalResident.current
+        val rows = Modifier.focusProperties { onEnter = { if (resident?.leavesKeyboard == true) cancelFocusChange() } }.focusGroup()
+        NxMenuSurface(rows, 0.dp, MENU_MAX_WIDTH, MENU_MAX_HEIGHT, footer = null, content)
     }
 }
 

@@ -253,6 +253,7 @@ private fun TakeFocus(resident: LayerResident, layers: WindowLayers) {
     // Decided once, as the layer first appears: a field focused later is the layer's own.
     val yields = remember(resident) { resident.yieldsToField && layers.dismiss.fieldFocused }
     DisposableEffect(resident) {
+        resident.leavesKeyboard = yields
         if (!resident.shown) return@DisposableEffect onDispose { }
         resident.trigger = layers.triggerHoldingFocus()
         resident.takenFrom = layers.layerHoldingFocus(except = resident)

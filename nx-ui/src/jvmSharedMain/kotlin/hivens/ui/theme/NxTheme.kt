@@ -77,7 +77,7 @@ fun NxTheme(
                 LocalContentColor provides answers.inkMain,
                 LocalTextSelectionColors provides selection,
             ) {
-                ThemedContextMenu(answers, content)
+                ThemedContextMenu(content)
             }
         }
     }

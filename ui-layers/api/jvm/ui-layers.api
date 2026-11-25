@@ -31,6 +31,7 @@ public final class hivens/ui/layers/LayerKt {
 
 public final class hivens/ui/layers/LayerResident {
 	public static final field $stable I
+	public final fun getLeavesKeyboard ()Z
 }
 
 public final class hivens/ui/layers/LayerTriggerKt {

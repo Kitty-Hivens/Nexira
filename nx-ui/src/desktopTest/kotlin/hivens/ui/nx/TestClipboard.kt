@@ -3,6 +3,7 @@ package hivens.ui.nx
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.ClipEntry
 import androidx.compose.ui.platform.Clipboard
+import androidx.compose.ui.platform.NativeClipboard
 import java.awt.datatransfer.DataFlavor
 import java.awt.datatransfer.StringSelection
 import java.awt.datatransfer.Transferable
@@ -22,6 +23,10 @@ internal class TestClipboard : Clipboard {
             ?.takeIf { it.isDataFlavorSupported(DataFlavor.stringFlavor) }
             ?.getTransferData(DataFlavor.stringFlavor) as String?
         set(value) = held.setContents(value?.let(::StringSelection), null)
+
+    /** A field's menu looks here for whether there is anything to paste. */
+    @Suppress("OVERRIDE_DEPRECATION")
+    override val nativeClipboard: NativeClipboard get() = held
 
     override suspend fun getClipEntry(): ClipEntry? = held.getContents(null)?.let(::ClipEntry)
 
