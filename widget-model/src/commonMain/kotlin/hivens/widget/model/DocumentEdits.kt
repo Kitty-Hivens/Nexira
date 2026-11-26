@@ -255,6 +255,40 @@ private fun Document.withOwnSlot(path: NodePath, instanceId: String, slot: SlotI
         )
     }
 
+/** The document with [config] as the config [id] of [composition], added or put in place of the one there. */
+fun Document.withConfig(composition: CompositionName, id: ConfigId, config: Config): Document {
+    val current = compositions[composition] ?: return this
+    if (current.configs[id] == config) return this
+    return copy(compositions = compositions + (composition to current.copy(configs = current.configs + (id to config))))
+}
+
+/** The document without the config [id] of [composition]. Identity where there is none. */
+fun Document.withoutConfig(composition: CompositionName, id: ConfigId): Document {
+    val current = compositions[composition] ?: return this
+    if (id !in current.configs) return this
+    return copy(compositions = compositions + (composition to current.copy(configs = current.configs - id)))
+}
+
+/**
+ * The document with every widget [composition] holds, in its singles' records, its configs and its residents, put
+ * through [transform], which answers what stands in its place: itself, another, several, or none. A widget's own
+ * children go through first, so [transform] sees them as they will be. The records of the singles themselves stay, so a
+ * widget the composition has once is not lost to a rewrite of what it holds. Identity where nothing changes.
+ */
+fun Document.flatMapWidgets(composition: CompositionName, transform: (WidgetInstance) -> List<WidgetInstance>): Document {
+    val current = compositions[composition] ?: return this
+    fun content(c: SlotContent): SlotContent {
+        val next = c.widgets.flatMap { w -> transform(w.copy(children = w.children.mapValues { (_, held) -> content(held) })) }
+        return if (next == c.widgets) c else c.copy(widgets = next)
+    }
+    val rewritten = current.copy(
+        singles = current.singles.mapValues { (_, r) -> r.copy(children = r.children.mapValues { (_, held) -> content(held) }) },
+        configs = current.configs.mapValues { (_, config) -> config.copy(layouts = config.layouts.map { it.copy(root = content(it.root)) }) },
+        residents = content(current.residents),
+    )
+    return if (rewritten == current) this else copy(compositions = compositions + (composition to rewritten))
+}
+
 /** Every widget a composition holds, once each: what stands in its configs and residents, its singles, and what any of them hold. */
 fun Composition.widgets(): Sequence<WidgetInstance> = sequence {
     for (record in singles.values) yieldAll(record.withChildren(singles.keys))

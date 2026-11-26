@@ -3,6 +3,9 @@ package hivens.ui.editor
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import hivens.ui.layout.DocumentStore
+import hivens.widget.model.CompositionName
+import hivens.widget.model.Config
+import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
@@ -29,7 +32,9 @@ import hivens.widget.model.shareOwn
 import hivens.widget.model.withFlow
 import hivens.widget.model.withGrid
 import hivens.widget.model.withPlacement
+import hivens.widget.model.withConfig
 import hivens.widget.model.withViewport
+import hivens.widget.model.withoutConfig
 import hivens.widget.model.withWidget
 import hivens.widget.model.withWidgetUpdated
 import hivens.widget.model.withoutWidget
@@ -297,6 +302,76 @@ class DocumentEditor(
 
     /** Gives the slot at [path] back to the record every config shares, dropping what this config held there. */
     fun shareOwn(path: NodePath) = edit { it.shareOwn(path) }
+
+    // ── Screens ──────────────────────────────────────────────────────
+
+    /**
+     * Makes a screen of [composition] called [title], laid out like its start config with nothing on its pages
+     * ([pagesOf] says which slots are pages), and a link to it on the rail. Returns its config id at once, before the
+     * edit lands, so the caller can open it once it is there.
+     */
+    fun createScreen(composition: CompositionName, title: String, icon: String, pagesOf: (WidgetKind) -> List<SlotId>): ConfigId {
+        val id = ConfigId(mint("screen"))
+        edit { d ->
+            val config = MadeScreens.blank(d, composition, title, icon, pagesOf) ?: return@edit d
+            MadeScreens.ensureLink(d.withConfig(composition, id, config), composition, id)
+        }
+        return id
+    }
+
+    /** Renames a screen or changes its icon. Null leaves that half as it is. Typing a name is one step. */
+    fun updateScreen(composition: CompositionName, id: ConfigId, title: String? = null, icon: String? = null) = edit("screen:${id.value}") { d ->
+        val config = d.compositions[composition]?.configs?.get(id) ?: return@edit d
+        d.withConfig(composition, id, config.copy(title = title ?: config.title, icon = icon ?: config.icon))
+    }
+
+    /** Deletes a screen and every link to it. [onDeleted] hears what was deleted, as it stood, for [restoreScreen]. */
+    fun deleteScreen(composition: CompositionName, id: ConfigId, onDeleted: (Config) -> Unit = {}) {
+        scope.launch(writes) {
+            val config = store.document.value.compositions[composition]?.configs?.get(id) ?: return@launch
+            apply(null) { d -> MadeScreens.removeLinks(d.withoutConfig(composition, id), composition, id) }
+            if (store.document.value.compositions[composition]?.configs?.containsKey(id) == false) onDeleted(config)
+        }
+    }
+
+    /** Puts a deleted screen back as it stood, with a link on the rail. */
+    fun restoreScreen(composition: CompositionName, id: ConfigId, config: Config) =
+        edit { d -> MadeScreens.ensureLink(d.withConfig(composition, id, config), composition, id) }
+
+    // ── Resets ───────────────────────────────────────────────────────
+
+    /**
+     * Puts the config [id] back as [standard] has it. A screen somebody made, which the standard document does not
+     * have, keeps its frame and loses what is on its pages.
+     */
+    fun resetScreen(composition: CompositionName, id: ConfigId, standard: Document, pagesOf: (WidgetKind) -> List<SlotId>) = edit { d ->
+        val current = d.compositions[composition]?.configs?.get(id) ?: return@edit d
+        val shipped = standard.compositions[composition]?.configs?.get(id)
+        d.withConfig(composition, id, shipped ?: current.copy(layouts = current.layouts.map { it.copy(root = MadeScreens.withoutPages(it.root, pagesOf)) }))
+    }
+
+    /**
+     * Puts everything back as [standard] has it, the frame and the modules included. The screens somebody made stay,
+     * each with a link on the rail, so the document stays the person's own. One step, like any other.
+     */
+    fun resetAll(standard: Document) = edit { d ->
+        standard.compositions.entries.fold(standard) { acc, (name, shipped) ->
+            val made = d.compositions[name]?.configs.orEmpty().filterKeys { it !in shipped.configs }
+            made.entries.fold(acc) { a, (id, config) -> MadeScreens.ensureLink(a.withConfig(name, id, config), name, id) }
+        }
+    }
+
+    /**
+     * Gives up the person's own document: the standard one is drawn again and each update replaces it again. The screens
+     * they made go with it. Not a step: nothing of theirs is left to step back into.
+     */
+    fun backToStandard() {
+        scope.launch(writes) {
+            if (!store.dropOwn()) return@launch
+            history.clear()
+            publish()
+        }
+    }
 
     /** What the slot at [path] holds now, for a caller deciding what to ask for. */
     fun contentAt(path: NodePath): SlotContent? = store.document.value.contentAt(path)

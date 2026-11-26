@@ -248,6 +248,28 @@ class DocumentTest {
         assertEquals(listOf(home), read.document.at(root(home)).widgets.first().shownOn)
     }
 
+    // Configs
+
+    @Test
+    fun `a config is added, put in place and taken away`() {
+        val other = config(node("news"))
+        val added = document.withConfig(launcher, ConfigId("made"), other)
+        assertEquals(other, added.launcher().configs[ConfigId("made")])
+        assertSame(added, added.withConfig(launcher, ConfigId("made"), other))
+        assertEquals(document.launcher().configs, added.withoutConfig(launcher, ConfigId("made")).launcher().configs)
+        assertSame(document, document.withoutConfig(launcher, ConfigId("none")))
+        assertSame(document, document.withConfig(CompositionName("gone"), home, other))
+    }
+
+    @Test
+    fun `every widget is rewritten, inside singles too, and the singles stay`() {
+        val noLinks = document.flatMapWidgets(launcher) { w -> if (w.kind.value == "link") emptyList() else listOf(w) }
+        assertEquals(emptyList(), noLinks.ids(root(home).child("rail", SlotId("top"))))
+        assertEquals(setOf(rail), noLinks.launcher().singles.keys)
+        assertEquals(listOf("news", "box"), noLinks.ids(root(home)).drop(1))
+        assertSame(document, document.flatMapWidgets(launcher) { listOf(it) })
+    }
+
     // Edits
 
     @Test
