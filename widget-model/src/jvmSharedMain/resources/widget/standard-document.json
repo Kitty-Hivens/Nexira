@@ -258,151 +258,7 @@
                                                     },
                                                     {
                                                         "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default",
-                                                        "children": {
-                                                            "main": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "browse.scope",
-                                                                        "instance_id": "browse-scope-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "browse.filter.builtBy",
-                                                                        "instance_id": "browse-filter-builtby-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "browse.filter.installed",
-                                                                        "instance_id": "browse-filter-installed-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "browse.filter.version",
-                                                                        "instance_id": "browse-filter-version-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "browse.filter.loader",
-                                                                        "instance_id": "browse-filter-loader-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "browse.filter.categories",
-                                                                        "instance_id": "browse-filter-categories-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "browse.filter.features",
-                                                                        "instance_id": "browse-filter-features-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "browse.filter.resolutions",
-                                                                        "instance_id": "browse-filter-resolutions-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "browse.filter.performance",
-                                                                        "instance_id": "browse-filter-performance-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "browse.filter.environment",
-                                                                        "instance_id": "browse-filter-environment-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "browse.filter.license",
-                                                                        "instance_id": "browse-filter-license-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "browse.filter.exclusions",
-                                                                        "instance_id": "browse-filter-exclusions-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "bottom": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ],
-                                                                "viewport": {
-                                                                    "kind": "scroll",
-                                                                    "scrollbar": false
-                                                                }
-                                                            },
-                                                            "bottom": {}
-                                                        }
+                                                        "instance_id": "appshell-region-right-default"
                                                     }
                                                 ],
                                                 "flow": {
@@ -1141,74 +997,7 @@
                                                     },
                                                     {
                                                         "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default",
-                                                        "children": {
-                                                            "main": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "mod.compatibility",
-                                                                        "instance_id": "mod-compatibility-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.links",
-                                                                        "instance_id": "mod-links-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.tags",
-                                                                        "instance_id": "mod-tags-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.creators",
-                                                                        "instance_id": "mod-creators-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.details",
-                                                                        "instance_id": "mod-details-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "bottom": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ],
-                                                                "viewport": {
-                                                                    "kind": "scroll",
-                                                                    "scrollbar": false
-                                                                }
-                                                            },
-                                                            "bottom": {}
-                                                        }
+                                                        "instance_id": "appshell-region-right-default"
                                                     }
                                                 ],
                                                 "flow": {
@@ -1286,74 +1075,7 @@
                                                     },
                                                     {
                                                         "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default",
-                                                        "children": {
-                                                            "main": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "mod.compatibility",
-                                                                        "instance_id": "mod-compatibility-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.links",
-                                                                        "instance_id": "mod-links-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.tags",
-                                                                        "instance_id": "mod-tags-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.creators",
-                                                                        "instance_id": "mod-creators-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.details",
-                                                                        "instance_id": "mod-details-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "bottom": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ],
-                                                                "viewport": {
-                                                                    "kind": "scroll",
-                                                                    "scrollbar": false
-                                                                }
-                                                            },
-                                                            "bottom": {}
-                                                        }
+                                                        "instance_id": "appshell-region-right-default"
                                                     }
                                                 ],
                                                 "flow": {
@@ -1409,74 +1131,7 @@
                                                     },
                                                     {
                                                         "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default",
-                                                        "children": {
-                                                            "main": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "mod.compatibility",
-                                                                        "instance_id": "mod-compatibility-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.links",
-                                                                        "instance_id": "mod-links-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.tags",
-                                                                        "instance_id": "mod-tags-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.creators",
-                                                                        "instance_id": "mod-creators-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    {
-                                                                        "kind": "mod.details",
-                                                                        "instance_id": "mod-details-default",
-                                                                        "placement": {
-                                                                            "padding": {
-                                                                                "top": 12.0,
-                                                                                "end": 12.0,
-                                                                                "bottom": 12.0,
-                                                                                "start": 12.0
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ],
-                                                                "viewport": {
-                                                                    "kind": "scroll",
-                                                                    "scrollbar": false
-                                                                }
-                                                            },
-                                                            "bottom": {}
-                                                        }
+                                                        "instance_id": "appshell-region-right-default"
                                                     }
                                                 ],
                                                 "flow": {
@@ -1657,87 +1312,288 @@
                             "widgets": [
                                 {
                                     "kind": "appshell.rightrail.compactnews",
-                                    "instance_id": "appshell-rightrail-compactnews-default"
+                                    "instance_id": "appshell-rightrail-compactnews-default",
+                                    "placement": {
+                                        "weight": 1.0
+                                    },
+                                    "hidden_on": [
+                                        "browse",
+                                        "catalogue.pack",
+                                        "project",
+                                        "project.build"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.scope",
+                                    "instance_id": "browse-scope-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.filter.builtBy",
+                                    "instance_id": "browse-filter-builtby-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.filter.installed",
+                                    "instance_id": "browse-filter-installed-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.filter.version",
+                                    "instance_id": "browse-filter-version-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.filter.loader",
+                                    "instance_id": "browse-filter-loader-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.filter.categories",
+                                    "instance_id": "browse-filter-categories-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.filter.features",
+                                    "instance_id": "browse-filter-features-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.filter.resolutions",
+                                    "instance_id": "browse-filter-resolutions-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.filter.performance",
+                                    "instance_id": "browse-filter-performance-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.filter.environment",
+                                    "instance_id": "browse-filter-environment-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.filter.license",
+                                    "instance_id": "browse-filter-license-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "browse.filter.exclusions",
+                                    "instance_id": "browse-filter-exclusions-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "bottom": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "browse"
+                                    ]
+                                },
+                                {
+                                    "kind": "mod.compatibility",
+                                    "instance_id": "mod-compatibility-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "catalogue.pack",
+                                        "project",
+                                        "project.build"
+                                    ]
+                                },
+                                {
+                                    "kind": "mod.links",
+                                    "instance_id": "mod-links-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "catalogue.pack",
+                                        "project",
+                                        "project.build"
+                                    ]
+                                },
+                                {
+                                    "kind": "mod.tags",
+                                    "instance_id": "mod-tags-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "catalogue.pack",
+                                        "project",
+                                        "project.build"
+                                    ]
+                                },
+                                {
+                                    "kind": "mod.creators",
+                                    "instance_id": "mod-creators-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "catalogue.pack",
+                                        "project",
+                                        "project.build"
+                                    ]
+                                },
+                                {
+                                    "kind": "mod.details",
+                                    "instance_id": "mod-details-default",
+                                    "placement": {
+                                        "padding": {
+                                            "top": 12.0,
+                                            "end": 12.0,
+                                            "bottom": 12.0,
+                                            "start": 12.0
+                                        }
+                                    },
+                                    "shown_on": [
+                                        "catalogue.pack",
+                                        "project",
+                                        "project.build"
+                                    ]
                                 }
-                            ]
+                            ],
+                            "viewport": {
+                                "kind": "scroll",
+                                "scrollbar": false
+                            }
                         },
                         "bottom": {
                             "widgets": [
                                 {
                                     "kind": "notifications.history",
-                                    "instance_id": "appshell-rightrail-history-default"
+                                    "instance_id": "appshell-rightrail-history-default",
+                                    "hidden_on": [
+                                        "browse",
+                                        "catalogue.pack",
+                                        "project",
+                                        "project.build"
+                                    ]
                                 }
                             ]
                         }
                     }
-                },
-                "mod.compatibility": {
-                    "kind": "mod.compatibility",
-                    "instance_id": "mod-compatibility-default"
-                },
-                "mod.links": {
-                    "kind": "mod.links",
-                    "instance_id": "mod-links-default"
-                },
-                "mod.tags": {
-                    "kind": "mod.tags",
-                    "instance_id": "mod-tags-default"
-                },
-                "mod.creators": {
-                    "kind": "mod.creators",
-                    "instance_id": "mod-creators-default"
-                },
-                "mod.details": {
-                    "kind": "mod.details",
-                    "instance_id": "mod-details-default"
-                },
-                "browse.scope": {
-                    "kind": "browse.scope",
-                    "instance_id": "browse-scope-default"
-                },
-                "browse.filter.builtBy": {
-                    "kind": "browse.filter.builtBy",
-                    "instance_id": "browse-filter-builtby-default"
-                },
-                "browse.filter.installed": {
-                    "kind": "browse.filter.installed",
-                    "instance_id": "browse-filter-installed-default"
-                },
-                "browse.filter.version": {
-                    "kind": "browse.filter.version",
-                    "instance_id": "browse-filter-version-default"
-                },
-                "browse.filter.loader": {
-                    "kind": "browse.filter.loader",
-                    "instance_id": "browse-filter-loader-default"
-                },
-                "browse.filter.categories": {
-                    "kind": "browse.filter.categories",
-                    "instance_id": "browse-filter-categories-default"
-                },
-                "browse.filter.features": {
-                    "kind": "browse.filter.features",
-                    "instance_id": "browse-filter-features-default"
-                },
-                "browse.filter.resolutions": {
-                    "kind": "browse.filter.resolutions",
-                    "instance_id": "browse-filter-resolutions-default"
-                },
-                "browse.filter.performance": {
-                    "kind": "browse.filter.performance",
-                    "instance_id": "browse-filter-performance-default"
-                },
-                "browse.filter.environment": {
-                    "kind": "browse.filter.environment",
-                    "instance_id": "browse-filter-environment-default"
-                },
-                "browse.filter.license": {
-                    "kind": "browse.filter.license",
-                    "instance_id": "browse-filter-license-default"
-                },
-                "browse.filter.exclusions": {
-                    "kind": "browse.filter.exclusions",
-                    "instance_id": "browse-filter-exclusions-default"
                 }
             }
         },

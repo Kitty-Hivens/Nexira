@@ -15,7 +15,14 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
+import hivens.ui.widgets.ChildLevel
+import hivens.ui.widgets.KoinLevelServicesHost
+import hivens.widget.api.CompositionKeys
+import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.ProvideScoped
+import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.WidgetScope
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
@@ -27,11 +34,15 @@ import hivens.widget.model.ConfigLayout
 import hivens.widget.model.Document
 import hivens.widget.model.History
 import hivens.widget.model.LayoutId
+import hivens.widget.model.ScopeLevel
 import hivens.widget.model.Show
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import kotlinx.coroutines.Dispatchers
+import org.koin.dsl.koinApplication
+import org.koin.dsl.module
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -42,6 +53,12 @@ import kotlin.test.assertEquals
  */
 @OptIn(ExperimentalComposeUiApi::class)
 class ConfigViewTest {
+
+    /** An app level the composition's level stands under, which is where the history is put. */
+    private val app: WidgetScope = koinApplication {
+        val data = WidgetDataRegistry().apply { declare(CompositionKeys.History) }
+        modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined) } })
+    }.koin.get()
 
     /** How many times each widget was made, by name. */
     private val made = HashMap<String, Int>()
@@ -70,6 +87,7 @@ class ConfigViewTest {
                                 children = mapOf(
                                     body to SlotContent(listOf(WidgetInstance(leaf, page))),
                                     side to SlotContent(if (blockInSide) listOf(WidgetInstance(block, "block")) else emptyList()),
+                                    BOTTOM to SlotContent(listOf(WidgetInstance(leaf, "only-on-b", shownOn = listOf(b)))),
                                 ),
                             ),
                         ),
@@ -83,7 +101,7 @@ class ConfigViewTest {
                 composition to Composition(
                     start = a,
                     singles = mapOf(
-                        frame to WidgetInstance(frame, "frame", children = mapOf(body to SlotContent(), side to SlotContent())),
+                        frame to WidgetInstance(frame, "frame", children = mapOf(body to SlotContent(), side to SlotContent(), BOTTOM to SlotContent())),
                         block to WidgetInstance(block, "block"),
                     ),
                     configs = mapOf(a to config("on-a", true), b to config("on-b", true), c to config("on-c", false)),
@@ -107,7 +125,7 @@ class ConfigViewTest {
         override val kind = WidgetKind("test.frame")
         override val displayName = "frame"
         override val removable = false
-        override val slots = listOf(SlotId("body"), SlotId("side"))
+        override val slots = listOf(SlotId("body"), SlotId("side"), BOTTOM)
         override val pages = listOf(SlotId("body"))
 
         @Composable
@@ -115,6 +133,7 @@ class ConfigViewTest {
             Box(Modifier.fillMaxSize()) {
                 SlotRenderer(instance, SlotId("body"))
                 SlotRenderer(instance, SlotId("side"))
+                SlotRenderer(instance, BOTTOM)
             }
         }
     }
@@ -132,8 +151,12 @@ class ConfigViewTest {
         var history by mutableStateOf(History(a))
         onEventThread {
             val scene = ImageComposeScene(200, 200, Density(1f)) {
-                CompositionLocalProvider(LocalWidgetRegistry provides registry) {
-                    ConfigView(composition, document, history, Modifier.fillMaxSize())
+                CompositionLocalProvider(LocalWidgetRegistry provides registry, LocalScope provides app) {
+                    ChildLevel(ScopeLevel.Composition) {
+                        ProvideScoped(CompositionKeys.History, history) {
+                            ConfigView(composition, document, history, Modifier.fillMaxSize())
+                        }
+                    }
                 }
             }
             try {
@@ -172,4 +195,18 @@ class ConfigViewTest {
         visit({ show(Show(c)) }, { show(Show(a)) })
         assertEquals(2, made["block"], "$made")
     }
+
+    @Test
+    fun `a widget shown on another config is not drawn`() {
+        visit()
+        assertEquals(null, made["only-on-b"], "$made")
+    }
+
+    @Test
+    fun `a widget shown on one config is drawn there only`() {
+        visit({ show(Show(b)) }, { back() })
+        assertEquals(1, made["only-on-b"], "made on b and nowhere else: $made")
+    }
 }
+
+private val BOTTOM = SlotId("bottom")

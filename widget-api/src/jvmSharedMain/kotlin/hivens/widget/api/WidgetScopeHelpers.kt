@@ -16,6 +16,7 @@ import hivens.widget.model.CommandKey
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 import hivens.widget.model.WidgetCommand
+import hivens.widget.model.WidgetInstance
 import org.slf4j.LoggerFactory
 
 /**
@@ -241,6 +242,17 @@ fun conditionHolds(id: String): Boolean {
 fun WidgetDescriptor.shownHere(): Boolean {
     val condition = shownWhen ?: return true
     return conditionHolds(condition)
+}
+
+/**
+ * Whether this instance is shown on the config its composition shows ([WidgetInstance.shownOn]). One that names no
+ * config, or one drawn where no composition says what it shows, is shown.
+ */
+@Composable
+fun WidgetInstance.shownHere(): Boolean {
+    if (!conditional) return true
+    val config = rememberScopedSource(CompositionKeys.History).valueOrNull()?.current?.config ?: return true
+    return shownOn(config)
 }
 
 /**

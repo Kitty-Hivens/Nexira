@@ -231,6 +231,23 @@ class DocumentTest {
         assertEquals(held, read.document)
     }
 
+    // Shown on
+
+    @Test
+    fun `a widget is shown on the configs it names and on none it is hidden on`() {
+        val anywhere = node("news")
+        assertTrue(anywhere.shownOn(home) && !anywhere.conditional)
+        val onHome = node("news").copy(shownOn = listOf(home))
+        assertTrue(onHome.shownOn(home))
+        assertFalse(onHome.shownOn(library))
+        val notOnHome = node("news").copy(hiddenOn = listOf(home))
+        assertFalse(notOnHome.shownOn(home))
+        assertTrue(notOnHome.shownOn(library))
+        assertFalse(node("news").copy(shownOn = listOf(home), hiddenOn = listOf(home)).shownOn(home), "hidden wins")
+        val read = assertIs<DocumentRead.Whole>(DocumentCodec.read(DocumentCodec.write(document.edit(root(home)) { it.withWidget(onHome, 0) })))
+        assertEquals(listOf(home), read.document.at(root(home)).widgets.first().shownOn)
+    }
+
     // Edits
 
     @Test

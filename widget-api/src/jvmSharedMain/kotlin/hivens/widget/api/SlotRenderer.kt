@@ -296,8 +296,8 @@ private fun storedAt(path: NodePath): SlotContent? {
 }
 
 /**
- * [content] less the widgets whose show condition does not hold here
- * ([WidgetDescriptor.shownWhen]), unless somebody is arranging, who sees them dimmed in
+ * [content] less the widgets whose show condition does not hold here ([WidgetDescriptor.shownWhen]), or that are not
+ * shown on the config the composition shows ([WidgetInstance.shownOn]), unless somebody is arranging, who sees them dimmed in
  * their places through [LocalHiddenWidget] instead.
  *
  * Taken out before the slot lays anything out, so a hidden widget is no item at all: no
@@ -313,7 +313,7 @@ private fun shownOf(content: SlotContent): SlotContent {
     content.widgets.forEach { instance ->
         key(instance.instanceId) {
             val descriptor = registry[instance.kind]
-            if (descriptor != null && !descriptor.shownHere()) hidden += instance.instanceId
+            if (!instance.shownHere() || (descriptor != null && !descriptor.shownHere())) hidden += instance.instanceId
         }
     }
     return if (hidden.isEmpty()) content else content.copy(widgets = content.widgets.filter { it.instanceId !in hidden })
@@ -1520,7 +1520,7 @@ private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance,
         // hold (see [shownOf]), and there it says so rather than passing for live.
         val hidden = LocalHiddenWidget.current
         val drawn = @Composable {
-            if (hidden != null && !descriptor.shownHere()) hidden(descriptor, instance, body) else body()
+            if (hidden != null && (!descriptor.shownHere() || !instance.shownHere())) hidden(descriptor, instance, body) else body()
         }
         entrance(descriptor.resolveEntrance(instance), Entrance.parse(instance.motion?.enter) != null, order, instance.motion?.delayMs) {
             if (ceiling == null) drawn() else Box(ceiling) { drawn() }
