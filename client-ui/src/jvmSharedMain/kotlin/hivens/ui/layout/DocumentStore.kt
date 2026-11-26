@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.concurrent.atomic.AtomicBoolean
 
 private val log = LoggerFactory.getLogger("hivens.ui.layout.DocumentStore")
 
@@ -27,7 +28,11 @@ private val log = LoggerFactory.getLogger("hivens.ui.layout.DocumentStore")
  *
  * A file this build cannot take as it is, written by a newer build or not a document at all, is left exactly as it
  * is: the standard document is drawn meanwhile, nothing is written, and the session says so. [save] is where a write
- * runs, off the caller's thread in the launcher.
+ * runs, off the caller's thread in the launcher, one at a time and in order.
+ *
+ * An edit is drawn at once and written later. A drag edits on every frame, so while one write waits its turn the
+ * edits after it ride on it, and when it runs it writes what the person meant last: the document as it stands, or no
+ * file at all once they have gone back to the standard one.
  */
 class DocumentStore(
     private val file: Path,
@@ -57,9 +62,8 @@ class DocumentStore(
     fun takeOwn(): Boolean {
         if (!writable) return false
         if (ownState.value) return true
-        val copy = state.value
-        persist(copy)
         ownState.value = true
+        sync()
         return true
     }
 
@@ -73,13 +77,38 @@ class DocumentStore(
         val next = transform(state.value)
         if (next == state.value) return true
         state.value = next
-        persist(next)
+        sync()
         return true
     }
 
-    private fun persist(document: Document) {
-        val text = DocumentCodec.write(document)
-        save("the interface") { AtomicFiles.writeString(file, text) }
+    /**
+     * Gives up the person's own document: the standard one is drawn again, and each update replaces it again. The file
+     * goes. False where the file there is one this build does not write.
+     */
+    @Synchronized
+    fun dropOwn(): Boolean {
+        if (!writable) return false
+        if (!ownState.value) return true
+        ownState.value = false
+        state.value = standard()
+        sync()
+        return true
+    }
+
+    /** Whether the document drawn is the standard one as it stands, the person's own included. */
+    val matchesStandard: Boolean get() = state.value == standard()
+
+    // Whether a write is queued and has not begun. The edits made meanwhile ride on it.
+    private val queued = AtomicBoolean(false)
+
+    private fun sync() {
+        if (!queued.compareAndSet(false, true)) return
+        save("the interface") {
+            queued.set(false)
+            synchronized(this) {
+                if (ownState.value) AtomicFiles.writeString(file, DocumentCodec.write(state.value)) else Files.deleteIfExists(file)
+            }
+        }
     }
 
     private class Loaded(val document: Document, val own: Boolean, val reason: ReadOnlyReason?)

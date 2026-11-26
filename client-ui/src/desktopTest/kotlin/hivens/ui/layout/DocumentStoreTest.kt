@@ -113,4 +113,54 @@ class DocumentStoreTest {
         assertIs<DocumentRead.Whole>(DocumentCodec.read(file.readText()))
         assertEquals(listOf("the interface"), asked)
     }
+
+    @Test
+    fun `edits made while a write waits ride on it, and it writes the last of them`() {
+        val held = ArrayList<() -> Unit>()
+        val store = DocumentStore(file, { standard }) { _, block -> held += block }
+        store.takeOwn()
+        repeat(30) { i -> store.update { it.copy(modules = listOf("frame-$i")) } }
+        assertEquals(1, held.size, "one write for the whole drag")
+        held.forEach { it() }
+        assertEquals(DocumentRead.Whole(standard.copy(modules = listOf("frame-29"))), DocumentCodec.read(file.readText()))
+        store.update { it.copy(modules = listOf("after")) }
+        assertEquals(2, held.size, "an edit after the write began is written again")
+    }
+
+    @Test
+    fun `going back to the standard document draws it, removes the file and takes no edits`() {
+        val store = store()
+        store.takeOwn()
+        store.update { it.copy(modules = emptyList()) }
+        assertFalse(store.matchesStandard)
+        assertTrue(store.dropOwn())
+        assertEquals(standard, store.document.value)
+        assertFalse(store.own.value)
+        assertTrue(store.matchesStandard)
+        assertFalse(Files.exists(file))
+        assertFalse(store.update { it.copy(modules = emptyList()) })
+        assertEquals(standard, store().document.value, "the next start draws the standard one")
+    }
+
+    @Test
+    fun `whatever order the writes run in, the file ends as the person last meant`() {
+        val held = ArrayList<() -> Unit>()
+        val store = DocumentStore(file, { standard }) { _, block -> held += block }
+        store.takeOwn()
+        store.update { it.copy(modules = emptyList()) }
+        store.dropOwn()
+        store.takeOwn()
+        held.toList().forEach { it() }
+        assertEquals(DocumentRead.Whole(standard), DocumentCodec.read(file.readText()), "own again, as the standard one was")
+        store.dropOwn()
+        held.toList().forEach { it() }
+        assertFalse(Files.exists(file))
+    }
+
+    @Test
+    fun `a file this build does not write is not given up either`() {
+        file.writeText("{not a document")
+        assertFalse(store().dropOwn())
+        assertEquals("{not a document", file.readText())
+    }
 }
