@@ -41,13 +41,14 @@ import hivens.widget.model.ConfigId
 import hivens.widget.model.PageValue
 import hivens.widget.model.Show
 import hivens.widget.model.Widget
+import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import org.koin.compose.koinInject
 
-// Each of the launcher's own screens as the one widget its config holds, until the screens are made of widgets
-// themselves. None is an argument's: what an opening sets is a value of the page, and the rest is a source or a
-// command like any widget's. Not removable, which keeps them out of the palette, and with no arrival of their own,
-// since the config that holds one arrives.
+// Each of the launcher's own screens as the widget its config holds, a container whose slots hold the widgets the
+// screen is made of, until the screens are made of widgets themselves. None is an argument's: what an opening sets is
+// a value of the page, and the rest is a source or a command like any widget's. Not removable, which keeps them out of
+// the palette, and with no arrival of their own, since the config that holds one arrives.
 
 /** The kind of the widget that draws [config] whole. */
 internal fun screenKind(config: ConfigId): WidgetKind = WidgetKind("screen.${config.value}")
@@ -67,38 +68,40 @@ private fun sessionState(): SessionState? = rememberScopedSource(AccountKeys.Ses
 @Composable
 private fun session(): SessionView? = (sessionState() as? SessionState.SignedIn)?.session
 
-@Widget(id = "screen.home", enter = "none", removable = false)
+@Widget(id = "screen.home", enter = "none", removable = false, slots = ["main"])
 @Composable
-fun HomeScreenWidget() = NewHomeScreen()
+fun HomeScreenWidget(instance: WidgetInstance) = NewHomeScreen(instance)
 
-@Widget(id = "screen.library", enter = "none", removable = false)
+@Widget(id = "screen.library", enter = "none", removable = false, slots = ["header", "body"])
 @Composable
-fun LibraryScreenWidget() {
+fun LibraryScreenWidget(instance: WidgetInstance) {
     val show = rememberShow()
-    LibraryScreen(onOpenPack = { show(LauncherConfigs.pack(it)) })
+    LibraryScreen(instance, onOpenPack = { show(LauncherConfigs.pack(it)) })
 }
 
-@Widget(id = "screen.browse", enter = "none", removable = false)
+@Widget(id = "screen.browse", enter = "none", removable = false, slots = ["header", "body"])
 @Composable
-fun BrowseScreenWidget() = BrowseScreen(intoInstanceId = pageValue(CataloguePages.Into))
+fun BrowseScreenWidget(instance: WidgetInstance) = BrowseScreen(instance, intoInstanceId = pageValue(CataloguePages.Into))
 
-@Widget(id = "screen.profile", enter = "none", removable = false)
+@Widget(id = "screen.profile", enter = "none", removable = false, slots = ["nav", "skin", "account", "signin"])
 @Composable
-fun ProfileScreenWidget() = ProfileSurface(session = session(), authResolving = sessionState() is SessionState.Resolving)
+fun ProfileScreenWidget(instance: WidgetInstance) =
+    ProfileSurface(instance, session = session(), authResolving = sessionState() is SessionState.Resolving)
 
 @Widget(id = "screen.wardrobe", enter = "none", removable = false)
 @Composable
 fun WardrobeScreenWidget() = WardrobeSurface(session = session(), onBack = rememberBack())
 
 // The language module's keys where it is brought in, and the one language in use where it is not.
-@Widget(id = "screen.settings", enter = "none", removable = false)
+@Widget(id = "screen.settings", enter = "none", removable = false, slots = ["theme.link", "theme.daynight"])
 @Composable
-fun SettingsScreenWidget() {
+fun SettingsScreenWidget(instance: WidgetInstance) {
     val show = rememberShow()
     val language = rememberScopedSource(I18nKeys.Language).valueOrNull() ?: LocalTranslator.current.language
     val languages = rememberScopedSource(I18nKeys.Languages).valueOrNull() ?: listOf(language)
     val update = rememberScopedCommand(I18nKeys.UpdateSettings)
     SettingsScreen(
+        instance                 = instance,
         currentLanguage          = language,
         languages                = languages,
         onLanguageChanged        = { tag -> update?.invoke(SettingsChange { it.copy(language = tag) }) },
@@ -107,19 +110,20 @@ fun SettingsScreenWidget() {
     )
 }
 
-@Widget(id = "screen.theme.picker", enter = "none", removable = false)
+@Widget(id = "screen.theme.picker", enter = "none", removable = false, slots = ["header", "grid", "preview"])
 @Composable
-fun ThemesScreenWidget() = ThemePickerSurface()
+fun ThemesScreenWidget(instance: WidgetInstance) = ThemePickerSurface(instance)
 
-@Widget(id = "screen.about", enter = "none", removable = false)
+@Widget(id = "screen.about", enter = "none", removable = false, slots = ["left", "right"])
 @Composable
-fun AboutScreenWidget() = AboutSurface(onBack = rememberBack())
+fun AboutScreenWidget(instance: WidgetInstance) = AboutSurface(instance, onBack = rememberBack())
 
-@Widget(id = "screen.background", enter = "none", removable = false)
+@Widget(id = "screen.background", enter = "none", removable = false, slots = ["controls", "theme", "theme.link", "motion"])
 @Composable
-fun BackgroundScreenWidget() {
+fun BackgroundScreenWidget(instance: WidgetInstance) {
     val update = rememberScopedCommand(Commands.UpdateBackground)
     BgSettingsSurface(
+        instance          = instance,
         currentSettings   = rememberScopedSource(Sources.Background).valueOrNull() ?: BackgroundSettings(),
         onSettingsChanged = { change -> update?.invoke(change) },
         onBack            = rememberBack(),
@@ -161,12 +165,13 @@ fun PackVersionsScreenWidget() {
     PackVersionsScreen(instanceId = pack, onBack = rememberBack())
 }
 
-@Widget(id = "screen.catalogue.pack", enter = "none", removable = false)
+@Widget(id = "screen.catalogue.pack", enter = "none", removable = false, slots = ["header", "body"])
 @Composable
-fun CataloguePackScreenWidget() {
+fun CataloguePackScreenWidget(instance: WidgetInstance) {
     val pack = pageValue(CataloguePages.Pack) ?: return
     val show = rememberShow()
     CataloguePackDetailScreen(
+        instance    = instance,
         origin      = pack.origin,
         packId      = pack.packId,
         onBack      = rememberBack(),
@@ -174,12 +179,12 @@ fun CataloguePackScreenWidget() {
     )
 }
 
-@Widget(id = "screen.project", enter = "none", removable = false)
+@Widget(id = "screen.project", enter = "none", removable = false, slots = ["header", "body"])
 @Composable
-fun ProjectScreenWidget() {
+fun ProjectScreenWidget(instance: WidgetInstance) {
     val target = pageValue(CataloguePages.Project) ?: return
     val show = rememberShow()
-    ModDetailScreen(target = target, onOpenVersion = { id, number -> show(LauncherConfigs.build(target, id, number)) })
+    ModDetailScreen(instance, target = target, onOpenVersion = { id, number -> show(LauncherConfigs.build(target, id, number)) })
 }
 
 @Widget(id = "screen.project.build", enter = "none", removable = false)

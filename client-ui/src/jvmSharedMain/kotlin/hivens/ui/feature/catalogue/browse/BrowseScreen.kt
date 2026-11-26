@@ -57,8 +57,6 @@ import hivens.catalogue.api.ScrollMark
 import hivens.catalogue.api.SearchResults
 import hivens.catalogue.api.SearchStatus
 import hivens.i18n.api.Strings
-import hivens.ui.RIGHT_RAIL_SURFACE
-import hivens.ui.RailFamily
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -75,32 +73,32 @@ import hivens.ui.theme.Dimens
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetInstance
 import java.util.UUID
 /**
  * Browse = the catalogue of everything installable: packs from every source the modules
  * brought in, and mods, resource packs and shaders from the project sources.
  *
- * The screen is a widget surface and owns none of its controls. What is searched,
- * in what order and into which pack is chosen in the right rail's browse family;
- * the search box and the results are this surface's two slots. All of them meet at
- * the window's [CatalogueKeys.Browse], so a widget moved, removed or added in the
- * editor needs nothing from its neighbours.
+ * The screen is a container and owns none of its controls. What is searched, in what
+ * order and into which pack is chosen in the right rail, which this config holds as
+ * its own; the search box and the results are this screen's two slots. All of them
+ * meet at the window's [CatalogueKeys.Browse], so a widget moved, removed or added in
+ * the editor needs nothing from its neighbours.
  *
- * What the screen does own is switching the rail to its family for as long as Browse
- * is up, naming the pack installs go into each time it comes up, so the catalogue
- * module reads it off disk anew for every widget to ask the same answer, and showing
- * the window's results for as long as it is up, which is what runs the search.
+ * What the screen does own is naming the pack installs go into each time it comes up,
+ * so the catalogue module reads it off disk anew for every widget to ask the same
+ * answer, and showing the window's results for as long as it is up, which is what runs
+ * the search.
  */
 @Composable
 fun BrowseScreen(
+    instance: WidgetInstance,
     /**
      * The pack this browse was opened from. It becomes the install target, and the
      * search moves to a kind the pack takes each time the reader asks for this browse
@@ -114,15 +112,6 @@ fun BrowseScreen(
     val setTarget = rememberScopedCommand(CatalogueKeys.SetTarget)
     val showResults = rememberScopedCommand(CatalogueKeys.ShowResults)
     val hideResults = rememberScopedCommand(CatalogueKeys.HideResults)
-    val families = LocalSurfaceFamilies.current
-
-    // This visit, as the family's owner, so a page leaving over it hands the rail
-    // back to Browse rather than to whatever it showed itself.
-    val railOwner = remember { Any() }
-    DisposableEffect(railOwner) {
-        families.switch(RIGHT_RAIL_SURFACE, RailFamily.BROWSE, railOwner)
-        onDispose { families.reset(RIGHT_RAIL_SURFACE, railOwner) }
-    }
 
     // The pack is the screen's own subject, so it is the target whenever the screen
     // comes up, and the one the rail chose is read again: a pack updated since to
@@ -151,13 +140,11 @@ fun BrowseScreen(
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp, vertical = 20.dp),
         ) {
-            SlotRenderer(SurfaceId(BROWSE_SURFACE), SlotId("header"), Modifier.fillMaxWidth(), spacing = 8.dp)
-            SlotRenderer(SurfaceId(BROWSE_SURFACE), SlotId("body"), Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
+            SlotRenderer(instance, SlotId("header"), Modifier.fillMaxWidth(), spacing = 8.dp)
+            SlotRenderer(instance, SlotId("body"), Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
         }
     }
 }
-
-internal const val BROWSE_SURFACE = "browse"
 
 /**
  * Packs from one source: the window's search as the catalogue module answers it, with

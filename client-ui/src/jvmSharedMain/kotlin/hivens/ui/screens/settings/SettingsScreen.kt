@@ -25,6 +25,7 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.chrome.LocalWindowClass
 import hivens.ui.chrome.WindowClass
 import hivens.ui.surface.SurfaceKind
+import hivens.widget.model.WidgetInstance
 
 /**
  * Settings orchestrator: form state, persistence, the "saved" banner,
@@ -37,6 +38,8 @@ import hivens.ui.surface.SurfaceKind
  */
 @Composable
 fun SettingsScreen(
+    /** The settings screen's widget, whose slots the appearance section leaves for the look's controls. */
+    instance: WidgetInstance,
     currentLanguage: LanguageInfo,
     languages: List<LanguageInfo>,
     onLanguageChanged: (tag: String) -> Unit,
@@ -127,6 +130,7 @@ fun SettingsScreen(
                     sectionRetention.SaveableStateProvider(selectedCategory.name) {
                     when (selectedCategory) {
                         SettingsCategory.Appearance -> AppearanceSection(
+                            instance                     = instance,
                             form                         = form,
                             save                         = ::save,
                             onOpenBackgroundSettings     = onOpenBackgroundSettings,

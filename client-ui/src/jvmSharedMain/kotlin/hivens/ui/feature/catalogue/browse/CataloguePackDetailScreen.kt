@@ -14,7 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -39,8 +38,6 @@ import hivens.i18n.api.Strings
 import hivens.packs.api.InstallRequest
 import hivens.packs.api.InstallStatus
 import hivens.packs.api.PackKeys
-import hivens.ui.RIGHT_RAIL_SURFACE
-import hivens.ui.RailFamily
 import hivens.ui.components.FullscreenVideo
 import hivens.ui.components.ImageGallery
 import hivens.ui.components.galleryMedia
@@ -73,7 +70,6 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
-import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.ProvideScoped
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberScopedAction
@@ -82,8 +78,8 @@ import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
+import hivens.widget.model.WidgetInstance
 import hivens.widget.model.SourceKey
-import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.launch
 
 /**
@@ -104,12 +100,12 @@ import kotlinx.coroutines.launch
  */
 @Composable
 fun CataloguePackDetailScreen(
+    instance: WidgetInstance,
     origin: String,
     packId: String,
     onBack: () -> Unit,
     onInstalled: (instanceId: String) -> Unit,
 ) {
-    val families = LocalSurfaceFamilies.current
     val show = rememberScopedCommand(CatalogueKeys.ShowPack)
     val hide = rememberScopedCommand(CatalogueKeys.HidePack)
     val retry = rememberScopedAction(CatalogueKeys.RetryPack)
@@ -122,7 +118,7 @@ fun CataloguePackDetailScreen(
     PuppetClick("catalogue.detail.back") { onBack() }
 
     // This visit of the page. The catalogue module opens it on the page as it was last
-    // read rather than on a spinner, and the rail follows it for as long as it is shown.
+    // read rather than on a spinner.
     val visit = rememberPageVisit(
         key = origin to packId,
         show = show?.let { cmd -> { v: String -> cmd(PackVisit(origin, packId, v)) } },
@@ -130,12 +126,6 @@ fun CataloguePackDetailScreen(
     )
     val page = rememberScopedSource(CatalogueKeys.PackPage).valueOrNull()?.takeIf { it.visit == visit }
     val status = page?.status ?: PackPageStatus.Loading
-
-    // This visit, as the rail's owner: a page arriving over this one takes the rail.
-    DisposableEffect(visit) {
-        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, visit)
-        onDispose { families.reset(RIGHT_RAIL_SURFACE, visit) }
-    }
 
     // The install is the packs module's and runs on past this screen. Matched on the
     // pack, so a return here finds an install started before the reader left.
@@ -178,7 +168,7 @@ fun CataloguePackDetailScreen(
         onRetry = { retry?.invoke() },
     )
 
-    // A widget surface, the way the project page is: the header and the tabs in
+    // A container, the way the project page is: the header and the tabs in
     // `header`, the tab's pane in `body`, each slot on the panel it always sat on.
     // The widgets read the page over this page's level, where nothing outside the
     // page can reach it.
@@ -189,7 +179,7 @@ fun CataloguePackDetailScreen(
                 modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp),
             ) {
                 SlotRenderer(
-                    SurfaceId(CATALOGUE_PACK_SURFACE),
+                    instance,
                     SlotId("header"),
                     Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
                 )
@@ -198,7 +188,7 @@ fun CataloguePackDetailScreen(
                 kind = SurfaceKind.Panel,
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
             ) {
-                SlotRenderer(SurfaceId(CATALOGUE_PACK_SURFACE), SlotId("body"), Modifier.fillMaxSize())
+                SlotRenderer(instance, SlotId("body"), Modifier.fillMaxSize())
             }
         }
     }
@@ -211,8 +201,6 @@ fun CataloguePackDetailScreen(
     }
 }
 
-/** The catalogue pack page's surface, see [CataloguePackPage]. */
-internal const val CATALOGUE_PACK_SURFACE = "catalogue.pack"
 
 /**
  * What the catalogue pack page's widgets share: the page as read, the tab it

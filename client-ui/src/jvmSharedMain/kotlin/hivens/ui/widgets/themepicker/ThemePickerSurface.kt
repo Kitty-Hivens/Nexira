@@ -15,9 +15,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.puppet.PuppetScreen
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
-
-private const val SURFACE = "theme.picker"
+import hivens.widget.model.WidgetInstance
 
 // theme.picker surface composable. What the theme.picker config holds. A frame
 // of slots and nothing else: the header (the title and Apply) on top, and the grid and
@@ -25,11 +23,11 @@ private const val SURFACE = "theme.picker"
 // themes on offer, the pending choice and applying it, is the colour provider's
 // controls', which hold the choice in the page, so the frame names none of it.
 @Composable
-fun ThemePickerSurface() {
+fun ThemePickerSurface(instance: WidgetInstance) {
     PuppetScreen("ThemePicker")
 
     Column(modifier = Modifier.fillMaxSize().padding(24.dp)) {
-        SlotRenderer(SurfaceId(SURFACE), SlotId("header"), Modifier.fillMaxWidth().padding(bottom = 24.dp))
+        SlotRenderer(instance, SlotId("header"), Modifier.fillMaxWidth().padding(bottom = 24.dp))
         // Grid is the editable panel. The preview reads the same selection, so
         // removing the preview widget hides it without breaking selection.
         BoxWithConstraints(Modifier.fillMaxSize()) {
@@ -37,16 +35,16 @@ fun ThemePickerSurface() {
                 // The preview over the grid on a window too narrow for them side by side:
                 // beside it the preview was left a strip a few letters wide.
                 Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("preview"), Modifier.fillMaxWidth().height(PREVIEW_HEIGHT_STACKED))
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("grid"), Modifier.weight(1f).fillMaxWidth())
+                    SlotRenderer(instance, SlotId("preview"), Modifier.fillMaxWidth().height(PREVIEW_HEIGHT_STACKED))
+                    SlotRenderer(instance, SlotId("grid"), Modifier.weight(1f).fillMaxWidth())
                 }
             } else {
                 Row(
                     modifier              = Modifier.fillMaxSize(),
                     horizontalArrangement = Arrangement.spacedBy(24.dp),
                 ) {
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("grid"), Modifier.weight(2f).fillMaxHeight())
-                    SlotRenderer(SurfaceId(SURFACE), SlotId("preview"), Modifier.weight(1f).fillMaxHeight())
+                    SlotRenderer(instance, SlotId("grid"), Modifier.weight(2f).fillMaxHeight())
+                    SlotRenderer(instance, SlotId("preview"), Modifier.weight(1f).fillMaxHeight())
                 }
             }
         }

@@ -196,6 +196,16 @@ fun Document.holdsOwn(path: NodePath): Boolean {
 }
 
 /**
+ * Whether some config of [path]'s composition, in any of its layouts, holds as its own the slot [path] names under a
+ * config's root: a slot whose content can change when the composition shows another config.
+ */
+fun Document.heldOwnAnywhere(path: NodePath): Boolean {
+    if (path.root !is NodeRoot.Layout) return false
+    val composition = compositions[path.composition] ?: return false
+    return composition.configs.any { (id, config) -> config.layouts.any { holdsOwn(path.copy(root = NodeRoot.Layout(id, it.id))) } }
+}
+
+/**
  * The document with [path], a slot of a single, held as its config's own from now on: the config holds what the slot
  * held, each widget in it under a name [mint] makes of its name where that name is taken, so the record and the config
  * hold two things and not one thing twice. Identity where the slot is the config's own already, or is no single's.

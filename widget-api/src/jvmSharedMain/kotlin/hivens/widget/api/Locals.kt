@@ -53,6 +53,21 @@ val LocalLayoutGraph: ProvidableCompositionLocal<LayoutGraph> =
 val LocalDocument: ProvidableCompositionLocal<Document?> =
     compositionLocalOf { null }
 
+/**
+ * Draws a slot of a widget its composition has once ([hivens.widget.model.Composition.singles]). Such a slot is the
+ * same in every config unless a config holds it as its own, and then what it shows changes when the composition shows
+ * another config. [slot] draws it at the path and with the modifier it is handed: [path] for the config shown, and the
+ * same slot under another config's root for a config on its way out.
+ *
+ * The kernel knows which slots these are and nothing of the history or of how one config's part replaces another's,
+ * which are the composition's. So the default draws the slot where it stands, and the composition provides one that
+ * puts each config's part on a page of its own.
+ */
+typealias SingleSlotHost = @Composable (path: NodePath, modifier: Modifier, slot: @Composable (NodePath, Modifier) -> Unit) -> Unit
+
+val LocalSingleSlotHost: ProvidableCompositionLocal<SingleSlotHost> =
+    staticCompositionLocalOf { { path, modifier, slot -> slot(path, modifier) } }
+
 // Static: the registry is built once at startup and a module registering into it
 // is a whole-tree event, which is the case static is actually for.
 

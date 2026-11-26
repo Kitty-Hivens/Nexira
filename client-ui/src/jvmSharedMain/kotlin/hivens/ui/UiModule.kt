@@ -46,6 +46,7 @@ import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
 import hivens.ui.layout.LayoutGraphFlushHook
+import hivens.ui.layout.DocumentStore
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.navigation.CompositionHistories
 import hivens.ui.navigation.LauncherConfigs
@@ -198,6 +199,10 @@ fun uiCoreModule(
     // of their own. Kept for the process, so a window stays open while the interface
     // starts over.
     single<Document> { StandardDocument.load() }
+    single {
+        val preferences: PreferenceWriter = get()
+        DocumentStore(file = get<Path>().resolve(Storage.INTERFACE_FILE), standard = { get<Document>() }, save = preferences::write)
+    }
     single {
         val document: Document = get()
         // The composition the launcher starts in has its window already.

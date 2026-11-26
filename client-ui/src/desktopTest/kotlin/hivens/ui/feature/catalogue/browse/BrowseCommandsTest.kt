@@ -18,6 +18,8 @@ import hivens.catalogue.api.SourceView
 import hivens.source.mirror.MirrorPackSource
 import hivens.source.mirror.MirrorSourceModule
 import hivens.themes.Themes
+import hivens.ui.Standing
+import hivens.ui.containerOf
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.theme.NxThemed
 import hivens.widget.api.ContributedServices
@@ -141,7 +143,7 @@ class BrowseCommandsTest {
     @Test
     fun `Browse shows the window's results for as long as it is up`() {
         var up by mutableStateOf(true)
-        val screen = scene { if (up) BrowseScreen() }
+        val screen = scene { if (up) Standing(containerOf("screen.browse")) { BrowseScreen(it) } }
         try {
             screen.frames()
             assertEquals(1, shown.size)

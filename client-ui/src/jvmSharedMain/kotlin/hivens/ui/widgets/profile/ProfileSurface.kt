@@ -29,11 +29,9 @@ import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxColor
-
-private const val SURFACE = "profile"
 
 /** Under this width the category list stacks above the section instead of standing beside it. */
 private val STACK_BELOW = 560.dp
@@ -68,6 +66,7 @@ private val STACK_BELOW = 560.dp
 // recover.
 @Composable
 fun ProfileSurface(
+    instance: WidgetInstance,
     session: SessionView?,
     authResolving: Boolean,
 ) {
@@ -108,17 +107,17 @@ fun ProfileSurface(
                     // bundled layout + reconcile stay untouched.
                     @Composable
                     fun Section(modifier: Modifier) = when (selection.category) {
-                        ProfileCategory.SmartyCraft -> SlotRenderer(SurfaceId(SURFACE), SlotId("account"), modifier)
-                        ProfileCategory.Microsoft -> SlotRenderer(SurfaceId(SURFACE), SlotId("signin"), modifier)
+                        ProfileCategory.SmartyCraft -> SlotRenderer(instance, SlotId("account"), modifier)
+                        ProfileCategory.Microsoft -> SlotRenderer(instance, SlotId("signin"), modifier)
                     }
                     if (stacked) {
                         Column(Modifier.fillMaxSize()) {
-                            SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.fillMaxWidth().height(IntrinsicSize.Min))
+                            SlotRenderer(instance, SlotId("nav"), Modifier.fillMaxWidth().height(IntrinsicSize.Min))
                             Section(Modifier.weight(1f).fillMaxWidth())
                         }
                     } else {
                         Row(Modifier.fillMaxSize()) {
-                            SlotRenderer(SurfaceId(SURFACE), SlotId("nav"), Modifier.width(200.dp).fillMaxHeight())
+                            SlotRenderer(instance, SlotId("nav"), Modifier.width(200.dp).fillMaxHeight())
                             Section(Modifier.weight(1f).fillMaxHeight())
                         }
                     }

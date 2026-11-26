@@ -45,7 +45,7 @@ import hivens.ui.theme.Status
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.childGap
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetInstance
 
 /**
  * Interface + Behavior block. Drives anything user-facing about how the
@@ -58,14 +58,15 @@ import hivens.widget.model.SurfaceId
  *
  * The way to the theme picker and the day and night switch belong to the
  * colour provider's controls, which the look draws wherever this leaves the
- * slots of [APPEARANCE_SURFACE] for them, and nothing at all where they are
- * absent or their provider does not draw.
+ * slots of [instance], the settings screen, for them, and nothing at all where
+ * they are absent or their provider does not draw.
  *
  * Network bypasses live separately in [NetworkSection]; update, content,
  * launch and protocol knobs in [AdvancedSection].
  */
 @Composable
 internal fun AppearanceSection(
+    instance: WidgetInstance,
     form: SettingsFormState,
     save: () -> Unit,
     onOpenBackgroundSettings: () -> Unit,
@@ -126,7 +127,7 @@ internal fun AppearanceSection(
             },
         )
 
-        SlotRenderer(SurfaceId(APPEARANCE_SURFACE), SlotId("theme.link"), gap)
+        SlotRenderer(instance, SlotId("theme.link"), gap)
 
         // Custom background shortcut.
         PuppetClick("settings.openBackground") { onOpenBackgroundSettings() }
@@ -140,7 +141,7 @@ internal fun AppearanceSection(
             trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxColor.lead()) },
         )
 
-        SlotRenderer(SurfaceId(APPEARANCE_SURFACE), SlotId("theme.daynight"), gap)
+        SlotRenderer(instance, SlotId("theme.daynight"), gap)
 
         // Window chrome. `undecorated` is fixed when the window is created, so the flip
         // lands at the next launch and the row says so rather than looking inert. Where
@@ -226,9 +227,6 @@ internal fun PickerBlock(
         )
     }
 }
-
-/** The surface whose slots this section leaves for the colour provider's controls. */
-private const val APPEARANCE_SURFACE = "settings.appearance"
 
 /** The gap between the rows of the Interface section, the section's own default spacing. */
 private val INTERFACE_ROW_GAP = 12.dp

@@ -178,6 +178,16 @@ class DocumentTest {
     }
 
     @Test
+    fun `a slot held as one's own by any config is known from every config`() {
+        val held = document.holdOwn(inRail(home), mint)
+        assertTrue(held.heldOwnAnywhere(inRail(library)))
+        assertTrue(held.heldOwnAnywhere(inRail(home)))
+        assertFalse(document.heldOwnAnywhere(inRail(library)))
+        assertFalse(held.heldOwnAnywhere(root(home).child("box", SlotId("body"))))
+        assertFalse(held.heldOwnAnywhere(NodePath(launcher, NodeRoot.Residents)))
+    }
+
+    @Test
     fun `a slot given back shows the record's again`() {
         val back = document.holdOwn(inRail(home), mint).edit(inRail(home)) { it.withWidget(node("filter"), 0) }.shareOwn(inRail(home))
         assertFalse(back.holdsOwn(inRail(home)))

@@ -24,7 +24,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -47,8 +46,6 @@ import hivens.catalogue.api.ProjectTarget
 import hivens.catalogue.api.VersionDependency
 import hivens.catalogue.api.gameVersionChips
 import hivens.core.update.VersionChannel
-import hivens.ui.RIGHT_RAIL_SURFACE
-import hivens.ui.RailFamily
 import hivens.ui.components.LoaderGlyph
 import hivens.ui.components.ReleaseNotes
 import hivens.ui.components.formatBuildTimestamp
@@ -68,7 +65,6 @@ import hivens.ui.feature.catalogue.browse.tagSearch
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.utils.humanSize
-import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -85,7 +81,8 @@ import hivens.ui.theme.Status
  * beside, what the author wrote about it, which of its three jars the installer
  * takes -- is a paragraph each and cannot be a column.
  *
- * The rail keeps showing the PROJECT while this is open, which is why the page
+ * The rail keeps showing the PROJECT while this is open, since this config holds
+ * the project's blocks in it as the project's config does, which is why the page
  * shows the project page of its own level beside the build: a build belongs to a
  * project, and a reader who followed a row here has not left it.
  */
@@ -95,7 +92,6 @@ fun ModVersionScreen(
     versionId: String,
     modifier: Modifier = Modifier,
 ) {
-    val families = LocalSurfaceFamilies.current
     val showBuild = rememberScopedCommand(CatalogueKeys.ShowBuild)
     val reload = rememberScopedAction(CatalogueKeys.ReloadProject)
 
@@ -104,11 +100,6 @@ fun ModVersionScreen(
     val project = rememberProjectPage(target, visit)
     LaunchedEffect(visit, versionId, showBuild != null) { showBuild?.invoke(BuildVisit(versionId, visit)) }
     val build = rememberScopedSource(CatalogueKeys.BuildPage).valueOrNull()?.takeIf { it.visit == visit && it.versionId == versionId }
-
-    DisposableEffect(visit) {
-        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, visit)
-        onDispose { families.reset(RIGHT_RAIL_SURFACE, visit) }
-    }
 
     ModVersionBody(
         project = project,

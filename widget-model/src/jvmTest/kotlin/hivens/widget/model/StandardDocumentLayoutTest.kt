@@ -10,10 +10,12 @@ import kotlin.test.assertTrue
 /**
  * The standard document holds what the bundled layout draws, config by config, for as long as both ship.
  *
- * [generated] is the mapping written down. The frame stands in every config of the launcher: the top bar, then a row
- * of the left rail, the centre and the right rail. The four regions are singles, kept once, each holding what its
- * surface held. The centre holds each config's screen as that config's own, and a screen holds the slots its surface
- * had. Where the right rail drew another family on a config, that config holds the rail's slots as its own.
+ * [generated] is the mapping written down. The frame stands in every config of the launcher: the top bar, then the
+ * body, a row of the left rail, the centre and the right rail. The regions are singles, kept once, each holding what
+ * its surface held, and every config holds the body's row as its own, so that the row can hold what is the config's.
+ * The centre holds each config's screen as that config's own, and a screen holds the slots its surface had. Where the
+ * right rail drew another family on a config, that config holds the rail's slots as its own, and the blocks it stands
+ * there are singles too, so a config showing the same blocks as the last one shows the same nodes.
  *
  * Set NEXIRA_WRITE_STANDARD_DOCUMENT=1 to write [generated] over the resource instead of comparing.
  */
@@ -70,9 +72,12 @@ class StandardDocumentLayoutTest {
         val right = regions.getValue("appshell.region.right").copy(
             children = mapOf(SlotId("main") to slot("appshell.rightrail", "news"), SlotId("bottom") to slot("appshell.rightrail", "bottom")),
         )
-        val singles = listOf(top, left, center, right).associateBy { it.kind }
-        val body = slot("appshell.root", "regions").widgets.single { it.kind.value == "appshell.region.body" }
         val centerPlacement = regions.getValue("appshell.region.center").placement
+        val bodyStanding = slot("appshell.root", "regions").widgets.single { it.kind.value == "appshell.region.body" }
+        val row = { center: WidgetInstance, right: WidgetInstance -> SlotContent(flow = FlowSpec.Row, widgets = listOf(stands(left), center, right)) }
+        val body = bodyStanding.copy(placement = null, children = mapOf(SlotId("content") to row(stands(center, centerPlacement), stands(right))))
+        val blocks = railFamilies.flatMap { (family, slots) -> slots.flatMap { slot("appshell.rightrail", it, family).widgets } }
+        val singles = (listOf(top, body, left, center, right) + blocks).associateBy { it.kind }
         val launcher = Composition(
             start = ConfigId("home"),
             frame = StandardDocument.load().compositions.getValue(LAUNCHER).frame,
@@ -84,20 +89,11 @@ class StandardDocumentLayoutTest {
                     instanceId = "screen.${screen.config}",
                     children = screen.slots.associate { SlotId(it) to slot(screen.surface!!, it) },
                 )
-                val row = SlotContent(
-                    flow = FlowSpec.Row,
-                    widgets = listOf(
-                        stands(left),
-                        stands(center, centerPlacement, mapOf(SlotId("body") to SlotContent(listOf(shown)))),
-                        stands(right, own = screen.rail?.let { railOf(it, screen.config) }.orEmpty()),
-                    ),
+                val own = row(
+                    stands(center, centerPlacement, mapOf(SlotId("body") to SlotContent(listOf(shown)))),
+                    stands(right, own = screen.rail?.let { railOf(it) }.orEmpty()),
                 )
-                val root = SlotContent(
-                    widgets = listOf(
-                        stands(top),
-                        body.copy(instanceId = "appshell-region-body-${screen.config}", children = mapOf(SlotId("content") to row)),
-                    ),
-                )
+                val root = SlotContent(widgets = listOf(stands(top), stands(body, bodyStanding.placement, mapOf(SlotId("content") to own))))
                 config to Config(layouts = listOf(ConfigLayout(MAIN, root)))
             },
         )
@@ -112,17 +108,14 @@ class StandardDocumentLayoutTest {
     }
 
     /**
-     * The rail's slots as [config] holds them for [family]: its blocks in one column that scrolls, each under a name of
-     * the config's, held off the rail's edges and apart from each other by its own room, and nothing pinned below.
+     * The rail's slots as a config holds them for [family]: its blocks, which are singles, standing in one column that
+     * scrolls, held off the rail's edges and apart from each other by their own room, and nothing pinned below.
      */
-    private fun railOf(family: FamilyId, config: String): Map<SlotId, SlotContent> {
+    private fun railOf(family: FamilyId): Map<SlotId, SlotContent> {
         val blocks = railFamilies.getValue(family).flatMap { slot("appshell.rightrail", it, family).widgets }
         val placed = blocks.mapIndexed { i, block ->
             val last = i == blocks.lastIndex
-            block.copy(
-                instanceId = "${block.instanceId.removeSuffix("-default")}-$config",
-                placement = Placement(padding = SurfaceInsets(start = RAIL_GUTTER, end = RAIL_GUTTER, top = RAIL_GUTTER, bottom = if (last) RAIL_GUTTER else null)),
-            )
+            stands(block, Placement(padding = SurfaceInsets(start = RAIL_GUTTER, end = RAIL_GUTTER, top = RAIL_GUTTER, bottom = if (last) RAIL_GUTTER else null)))
         }
         return mapOf(
             SlotId("main") to SlotContent(widgets = placed, viewport = ViewportSpec(kind = ViewportSpec.SCROLL, scrollbar = false)),
@@ -172,16 +165,16 @@ class StandardDocumentLayoutTest {
         val document = StandardDocument.load()
         for (screen in screens.filter { it.surface != null }) {
             val body = NodePath(LAUNCHER, NodeRoot.Layout(ConfigId(screen.config), MAIN))
-                .child("appshell-region-body-${screen.config}", SlotId("content"))
+                .child(BODY, SlotId("content"))
                 .child("appshell-region-center-default", SlotId("body"))
             for (name in screen.slots) {
                 val held = assertNotNull(document.contentAt(body.child("screen.${screen.config}", SlotId(name))), "${screen.config}:$name")
                 assertEquals(slot(screen.surface!!, name), held, "${screen.config}:$name")
             }
         }
-        val home = NodePath(LAUNCHER, NodeRoot.Layout(ConfigId("home"), MAIN)).child("appshell-region-body-home", SlotId("content"))
+        val home = NodePath(LAUNCHER, NodeRoot.Layout(ConfigId("home"), MAIN)).child(BODY, SlotId("content"))
         assertEquals(slot("appshell.rightrail", "news").widgets, document.contentAt(home.child("appshell-region-right-default", SlotId("main")))?.widgets)
-        val project = NodePath(LAUNCHER, NodeRoot.Layout(ConfigId("project"), MAIN)).child("appshell-region-body-project", SlotId("content"))
+        val project = NodePath(LAUNCHER, NodeRoot.Layout(ConfigId("project"), MAIN)).child(BODY, SlotId("content"))
         val blocks = assertNotNull(document.contentAt(project.child("appshell-region-right-default", SlotId("main"))))
         assertEquals(listOf("modData", "authorData").flatMap { slot("appshell.rightrail", it, PROJECT_VIEW).widgets.map { w -> w.kind } }, blocks.widgets.map { it.kind })
         assertTrue(document.holdsOwn(project.child("appshell-region-right-default", SlotId("main"))))
@@ -208,6 +201,7 @@ class StandardDocumentLayoutTest {
         val PROJECT_VIEW = FamilyId("projectView")
         val BROWSE = FamilyId("browse")
         const val RAIL_GUTTER = 12f
+        const val BODY = "appshell-region-body-default"
 
         /** What the frame is made of, which the bundled layout drew around every screen and the comparison leaves out. */
         val FRAME = setOf("appshell.region.top", "appshell.region.body", "appshell.region.left", "appshell.region.center", "appshell.region.right")

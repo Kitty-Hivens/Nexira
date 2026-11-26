@@ -60,7 +60,7 @@ import hivens.ui.utils.pickFile
 import hivens.ui.utils.rememberFileDialogSettings
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetInstance
 import io.github.vinceglb.filekit.dialogs.FileKitType
 import io.github.vinceglb.filekit.path
 import kotlinx.coroutines.Dispatchers
@@ -84,6 +84,7 @@ import hivens.ui.theme.Status
  */
 @Composable
 fun LibraryScreen(
+    instance: WidgetInstance,
     onOpenPack: (id: String) -> Unit,
 ) {
     PuppetScreen("Library")
@@ -193,8 +194,8 @@ fun LibraryScreen(
                     .fillMaxWidth()
                     .padding(horizontal = 24.dp, vertical = 20.dp),
             ) {
-                SlotRenderer(SurfaceId(SURFACE), SlotId("header"), modifier = Modifier.fillMaxWidth(), spacing = 8.dp)
-                SlotRenderer(SurfaceId(SURFACE), SlotId("body"), modifier = Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
+                SlotRenderer(instance, SlotId("header"), modifier = Modifier.fillMaxWidth(), spacing = 8.dp)
+                SlotRenderer(instance, SlotId("body"), modifier = Modifier.weight(1f).fillMaxWidth(), spacing = 8.dp)
             }
         }
 
@@ -384,5 +385,3 @@ private fun NewLocalPackDialog(
 private fun FieldLabel(text: String) {
     Text(text, style = MaterialTheme.typography.labelMedium, color = NxInk.quiet)
 }
-
-private const val SURFACE = "library"

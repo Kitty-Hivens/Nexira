@@ -13,8 +13,10 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.widget.api.LocalDocument
 import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalSingleSlotHost
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.SingleSlotHost
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.WidgetDecorator
 import hivens.widget.api.WidgetDescriptor
@@ -94,6 +96,23 @@ class DocumentSlotTest {
     }
 
     @Test
+    fun `a slot of a single is drawn through the composition's host and no other slot is`() {
+        val record = container("rail", slot(leaf("kept"))).copy(kind = RAIL)
+        val document = document(
+            root = slot(WidgetInstance(kind = RAIL, instanceId = "rail"), container("box", slot(leaf("a")))),
+            singles = mapOf(RAIL to record),
+        )
+        val hosted = ArrayList<NodePath>()
+        val host: SingleSlotHost = { path, modifier, slot ->
+            hosted += path
+            slot(path, modifier)
+        }
+        val drawn = draw(document, HOME, host = host)
+        assertEquals(setOf(HOME.child("rail", BODY)), hosted.toSet())
+        assertEquals(setOf(Seen(HOME, "rail"), Seen(HOME.child("rail", BODY), "kept"), Seen(HOME, "box"), Seen(HOME.child("box", BODY), "a")), drawn.toSet())
+    }
+
+    @Test
     fun `the residents are a root of their own`() {
         val residents = NodePath(LAUNCHER, NodeRoot.Residents)
         assertEquals(listOf(Seen(residents, "r")), draw(document(root = slot(leaf("a")), residents = slot(leaf("r"))), residents))
@@ -158,9 +177,9 @@ class DocumentSlotTest {
         ),
     )
 
-    private fun draw(document: Document?, path: NodePath, graph: LayoutGraph = LayoutGraph.EMPTY): List<Seen> {
+    private fun draw(document: Document?, path: NodePath, graph: LayoutGraph = LayoutGraph.EMPTY, host: SingleSlotHost? = null): List<Seen> {
         val seen = ArrayList<Seen>()
-        val scene = scene(mutableStateOf(document), graph, path, seen)
+        val scene = scene(mutableStateOf(document), graph, path, seen, host)
         try {
             scene.render().close()
         } finally {
@@ -169,7 +188,13 @@ class DocumentSlotTest {
         return seen
     }
 
-    private fun scene(document: MutableState<Document?>, graph: LayoutGraph, path: NodePath, seen: MutableList<Seen>): ImageComposeScene {
+    private fun scene(
+        document: MutableState<Document?>,
+        graph: LayoutGraph,
+        path: NodePath,
+        seen: MutableList<Seen>,
+        host: SingleSlotHost? = null,
+    ): ImageComposeScene {
         val decorator: WidgetDecorator = { at, _, _, instance, content ->
             seen += Seen(at, instance.instanceId)
             content()
@@ -181,7 +206,7 @@ class DocumentSlotTest {
                 LocalWidgetRegistry provides registry,
                 LocalWidgetDecorator provides decorator,
             ) {
-                SlotRenderer(path)
+                if (host == null) SlotRenderer(path) else CompositionLocalProvider(LocalSingleSlotHost provides host) { SlotRenderer(path) }
             }
         }
     }
@@ -195,8 +220,7 @@ class DocumentSlotTest {
         override fun Render(instance: WidgetInstance) = Box(Modifier.size(4.dp))
     }
 
-    private object Container : WidgetDescriptor {
-        override val kind = CONTAINER
+    private open class Container(override val kind: WidgetKind = CONTAINER) : WidgetDescriptor {
         override val displayName = "container"
         override val removable = true
 
@@ -205,7 +229,7 @@ class DocumentSlotTest {
     }
 
     private val registry = object : WidgetRegistry {
-        private val kinds = listOf(Leaf, Container).associateBy { it.kind }
+        private val kinds = listOf(Leaf, Container(), Container(RAIL)).associateBy { it.kind }
 
         override fun all(): Map<WidgetKind, WidgetDescriptor> = kinds
 
@@ -219,5 +243,6 @@ class DocumentSlotTest {
         val BODY = SlotId("body")
         val LEAF = WidgetKind("leaf")
         val CONTAINER = WidgetKind("container")
+        val RAIL = WidgetKind("rail")
     }
 }

@@ -25,12 +25,10 @@ import hivens.widget.api.ProvideScopedCommand
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberLatestCommand
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetInstance
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.minutes
-
-private const val SURFACE = "about"
 
 // about surface. What the about config holds. Two
 // side-by-side slots: `left` (logo + credits) and `right` (update
@@ -49,7 +47,7 @@ private const val SURFACE = "about"
 // self-scrolls its long body text. Lazy widgets the user may drop
 // via the editor render with bounded constraints.
 @Composable
-fun AboutSurface(onBack: () -> Unit) {
+fun AboutSurface(instance: WidgetInstance, onBack: () -> Unit) {
     val s = nexiraStrings()
     val host = rememberHostActions()
     val scope = rememberCoroutineScope()
@@ -132,13 +130,13 @@ fun AboutSurface(onBack: () -> Unit) {
                 if (widthClass == WidthClass.Expanded) {
                     Row(Modifier.fillMaxSize(), horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                         SlotRenderer(
-                            SurfaceId(SURFACE),
+                            instance,
                             SlotId("left"),
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             spacing  = 16.dp,
                         )
                         SlotRenderer(
-                            SurfaceId(SURFACE),
+                            instance,
                             SlotId("right"),
                             modifier = Modifier.weight(1f).fillMaxHeight(),
                             spacing  = 16.dp,
@@ -150,13 +148,13 @@ fun AboutSurface(onBack: () -> Unit) {
                     // verticalScroll on a slot -- it would collide with that inner scroll.
                     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         SlotRenderer(
-                            SurfaceId(SURFACE),
+                            instance,
                             SlotId("left"),
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             spacing  = 16.dp,
                         )
                         SlotRenderer(
-                            SurfaceId(SURFACE),
+                            instance,
                             SlotId("right"),
                             modifier = Modifier.weight(1f).fillMaxWidth(),
                             spacing  = 16.dp,

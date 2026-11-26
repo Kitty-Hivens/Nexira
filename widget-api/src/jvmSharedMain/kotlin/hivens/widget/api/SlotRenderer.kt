@@ -133,7 +133,8 @@ import hivens.widget.model.viewportMode
 //     inside their @Composable body. Extends LocalSlotPath with the
 //     container's instanceId so the editor's drop-target registry
 //     distinguishes "slot 'body' on container X" from "slot 'body' on
-//     container Y".
+//     container Y". A slot of a widget the composition has once is drawn
+//     through LocalSingleSlotHost.
 //
 // The slot OWNS its intra-slot layout, and owns it in one of two modes rather
 // than one of five names. A flow derives each child's position from the
@@ -205,8 +206,19 @@ fun SlotRenderer(
 ) {
     val parentPath = LocalSlotPath.current
     val childPath = parentPath.child(parent.instanceId, slot)
-    CompositionLocalProvider(LocalSlotPath provides childPath) {
-        RenderSlotContent(childPath, modifier, spacing, contentPadding)
+    // A slot of a widget the composition has once can change with the config shown, which is the composition's to draw.
+    val single = parentPath.slotPath == null &&
+        LocalDocument.current?.compositions?.get(parentPath.composition)?.singles?.containsKey(parent.kind) == true
+    if (!single) {
+        CompositionLocalProvider(LocalSlotPath provides childPath) {
+            RenderSlotContent(childPath, modifier, spacing, contentPadding)
+        }
+        return
+    }
+    LocalSingleSlotHost.current(childPath, modifier) { path, outer ->
+        CompositionLocalProvider(LocalSlotPath provides path) {
+            RenderSlotContent(path, outer, spacing, contentPadding)
+        }
     }
 }
 

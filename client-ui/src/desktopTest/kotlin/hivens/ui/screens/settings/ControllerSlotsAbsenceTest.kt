@@ -28,6 +28,8 @@ import hivens.themes.Themes
 import hivens.ui.host.HostKoin
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
+import hivens.ui.Standing
+import hivens.ui.containerOf
 import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.theme.NxThemed
@@ -38,7 +40,6 @@ import hivens.widget.api.HostApi
 import hivens.widget.api.KeyContribution
 import hivens.widget.api.LevelServices
 import hivens.widget.api.LevelServicesHost
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
@@ -49,15 +50,12 @@ import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.registerModuleKeys
-import hivens.widget.model.DefaultLayout
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotContent
-import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
+import hivens.widget.model.StandardDocument
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import hivens.widget.model.widgets
 import kotlinx.coroutines.Dispatchers
 import org.koin.dsl.koinApplication
 import kotlin.reflect.KClass
@@ -119,17 +117,19 @@ class ControllerSlotsAbsenceTest {
 
     private val app = WidgetScope.app(data, NoServices, Dispatchers.Unconfined, commands)
 
-    /** The given slots of [surface] each holding one [Probe]. */
-    private fun probed(surface: String, vararg slots: String) = LayoutGraph(
-        surfaces = mapOf(
-            SurfaceId(surface) to SurfaceLayout(
-                slots = slots.associate { SlotId(it) to SlotContent(widgets = listOf(WidgetInstance(Probe.kind, "probe-$it"))) },
-            ),
-        ),
-    )
+    /** The screen [kind] with the given slots each holding one [Probe]. */
+    private fun probed(kind: String, vararg slots: String) =
+        containerOf(kind, *slots.map { it to SlotContent(widgets = listOf(WidgetInstance(Probe.kind, "probe-$it"))) }.toTypedArray())
 
-    /** Draws [content] over [graph] and hands back the scene to read, closed by [read]. */
-    private fun <T> drawn(graph: LayoutGraph, content: @Composable () -> Unit, read: (ImageComposeScene) -> T): T = onEventThread {
+    /** The screen [kind] as the standard document has it. */
+    private fun standard(kind: String): WidgetInstance =
+        StandardDocument.load().compositions.values.flatMap { it.widgets().toList() }.first { it.kind.value == kind }
+
+    /** The screen [kind] holding nothing. */
+    private fun empty(kind: String) = containerOf(kind)
+
+    /** Draws [content] for [screen] and hands back the scene to read, closed by [read]. */
+    private fun <T> drawn(screen: WidgetInstance, content: @Composable (WidgetInstance) -> Unit, read: (ImageComposeScene) -> T): T = onEventThread {
         val scene = ImageComposeScene(900, 2000, density = Density(1f)) {
             HostKoin(koin) {
                 ShippedLanguageProvider("en") {
@@ -138,9 +138,8 @@ class ControllerSlotsAbsenceTest {
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides commands,
                             LocalScope provides app,
-                            LocalLayoutGraph provides graph,
                             LocalWidgetRegistry provides registry,
-                        ) { content() }
+                        ) { Standing(screen, content) }
                     }
                 }
             }
@@ -153,13 +152,14 @@ class ControllerSlotsAbsenceTest {
         }
     }
 
-    /** The height the settings Appearance section takes over [graph]. */
-    private fun sectionHeight(graph: LayoutGraph): Int {
+    /** The height the settings Appearance section takes in [screen]. */
+    private fun sectionHeight(screen: WidgetInstance): Int {
         var height = -1
-        drawn(graph, {
+        drawn(screen, { instance ->
             val form = remember { SettingsFormState(SettingsData()) }
             Column(Modifier.width(720.dp).onSizeChanged { height = it.height }) {
                 AppearanceSection(
+                    instance = instance,
                     form = form,
                     save = {},
                     onOpenBackgroundSettings = {},
@@ -173,11 +173,11 @@ class ControllerSlotsAbsenceTest {
     }
 
     /**
-     * How far the theme island's content scrolls over [graph], drawn short enough that it always
+     * How far the theme island's content scrolls in [screen], drawn short enough that it always
      * does: its content's height less the window's, read off the scroll the island reports.
      */
-    private fun islandReach(graph: LayoutGraph): Int = drawn(graph, {
-        AppearanceThemeIsland(Modifier.width(320.dp).height(20.dp))
+    private fun islandReach(screen: WidgetInstance): Int = drawn(screen, { instance ->
+        AppearanceThemeIsland(instance, Modifier.width(320.dp).height(20.dp))
     }) { scene ->
         val ranges = scene.semanticsOwners.asSequence()
             .flatMap { it.rootSemanticsNode.withDescendants() }
@@ -192,17 +192,17 @@ class ControllerSlotsAbsenceTest {
 
     @Test
     fun `the settings Appearance section takes the room of one without the controls' slots`() {
-        val hidden = sectionHeight(DefaultLayout.load())
-        assertEquals(hidden, sectionHeight(LayoutGraph.EMPTY), "the controls, left out, take what empty slots take")
-        val probed = sectionHeight(probed("settings.appearance", "theme.link", "theme.daynight"))
+        val hidden = sectionHeight(standard("screen.settings"))
+        assertEquals(hidden, sectionHeight(empty("screen.settings")), "the controls, left out, take what empty slots take")
+        val probed = sectionHeight(probed("screen.settings", "theme.link", "theme.daynight"))
         assertEquals(2 * (PROBE + SECTION_GAP), probed - hidden, "each slot left out takes its block and one gap with it")
     }
 
     @Test
     fun `the theme island takes the room of one without the controls' slots`() {
-        val hidden = islandReach(DefaultLayout.load())
-        assertEquals(hidden, islandReach(LayoutGraph.EMPTY), "the controls, left out, take what empty slots take")
-        val probed = islandReach(probed("bg.settings", "theme", "motion", "theme.link"))
+        val hidden = islandReach(standard("screen.background"))
+        assertEquals(hidden, islandReach(empty("screen.background")), "the controls, left out, take what empty slots take")
+        val probed = islandReach(probed("screen.background", "theme", "motion", "theme.link"))
         // Every row of the island is a slot now, so the first of them takes no gap before it.
         assertEquals(3 * PROBE + 2 * ISLAND_GAP, probed - hidden, "each slot left out takes its block and one gap with it")
     }

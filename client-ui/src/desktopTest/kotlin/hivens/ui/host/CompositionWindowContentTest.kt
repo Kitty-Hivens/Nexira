@@ -8,6 +8,7 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.themes.Themes
 import hivens.ui.CompositionContent
 import hivens.ui.i18n.ShippedLanguageProvider
+import hivens.ui.layout.DocumentStore
 import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.levelServicesModule
 import hivens.ui.navigation.CompositionHistories
@@ -81,6 +82,7 @@ class CompositionWindowContentTest {
                 single { ConsoleSettingsStore(dir.resolve("console.json"), json, scope) }
                 single { CompositionHistories() }
                 single<Document> { StandardDocument.load() }
+                single { DocumentStore(dir.resolve("interface.json"), { get<Document>() }) }
                 single { WidgetModules(dir.resolve("widgets"), dir.resolve("widget-modules.json"), json, GeneratedWidgetRegistry, scope, NoWidgetModuleHost) }
                 single { LayoutGraphRepository(dir.resolve("layout-graph.json"), json, scope) { LayoutGraph.EMPTY } }
                 single { WidgetServiceRegistry() }

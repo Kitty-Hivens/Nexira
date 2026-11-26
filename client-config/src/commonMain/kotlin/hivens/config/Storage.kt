@@ -13,6 +13,9 @@ object Storage {
     const val PACKS_FILE            = "packs.json"
     const val LAYOUT_GRAPH_FILE     = "layout-graph.json"
 
+    /** A person's own document of the interface, there only once they have edited it. */
+    const val INTERFACE_FILE        = "interface.json"
+
     /** One-shot marker: "boot into recovery once", written by the in-app restart action. */
     const val RECOVERY_REQUEST_FILE = "recovery.request"
     const val PRESETS_DIR           = "presets"

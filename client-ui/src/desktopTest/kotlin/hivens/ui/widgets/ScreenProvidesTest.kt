@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.Density
 import hivens.catalogue.api.ProjectTarget
 import hivens.themes.Themes
 import hivens.themes.api.ThemesKeys
+import hivens.ui.Standing
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.editor.EditorSurfaces
 import hivens.ui.feature.catalogue.browse.CataloguePackDetailScreen
@@ -24,7 +25,6 @@ import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.themepicker.ThemePickerSurface
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSurfaceFamilies
@@ -42,7 +42,6 @@ import hivens.widget.model.FlowSpec
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.Dispatchers
@@ -94,8 +93,16 @@ class ScreenProvidesTest {
         }
     }
 
-    /** Draws [screen] for [surface] with a probe in every slot, and says what the probes drew and what they missed. */
-    private fun probe(surface: String, services: Module = module { }, screen: @Composable () -> Unit): Pair<List<String>, Set<String>> {
+    /**
+     * Draws [screen], the container [kind] that drew [surface], with a probe in every slot the surface had, and says
+     * what the probes drew and what they missed.
+     */
+    private fun probe(
+        surface: String,
+        kind: String,
+        services: Module = module { },
+        screen: @Composable (WidgetInstance) -> Unit,
+    ): Pair<List<String>, Set<String>> {
         val koin = graph(services)
         val app: WidgetScope = koin.koin.get()
         val id = SurfaceId(surface)
@@ -107,16 +114,13 @@ class ScreenProvidesTest {
             override fun all() = mapOf(descriptor.kind to descriptor)
             override fun get(kind: WidgetKind) = descriptor.takeIf { it.kind == kind }
         }
-        val bundled = DefaultLayout.load()
-        val slots = bundled.surfaces[id]?.slotsOf(FamilyId.GENERAL)?.keys.orEmpty()
-        val graph = bundled.copy(
-            surfaces = bundled.surfaces + (
-                id to SurfaceLayout(
-                    slots = slots.associateWith {
-                        SlotContent(widgets = listOf(WidgetInstance(kind = descriptor.kind, instanceId = "probe-${it.value}")), flow = FlowSpec.Column)
-                    },
-                )
-            ),
+        val slots = DefaultLayout.load().surfaces[id]?.slotsOf(FamilyId.GENERAL)?.keys.orEmpty()
+        val container = WidgetInstance(
+            kind = WidgetKind(kind),
+            instanceId = kind,
+            children = slots.associateWith {
+                SlotContent(widgets = listOf(WidgetInstance(kind = descriptor.kind, instanceId = "probe-${it.value}")), flow = FlowSpec.Column)
+            },
         )
         onEventThread {
             val scene = ImageComposeScene(1200, 800, density = Density(1f)) {
@@ -127,13 +131,12 @@ class ScreenProvidesTest {
                                 LocalWidgetDataRegistry provides data,
                                 LocalWidgetCommandRegistry provides commands,
                                 LocalScope provides app,
-                                LocalLayoutGraph provides graph,
                                 LocalWidgetRegistry provides registry,
                                 LocalSurfaceFamilies provides SurfaceFamilies(),
                                 LocalMisplacedWidget provides { _, _, missing -> missed += missing },
                             ) {
                                 ChildLevel(ScopeLevel.Composition) {
-                                    ChildLevel(ScopeLevel.Page) { Box(Modifier.fillMaxSize()) { screen() } }
+                                    ChildLevel(ScopeLevel.Page) { Box(Modifier.fillMaxSize()) { Standing(container, screen) } }
                                 }
                             }
                         }
@@ -157,7 +160,7 @@ class ScreenProvidesTest {
         // themes module's answers, since this probe's Koin holds no manager to answer them.
         data.register(ThemesKeys.Offered, flowSource(MutableStateFlow(Themes.all)))
         data.register(ThemesKeys.Active, flowSource(MutableStateFlow(Themes.default)))
-        val (drew, missed) = probe("theme.picker") { ThemePickerSurface() }
+        val (drew, missed) = probe("theme.picker", "screen.theme.picker") { ThemePickerSurface(it) }
         assertEquals(emptySet(), missed)
         assertTrue(drew.isNotEmpty())
     }
@@ -166,15 +169,15 @@ class ScreenProvidesTest {
     fun `the about page hands its widgets what its surface lists`() {
         // The page asks the application's Koin for the host's actions, which this
         // probe's answers with none: no update check runs.
-        val (drew, missed) = probe("about") { AboutSurface(onBack = {}) }
+        val (drew, missed) = probe("about", "screen.about") { AboutSurface(it, onBack = {}) }
         assertEquals(emptySet(), missed)
         assertTrue(drew.isNotEmpty())
     }
 
     @Test
     fun `a catalogue pack's page hands its widgets what its surface lists`() {
-        val (drew, missed) = probe("catalogue.pack") {
-            CataloguePackDetailScreen(origin = "Mirror", packId = "probe", onBack = {}, onInstalled = {})
+        val (drew, missed) = probe("catalogue.pack", "screen.catalogue.pack") {
+            CataloguePackDetailScreen(it, origin = "Mirror", packId = "probe", onBack = {}, onInstalled = {})
         }
         assertEquals(emptySet(), missed)
         assertTrue(drew.isNotEmpty())
@@ -182,8 +185,8 @@ class ScreenProvidesTest {
 
     @Test
     fun `a project's page hands its widgets what its surface lists`() {
-        val (drew, missed) = probe("project") {
-            ModDetailScreen(target = ProjectTarget.Catalogue("probe"), onOpenVersion = { _, _ -> })
+        val (drew, missed) = probe("project", "screen.project") {
+            ModDetailScreen(it, target = ProjectTarget.Catalogue("probe"), onOpenVersion = { _, _ -> })
         }
         assertEquals(emptySet(), missed)
         assertTrue(drew.isNotEmpty())

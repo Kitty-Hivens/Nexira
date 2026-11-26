@@ -20,8 +20,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.ProvidableCompositionLocal
-import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -78,7 +76,9 @@ import hivens.ui.icons.Symbol
 import hivens.ui.layers.DismissOnBack
 import hivens.ui.surface.NxSurface
 import hivens.widget.api.CompositionKeys
+import hivens.widget.api.LocalDocument
 import hivens.widget.api.LocalSlotPath
+import hivens.widget.api.rememberWidgetState
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
@@ -87,22 +87,17 @@ import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
-import hivens.widget.model.slotPath
+import hivens.widget.model.widgets
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.booleanOrNull
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.surface.defaultOpacity
-import hivens.widget.api.LocalLayoutGraph
-import hivens.widget.model.walkInstances
 import kotlinx.serialization.json.intOrNull
 
 
@@ -166,17 +161,6 @@ data class ShellLeftRegionProps(
 )
 
 /**
- * The screen router the centre region draws, provided by [hivens.ui.AppLayout].
- * Supplied here rather than stored in the layout graph because the navigation tree
- * is not (yet) a widget surface. Everything else the regions read is a source or a
- * command of the composition.
- *
- * Nothing by default, which is what a region drawn outside the shell, in the
- * palette say, has to route.
- */
-val LocalCenterBody: ProvidableCompositionLocal<@Composable () -> Unit> = compositionLocalOf { {} }
-
-/**
  * What the system keeps for itself at each edge: the bars, a cutout, the keyboard. The regions
  * draw their backgrounds under it and pad their content by it, so the window reads as filling the
  * screen. All zero on a desktop window, where nothing is left for the system to claim.
@@ -227,6 +211,7 @@ private fun CollapsedRegionStrip() {
     enter = "none",
     displayName = "widget.appshell.region.left",
     removable = false,
+    slots = ["top", "bottom"],
     propsClass = ShellLeftRegionProps::class,
     drawsOwnSurface = true,
     needs = ["nav.show"],
@@ -263,6 +248,7 @@ fun ShellLeftRegion(instance: WidgetInstance) {
             opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
         ) {
             AppSidebar(
+                instance        = instance,
                 isAuthenticated = appState is SessionState.SignedIn && signOut != null,
                 onSection       = { show(LauncherConfigs.section(it)) },
                 onLogout        = signOut ?: {},
@@ -286,20 +272,30 @@ val NAV_RAIL_DEFAULT_WIDTH = 65.dp
  * flexes between the two rails. removable=false and never collapsible -- without
  * it there is no content area.
  */
-@Widget(id = "appshell.region.center", enter = "none", displayName = "widget.appshell.region.center", removable = false, propsClass = ShellCenterRegionProps::class, drawsOwnSurface = true)
+@Widget(
+    id = "appshell.region.center",
+    enter = "none",
+    displayName = "widget.appshell.region.center",
+    removable = false,
+    propsClass = ShellCenterRegionProps::class,
+    drawsOwnSurface = true,
+    slots = ["layers", "body", "bottom"],
+    pages = ["body"],
+)
 @Composable
 fun ShellCenterRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellCenterRegionProps>()
     // The wedge is the chrome reaching around the corner, so it takes the rail's own
     // colour rather than one of its own: the step above the page, at the opacity the
     // rail actually draws at. It only does its job while it is exactly that colour, so
-    // the rail's named opacity is read off the layout rather than assumed.
-    val graph = LocalLayoutGraph.current
-    val railOpacity = remember(graph) {
+    // the rail's named opacity is read off the document rather than assumed.
+    val document = LocalDocument.current
+    val composition = LocalSlotPath.current.composition
+    val railOpacity = remember(document, composition) {
         // Read as the region's own props class reads it: a value of the wrong shape
         // in a hand-edited file is no opacity rather than a throw in the region that
         // is always on screen, which restarted the shell on every start.
-        (graph.walkInstances().firstOrNull { it.kind.value == "appshell.region.left" }
+        (document?.compositions?.get(composition)?.widgets()?.firstOrNull { it.kind.value == "appshell.region.left" }
             ?.props?.get("opacityPct") as? JsonPrimitive)?.intOrNull?.regionOpacity()
     }
     val chrome = NxColor.depth(1).copy(alpha = railOpacity ?: SurfaceKind.Chrome.defaultOpacity())
@@ -322,10 +318,11 @@ fun ShellCenterRegion(instance: WidgetInstance) {
     ) {
         // Under everything the screen draws: a layer for decor, a field of
         // particles say, that shows wherever the screen leaves the pane open.
-        SlotRenderer(SurfaceId(BACKDROP_SURFACE), SlotId("layers"), Modifier.matchParentSize())
+        SlotRenderer(instance, SlotId("layers"), Modifier.matchParentSize())
         val edge = rememberEdgeInsets()
         Box(Modifier.fillMaxSize().padding(end = edge.end, bottom = edge.bottom)) {
-        LocalCenterBody.current()
+        // What the config shows, its own in each config.
+        SlotRenderer(instance, SlotId("body"), Modifier.fillMaxSize())
         // Nestle the content's top-start corner into the chrome (Modrinth-style).
         // A chrome-colored wedge, not a clip -- clipping the (transparent over a
         // wallpaper) content would be invisible; the wedge reads either way.
@@ -343,16 +340,10 @@ fun ShellCenterRegion(instance: WidgetInstance) {
         // never rides over the rails, and above centerBody so it is not
         // scrolled away by whatever screen is mounted. It reserves no space:
         // an empty slot measures to nothing and an occupied one draws on top.
-        SlotRenderer(SurfaceId(OVERLAY_SURFACE), SlotId("bottom"), Modifier.fillMaxSize())
+        SlotRenderer(instance, SlotId("bottom"), Modifier.fillMaxSize())
         }
     }
 }
-
-/** Sub-surface for widgets that float over the content rather than sit in it. */
-private const val OVERLAY_SURFACE = "appshell.overlay"
-
-/** Sub-surface for decor under the content: the pane's backdrop. */
-private const val BACKDROP_SURFACE = "appshell.backdrop"
 
 private const val RAIL_COLLAPSED_GRAB = 0 // collapsed reserves no width and is not part of the layout, reopen via Ctrl+N
 internal val AUTO_COLLAPSE_BELOW = 980.dp   // window narrower than this auto-collapses the right rail
@@ -394,7 +385,15 @@ private val RAIL_INSET = 4.dp
  * went to zero and the sentence outlived it. Edit mode keeps the static
  * prop-driven behaviour.
  */
-@Widget(id = "appshell.region.right", enter = "none", displayName = "widget.appshell.region.right", removable = false, propsClass = ShellRightRegionProps::class, drawsOwnSurface = true)
+@Widget(
+    id = "appshell.region.right",
+    enter = "none",
+    displayName = "widget.appshell.region.right",
+    removable = false,
+    propsClass = ShellRightRegionProps::class,
+    drawsOwnSurface = true,
+    slots = ["main", "bottom"],
+)
 @Composable
 fun ShellRightRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellRightRegionProps>()
@@ -403,32 +402,24 @@ fun ShellRightRegion(instance: WidgetInstance) {
     // and with none. Its opacity and blur are
     // the editable pair.
     val editing = LocalEditMode.current is EditModeState.On
-    // Where the rail's record is kept in the layout graph, null where it stands in no surface.
-    val path = LocalSlotPath.current.slotPath
     val controller: EditModeController = koinInject()
-    val toggleCollapse: () -> Unit = {
-        // Flipped from the props as they are when the write lands, not as this
-        // composition last saw them: a slider in the prop panel writes the same
-        // record, and a flip built on an older copy undid it, or was undone by it.
-        if (path != null) controller.updatePropsFrom(path, instance.instanceId, historyKey = "collapsed") { stored ->
-            val collapsed = (stored["collapsed"] as? JsonPrimitive)?.booleanOrNull ?: ShellRightRegionProps().collapsed
-            JsonObject(stored + ("collapsed" to JsonPrimitive(!collapsed)))
-        }
-    }
+    // Whether the rail is folded is the rail's own state, kept for it between runs, and
+    // not its arrangement: folding it is no edit of the interface. Until it is folded or
+    // opened the arrangement's word stands.
+    var fold by instance.rememberWidgetState { RailFold() }
+    val folded = fold.collapsed ?: props.collapsed
+    val currentlyFolded by rememberUpdatedState(folded)
+    val toggleCollapse: () -> Unit = { fold = RailFold(!currentlyFolded) }
     // Ctrl+N (window-level, see AppShell) toggles the rail. rememberUpdatedState
     // keeps the flip reading the latest collapsed value across recompositions.
     val currentToggle by rememberUpdatedState(toggleCollapse)
     // Where a swipe left the rail, written as that value rather than as a flip. The
-    // gesture outlives recomposition, and a flip decided against the props it was
-    // created with skipped the write after Ctrl+N had changed them: the rail shut on
+    // gesture outlives recomposition, and a flip decided against the state it was
+    // created with skipped the write after Ctrl+N had changed it: the rail shut on
     // screen and stayed open in the file, so the next Ctrl+N did nothing visible.
-    val setCollapsed: (Boolean) -> Unit = { collapse ->
-        if (path != null) controller.updatePropsFrom(path, instance.instanceId, historyKey = "collapsed") { stored ->
-            JsonObject(stored + ("collapsed" to JsonPrimitive(collapse)))
-        }
-    }
+    val setCollapsed: (Boolean) -> Unit = { collapse -> fold = RailFold(collapse) }
     val currentSetCollapsed by rememberUpdatedState(setCollapsed)
-    val currentlyCollapsed by rememberUpdatedState(props.collapsed)
+    val currentlyCollapsed by rememberUpdatedState(folded)
     val density = LocalDensity.current
     // Auto-collapse on a narrow window so the rail stops reserving ~265dp the
     // content can't use -- the widgets reclaim the width and the pack banner
@@ -454,7 +445,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
     // (driven by the static LocalEditMode) MOVES the panel -- and its news SlotRenderer's
     // loaded state -- instead of disposing and reloading it on every Ctrl+E.
     val rightPanelMovable = remember {
-        movableContentOf { RightPanel(Modifier.fillMaxSize()) }
+        movableContentOf { RightPanel(instance, Modifier.fillMaxSize()) }
     }
 
     val panelShape = MaterialTheme.shapes.large
@@ -465,7 +456,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
         // width it will be live: no 22dp strip stealing from the centre and pushing
         // right-edge widgets into an overflow that exists only while editing. Reopen
         // stays Ctrl+N (window-scoped, fires while editing), so nothing is stranded.
-        if (props.collapsed) return
+        if (folded) return
         val sized = Modifier.width(if (props.widthDp > 0) props.widthDp.dp else RAIL_DEFAULT_WIDTH)
         NxSurface(
             SurfaceKind.Panel,
@@ -495,7 +486,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
         ) { rightPanelMovable() }
         return
     }
-    val effectiveCollapsed = props.collapsed || autoCollapsed
+    val effectiveCollapsed = folded || autoCollapsed
     val expandedWidth = if (props.widthDp > 0) props.widthDp.dp else RAIL_DEFAULT_WIDTH
     val expandedPx  = with(density) { expandedWidth.toPx() }
     // Collapsed reserves nothing, so there is no catch to drag: RAIL_COLLAPSED_GRAB
@@ -584,8 +575,6 @@ data class ShellTopRegionProps(
     @PropLabel("widget.appshell.topbar.controls") val controls: WindowControlsMode = WindowControlsMode.Auto,
 )
 
-private const val TOPBAR_SURFACE = "appshell.topbar"
-
 /**
  * Top region: the custom title bar. Replaces the OS chrome -- hosts the
  * breadcrumb / status widgets (the appshell.topbar sub-surface), a draggable
@@ -595,7 +584,15 @@ private const val TOPBAR_SURFACE = "appshell.topbar"
  * window no actions of its own, see [hivens.ui.chrome.WindowCapabilities]). removable=false --
  * losing the bar would strand window controls on a floating DE.
  */
-@Widget(id = "appshell.region.top", enter = "none", displayName = "widget.appshell.region.top", removable = false, propsClass = ShellTopRegionProps::class, drawsOwnSurface = true)
+@Widget(
+    id = "appshell.region.top",
+    enter = "none",
+    displayName = "widget.appshell.region.top",
+    removable = false,
+    propsClass = ShellTopRegionProps::class,
+    drawsOwnSurface = true,
+    slots = ["left", "center", "right"],
+)
 @Composable
 fun ShellTopRegion(instance: WidgetInstance) {
     val props = instance.rememberProps<ShellTopRegionProps>()
@@ -651,7 +648,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
             contentAlignment = Alignment.Center,
         ) {
             Box(if (frame == null) Modifier else with(frame) { Modifier.dragExclusion() }) {
-                SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("center"), spacing = 4.dp)
+                SlotRenderer(instance, SlotId("center"), spacing = 4.dp)
             }
         }
     }
@@ -688,9 +685,9 @@ fun ShellTopRegion(instance: WidgetInstance) {
                 if (HOST_IS_MAC) Caption()
                 AppGlyph()
                 BarDivider()
-                SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("left"), spacing = 4.dp)
+                SlotRenderer(instance, SlotId("left"), spacing = 4.dp)
                 DragLane()
-                SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("right"), spacing = 4.dp)
+                SlotRenderer(instance, SlotId("right"), spacing = 4.dp)
                 RailToggle()
                 if (!HOST_IS_MAC) Caption()
             }
@@ -717,7 +714,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
                 opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
             ) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("left"), spacing = 4.dp)
+                    SlotRenderer(instance, SlotId("left"), spacing = 4.dp)
                 }
             }
             DragLane()
@@ -726,7 +723,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
                 opacity = props.opacityPct.regionOpacity(), blurDp = props.blurDp.toFloat(),
             ) {
                 Row(Modifier.fillMaxHeight().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    SlotRenderer(SurfaceId(TOPBAR_SURFACE), SlotId("right"), spacing = 4.dp)
+                    SlotRenderer(instance, SlotId("right"), spacing = 4.dp)
                 }
             }
             RailToggle()
@@ -768,8 +765,15 @@ private fun BarDivider() {
  * (the arrangement comes from that slot, mirroring the appshell.leftrail nesting).
  * removable=false -- it carries the entire app body.
  */
-@Widget(id = "appshell.region.body", enter = "none", displayName = "widget.appshell.region.body", removable = false)
+@Widget(id = "appshell.region.body", enter = "none", displayName = "widget.appshell.region.body", removable = false, slots = ["content"])
 @Composable
-fun ShellBodyRegion() {
-    SlotRenderer(SurfaceId("appshell.body"), SlotId("content"), Modifier.fillMaxSize())
+fun ShellBodyRegion(instance: WidgetInstance) {
+    SlotRenderer(instance, SlotId("content"), Modifier.fillMaxSize())
 }
+
+/**
+ * The right rail's own state: whether it is folded, null until it is folded or opened, when the
+ * arrangement's [ShellRightRegionProps.collapsed] stands.
+ */
+@Serializable
+internal data class RailFold(val collapsed: Boolean? = null)

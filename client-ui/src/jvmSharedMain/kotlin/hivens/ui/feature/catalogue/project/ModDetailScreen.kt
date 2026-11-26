@@ -15,7 +15,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -45,8 +44,6 @@ import hivens.ui.feature.catalogue.browse.tagSearch
 import hivens.ui.feature.catalogue.browse.label
 import hivens.ui.feature.catalogue.browse.reason
 import hivens.ui.feature.catalogue.rememberPageVisit
-import hivens.ui.RIGHT_RAIL_SURFACE
-import hivens.ui.RailFamily
 import hivens.ui.i18n.modrinthCategory
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
@@ -64,7 +61,6 @@ import hivens.ui.render.MarkdownHtml
 import hivens.ui.screens.console.copyPlainText
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.ProvideScoped
 import hivens.widget.api.rememberScopedAction
@@ -72,7 +68,7 @@ import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetInstance
 import kotlinx.coroutines.launch
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
@@ -87,13 +83,14 @@ import hivens.ui.theme.Status
  * page starts and pushed the mark off the margin every other page keeps.
  *
  * Nothing else, on purpose. The compatibility, links and details blocks live in
- * `appshell.rightrail`, which is a shell surface and therefore already beside
- * this page on every screen -- a page carrying its own right-hand column would
- * stand a third column next to it. The page publishes what it knows and the rail
- * switches to the family that reads it, so neither reaches into the other.
+ * the right rail, which every config has beside its page and this config holds as
+ * its own -- a page carrying its own right-hand column would stand a third column
+ * next to it. The page publishes what it knows and the rail's blocks read it, so
+ * neither reaches into the other.
  */
 @Composable
 fun ModDetailScreen(
+    instance: WidgetInstance,
     target: ProjectTarget,
     /**
      * Opens one build's own page. Carries the build's number as well as its id,
@@ -103,7 +100,6 @@ fun ModDetailScreen(
     onOpenVersion: (versionId: String, versionNumber: String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val families = LocalSurfaceFamilies.current
     val visit = rememberProjectVisit(target)
     val view = rememberProjectPage(target, visit)
 
@@ -127,14 +123,6 @@ fun ModDetailScreen(
         tab = tabOnceLoaded(tab, view.loading, noGallery = gallery.isEmpty())
     }
 
-    // The rail follows the page for exactly as long as the page is mounted. Tied
-    // to the composition rather than to navigation so every way out -- Back, a
-    // link, a crash recovery remount -- puts the rail back the same way.
-    DisposableEffect(visit) {
-        families.switch(RIGHT_RAIL_SURFACE, RailFamily.PROJECT_VIEW, visit)
-        onDispose { families.reset(RIGHT_RAIL_SURFACE, visit) }
-    }
-
     val page = ProjectPage(
         view = view,
         tab = tabState,
@@ -142,7 +130,7 @@ fun ModDetailScreen(
         onOpenVersion = { b -> onOpenVersion(b.id, b.versionNumber.ifBlank { b.name }) },
     )
 
-    // A widget surface: the header and the tabs in `header`, the tab's pane in
+    // A container: the header and the tabs in `header`, the tab's pane in
     // `body`, each slot on the panel it always sat on. The widgets read the page
     // over this page's level, where nothing outside the page can reach it.
     ProvideScoped(ProjectPageSource, page) {
@@ -155,7 +143,7 @@ fun ModDetailScreen(
                 modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp),
             ) {
                 SlotRenderer(
-                    SurfaceId(PROJECT_SURFACE),
+                    instance,
                     SlotId("header"),
                     Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
                 )
@@ -164,7 +152,7 @@ fun ModDetailScreen(
                 kind = SurfaceKind.Panel,
                 modifier = Modifier.weight(1f).fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
             ) {
-                SlotRenderer(SurfaceId(PROJECT_SURFACE), SlotId("body"), Modifier.fillMaxSize())
+                SlotRenderer(instance, SlotId("body"), Modifier.fillMaxSize())
             }
         }
     }
@@ -498,7 +486,6 @@ private fun InstallButton(state: ProjectPageView) {
         )
     }
 }
-
 
 /**
  * The page's tabs.

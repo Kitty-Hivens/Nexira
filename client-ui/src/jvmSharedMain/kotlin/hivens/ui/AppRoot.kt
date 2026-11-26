@@ -20,6 +20,7 @@ import hivens.ui.background.BackgroundSettings
 import hivens.ui.components.SignOutPrompt
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.host.CompositionWindows
+import hivens.ui.layout.DocumentStore
 import hivens.ui.navigation.CompositionHistories
 import hivens.ui.navigation.CompositionHistory
 import hivens.ui.navigation.LauncherConfigs
@@ -32,14 +33,12 @@ import hivens.ui.theme.NxColor
 import hivens.themes.api.WallpaperTone
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.host.launcherServices
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
 import hivens.widget.model.History
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.Show
-import hivens.widget.model.screen
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -135,13 +134,15 @@ fun AppRoot(
 
     NavigationInputs(history)
 
-    // What the composition can show: its own configs, and the screens somebody made. One
-    // deleted while it sits in the history leaves it, back and forward both, so neither
-    // arrow can open a page about nothing.
-    val graph by rememberUpdatedState(LocalLayoutGraph.current)
-    val has: (ConfigId) -> Boolean = remember { { it in LauncherConfigs.all || graph.screen(it.value) != null } }
-    val screenIds = graph.screens.map { it.id }.toSet()
-    LaunchedEffect(screenIds) { history.retain { has(it.config) } }
+    // What the composition can show: the configs the document gives it. One gone while it
+    // sits in the history leaves it, back and forward both, so neither arrow can open a page
+    // about nothing.
+    val store: DocumentStore = koinInject()
+    val document by store.document.collectAsState()
+    val configs = document.compositions[LauncherConfigs.Composition]?.configs?.keys.orEmpty()
+    val known by rememberUpdatedState(configs)
+    val has: (ConfigId) -> Boolean = remember { { it in known } }
+    LaunchedEffect(configs) { history.retain { has(it.config) } }
     val show: (Show) -> Unit = remember(history, has) { { if (has(it.config)) history.show(it) } }
 
     // Out-of-composition navigation requests (notification actions, drivers)

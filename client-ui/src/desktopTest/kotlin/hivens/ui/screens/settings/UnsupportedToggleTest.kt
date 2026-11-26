@@ -15,6 +15,8 @@ import androidx.compose.ui.unit.Density
 import hivens.core.data.SettingsData
 import hivens.i18n.ShippedLanguages
 import hivens.themes.Themes
+import hivens.ui.Standing
+import hivens.ui.containerOf
 import hivens.ui.host.HostKoin
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.i18n.ShippedLanguageProvider
@@ -50,14 +52,17 @@ class UnsupportedToggleTest {
                 ShippedLanguageProvider("en") {
                     NxThemed(Themes.default, dark = true) {
                         Column(Modifier.verticalScroll(rememberScrollState())) {
-                            AppearanceSection(
-                                form = form,
-                                save = {},
-                                onOpenBackgroundSettings = {},
-                                currentLanguage = NexiraStrings.translator("en").language,
-                                languages = ShippedLanguages.all,
-                                onLanguageChanged = {},
-                            )
+                            Standing(containerOf("screen.settings")) { instance ->
+                                AppearanceSection(
+                                    instance = instance,
+                                    form = form,
+                                    save = {},
+                                    onOpenBackgroundSettings = {},
+                                    currentLanguage = NexiraStrings.translator("en").language,
+                                    languages = ShippedLanguages.all,
+                                    onLanguageChanged = {},
+                                )
+                            }
                         }
                     }
                 }

@@ -37,7 +37,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-home",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -131,7 +131,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-library",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -205,7 +205,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-browse",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -264,7 +264,7 @@
                                                                 "widgets": [
                                                                     {
                                                                         "kind": "browse.scope",
-                                                                        "instance_id": "browse-scope-browse",
+                                                                        "instance_id": "browse-scope-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -275,7 +275,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "browse.filter.builtBy",
-                                                                        "instance_id": "browse-filter-builtby-browse",
+                                                                        "instance_id": "browse-filter-builtby-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -286,7 +286,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "browse.filter.installed",
-                                                                        "instance_id": "browse-filter-installed-browse",
+                                                                        "instance_id": "browse-filter-installed-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -297,7 +297,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "browse.filter.version",
-                                                                        "instance_id": "browse-filter-version-browse",
+                                                                        "instance_id": "browse-filter-version-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -308,7 +308,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "browse.filter.loader",
-                                                                        "instance_id": "browse-filter-loader-browse",
+                                                                        "instance_id": "browse-filter-loader-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -319,7 +319,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "browse.filter.categories",
-                                                                        "instance_id": "browse-filter-categories-browse",
+                                                                        "instance_id": "browse-filter-categories-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -330,7 +330,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "browse.filter.features",
-                                                                        "instance_id": "browse-filter-features-browse",
+                                                                        "instance_id": "browse-filter-features-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -341,7 +341,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "browse.filter.resolutions",
-                                                                        "instance_id": "browse-filter-resolutions-browse",
+                                                                        "instance_id": "browse-filter-resolutions-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -352,7 +352,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "browse.filter.performance",
-                                                                        "instance_id": "browse-filter-performance-browse",
+                                                                        "instance_id": "browse-filter-performance-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -363,7 +363,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "browse.filter.environment",
-                                                                        "instance_id": "browse-filter-environment-browse",
+                                                                        "instance_id": "browse-filter-environment-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -374,7 +374,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "browse.filter.license",
-                                                                        "instance_id": "browse-filter-license-browse",
+                                                                        "instance_id": "browse-filter-license-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -385,7 +385,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "browse.filter.exclusions",
-                                                                        "instance_id": "browse-filter-exclusions-browse",
+                                                                        "instance_id": "browse-filter-exclusions-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -431,7 +431,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-profile",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -521,7 +521,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-wardrobe",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -577,7 +577,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-settings",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -651,7 +651,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-theme.picker",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -733,7 +733,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-about",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -819,7 +819,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-background",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -980,7 +980,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-pack",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -1036,7 +1036,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-pack.versions",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -1092,7 +1092,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-catalogue.pack",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -1147,7 +1147,7 @@
                                                                 "widgets": [
                                                                     {
                                                                         "kind": "mod.compatibility",
-                                                                        "instance_id": "mod-compatibility-catalogue.pack",
+                                                                        "instance_id": "mod-compatibility-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1158,7 +1158,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.links",
-                                                                        "instance_id": "mod-links-catalogue.pack",
+                                                                        "instance_id": "mod-links-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1169,7 +1169,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.tags",
-                                                                        "instance_id": "mod-tags-catalogue.pack",
+                                                                        "instance_id": "mod-tags-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1180,7 +1180,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.creators",
-                                                                        "instance_id": "mod-creators-catalogue.pack",
+                                                                        "instance_id": "mod-creators-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1191,7 +1191,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.details",
-                                                                        "instance_id": "mod-details-catalogue.pack",
+                                                                        "instance_id": "mod-details-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1237,7 +1237,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-project",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -1292,7 +1292,7 @@
                                                                 "widgets": [
                                                                     {
                                                                         "kind": "mod.compatibility",
-                                                                        "instance_id": "mod-compatibility-project",
+                                                                        "instance_id": "mod-compatibility-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1303,7 +1303,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.links",
-                                                                        "instance_id": "mod-links-project",
+                                                                        "instance_id": "mod-links-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1314,7 +1314,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.tags",
-                                                                        "instance_id": "mod-tags-project",
+                                                                        "instance_id": "mod-tags-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1325,7 +1325,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.creators",
-                                                                        "instance_id": "mod-creators-project",
+                                                                        "instance_id": "mod-creators-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1336,7 +1336,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.details",
-                                                                        "instance_id": "mod-details-project",
+                                                                        "instance_id": "mod-details-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1382,7 +1382,7 @@
                                     },
                                     {
                                         "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-project.build",
+                                        "instance_id": "appshell-region-body-default",
                                         "children": {
                                             "content": {
                                                 "widgets": [
@@ -1415,7 +1415,7 @@
                                                                 "widgets": [
                                                                     {
                                                                         "kind": "mod.compatibility",
-                                                                        "instance_id": "mod-compatibility-project.build",
+                                                                        "instance_id": "mod-compatibility-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1426,7 +1426,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.links",
-                                                                        "instance_id": "mod-links-project.build",
+                                                                        "instance_id": "mod-links-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1437,7 +1437,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.tags",
-                                                                        "instance_id": "mod-tags-project.build",
+                                                                        "instance_id": "mod-tags-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1448,7 +1448,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.creators",
-                                                                        "instance_id": "mod-creators-project.build",
+                                                                        "instance_id": "mod-creators-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1459,7 +1459,7 @@
                                                                     },
                                                                     {
                                                                         "kind": "mod.details",
-                                                                        "instance_id": "mod-details-project.build",
+                                                                        "instance_id": "mod-details-default",
                                                                         "placement": {
                                                                             "padding": {
                                                                                 "top": 12.0,
@@ -1516,6 +1516,34 @@
                             }
                         },
                         "right": {
+                            "flow": {
+                                "direction": "horizontal"
+                            }
+                        }
+                    }
+                },
+                "appshell.region.body": {
+                    "kind": "appshell.region.body",
+                    "instance_id": "appshell-region-body-default",
+                    "children": {
+                        "content": {
+                            "widgets": [
+                                {
+                                    "kind": "appshell.region.left",
+                                    "instance_id": "appshell-region-left-default"
+                                },
+                                {
+                                    "kind": "appshell.region.center",
+                                    "instance_id": "appshell-region-center-default",
+                                    "placement": {
+                                        "weight": 1.0
+                                    }
+                                },
+                                {
+                                    "kind": "appshell.region.right",
+                                    "instance_id": "appshell-region-right-default"
+                                }
+                            ],
                             "flow": {
                                 "direction": "horizontal"
                             }
@@ -1642,6 +1670,74 @@
                             ]
                         }
                     }
+                },
+                "mod.compatibility": {
+                    "kind": "mod.compatibility",
+                    "instance_id": "mod-compatibility-default"
+                },
+                "mod.links": {
+                    "kind": "mod.links",
+                    "instance_id": "mod-links-default"
+                },
+                "mod.tags": {
+                    "kind": "mod.tags",
+                    "instance_id": "mod-tags-default"
+                },
+                "mod.creators": {
+                    "kind": "mod.creators",
+                    "instance_id": "mod-creators-default"
+                },
+                "mod.details": {
+                    "kind": "mod.details",
+                    "instance_id": "mod-details-default"
+                },
+                "browse.scope": {
+                    "kind": "browse.scope",
+                    "instance_id": "browse-scope-default"
+                },
+                "browse.filter.builtBy": {
+                    "kind": "browse.filter.builtBy",
+                    "instance_id": "browse-filter-builtby-default"
+                },
+                "browse.filter.installed": {
+                    "kind": "browse.filter.installed",
+                    "instance_id": "browse-filter-installed-default"
+                },
+                "browse.filter.version": {
+                    "kind": "browse.filter.version",
+                    "instance_id": "browse-filter-version-default"
+                },
+                "browse.filter.loader": {
+                    "kind": "browse.filter.loader",
+                    "instance_id": "browse-filter-loader-default"
+                },
+                "browse.filter.categories": {
+                    "kind": "browse.filter.categories",
+                    "instance_id": "browse-filter-categories-default"
+                },
+                "browse.filter.features": {
+                    "kind": "browse.filter.features",
+                    "instance_id": "browse-filter-features-default"
+                },
+                "browse.filter.resolutions": {
+                    "kind": "browse.filter.resolutions",
+                    "instance_id": "browse-filter-resolutions-default"
+                },
+                "browse.filter.performance": {
+                    "kind": "browse.filter.performance",
+                    "instance_id": "browse-filter-performance-default"
+                },
+                "browse.filter.environment": {
+                    "kind": "browse.filter.environment",
+                    "instance_id": "browse-filter-environment-default"
+                },
+                "browse.filter.license": {
+                    "kind": "browse.filter.license",
+                    "instance_id": "browse-filter-license-default"
+                },
+                "browse.filter.exclusions": {
+                    "kind": "browse.filter.exclusions",
+                    "instance_id": "browse-filter-exclusions-default"
                 }
             }
         },

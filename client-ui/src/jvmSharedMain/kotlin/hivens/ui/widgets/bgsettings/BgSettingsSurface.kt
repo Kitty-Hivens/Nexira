@@ -18,11 +18,8 @@ import hivens.ui.puppet.PuppetToggle
 import hivens.ui.surface.NxSurface
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetInstance
 import hivens.ui.surface.SurfaceKind
-
-/** The Appearance studio's surface, whose slots both of its islands draw. */
-internal const val BG_SETTINGS_SURFACE = "bg.settings"
 
 // Island widths -- bounded so sliders never run to the monitor edge (Rule 6 / D08)
 // and the live wallpaper breathes in the channel between them (Rule 3 gap).
@@ -44,6 +41,7 @@ private val THEME_PANEL_WIDTH = 320.dp
  */
 @Composable
 fun BgSettingsSurface(
+    instance: WidgetInstance,
     currentSettings: BackgroundSettings,
     onSettingsChanged: (BackgroundSettings.() -> BackgroundSettings) -> Unit,
     onBack: () -> Unit,
@@ -68,7 +66,7 @@ fun BgSettingsSurface(
             // because this screen wraps it: the kernel is what knows how each
             // widget is measured once the column has no end.
             SlotRenderer(
-                SurfaceId(BG_SETTINGS_SURFACE),
+                instance,
                 SlotId("controls"),
                 modifier       = Modifier.fillMaxSize(),
                 spacing        = 16.dp,
@@ -78,6 +76,6 @@ fun BgSettingsSurface(
 
         Spacer(Modifier.weight(1f))
 
-        AppearanceThemeIsland(Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight())
+        AppearanceThemeIsland(instance, Modifier.width(THEME_PANEL_WIDTH).fillMaxHeight())
     }
 }

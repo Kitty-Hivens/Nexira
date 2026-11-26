@@ -7,7 +7,7 @@ import androidx.compose.ui.unit.dp
 import hivens.ui.puppet.PuppetScreen
 import hivens.widget.api.SlotRenderer
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetInstance
 
 /**
  * Widget-composed home surface. Kernel-3 ships a minimal prototype --
@@ -16,7 +16,7 @@ import hivens.widget.model.SurfaceId
  * Content grows in later phases as user-customization arrives.
  */
 @Composable
-fun NewHomeScreen() {
+fun NewHomeScreen(instance: WidgetInstance) {
     PuppetScreen("NewHome")
 
     // The context Home's widgets read is the shell's now (see AppLayout), so a Home
@@ -29,11 +29,9 @@ fun NewHomeScreen() {
     // placement, so a widget that wants to reach the edge can and a widget that
     // wants room says so. The bundled layout seeds the gutter it used to get here.
     SlotRenderer(
-        SurfaceId(SURFACE),
+        instance,
         SlotId("main"),
         modifier = Modifier.fillMaxSize(),
         spacing  = 8.dp,
     )
 }
-
-private const val SURFACE = "home.new"

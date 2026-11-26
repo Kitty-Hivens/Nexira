@@ -7,6 +7,9 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -36,11 +39,20 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 
 /**
- * The router of a composition's history: entries of one page differ by what the page
- * noted on them, and share the page's saved state and level.
+ * A slot drawn on the pages of a composition's history: entries of one page differ by
+ * what the page noted on them, and share the page's saved state and level. Content no
+ * entry holds as its own is one content across them.
  */
 @OptIn(ExperimentalComposeUiApi::class)
-class ScreenRouterTest {
+class PagedSlotTest {
+
+    /** The slot as a config's own on every entry, unless [own] says otherwise. */
+    @Composable
+    private fun Router(history: History, own: (HistoryEntry) -> Boolean = { true }, content: @Composable (HistoryEntry) -> Unit) {
+        val retention = rememberSaveableStateHolder()
+        val pages = LocalScope.current?.nearest(ScopeLevel.Composition)?.pages
+        PagedSlot(retention, pages, history, slotKey = "slot", own = own, content = content)
+    }
 
     private val pack = History(LauncherConfigs.Home).show(LauncherConfigs.pack("a"))
     private val noted = pack.rewrite(mapOf(PackSettingsPage.of("Version")))
@@ -80,7 +92,7 @@ class ScreenRouterTest {
     fun `two entries of one page in a row do not take the window down`() {
         val drawn = ArrayList<HistoryEntry>()
         val errors = route(noted, { rewrite(mapOf(PackSettingsPage.id to null)) }, { show(LauncherConfigs.packVersions("a")) }) { history ->
-            ScreenRouter(history) { entry ->
+            Router(history) { entry ->
                 val visits by rememberSaveable { mutableStateOf(0) }
                 drawn += entry
                 Box(Modifier.size((10 + visits).dp))
@@ -90,20 +102,32 @@ class ScreenRouterTest {
         assertEquals(LauncherConfigs.PackVersions, drawn.last().config)
     }
 
-    /** What a page reads of its own entry, as it stands on each pass it is drawn on. */
-    private fun reads(start: History, vararg moves: History.() -> History): List<Pair<HistoryEntry?, String?>> {
+    /** An app level reading the page's entry and the pack page's note, for [inComposition]. */
+    private val app: WidgetScope by lazy {
         val data = WidgetDataRegistry().apply {
             declare(PageKeys.Entry)
             registerFactory(PackSettingsPage.key) { page -> page.read(PackSettingsPage) }
         }
-        val app: WidgetScope = koinApplication {
+        koinApplication {
             modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Default) } })
         }.koin.get()
+    }
+
+    /** [content] inside a composition's level, which keeps the page levels. */
+    @Composable
+    private fun inComposition(content: @Composable () -> Unit) {
+        CompositionLocalProvider(LocalScope provides app) {
+            ChildLevel(ScopeLevel.Composition, content)
+        }
+    }
+
+    /** What a page reads of its own entry, as it stands on each pass it is drawn on. */
+    private fun reads(start: History, vararg moves: History.() -> History): List<Pair<HistoryEntry?, String?>> {
         val seen = ArrayList<Pair<HistoryEntry?, String?>>()
         val errors = route(start, *moves) { history ->
             CompositionLocalProvider(LocalScope provides app) {
                 ChildLevel(ScopeLevel.Composition) {
-                    ScreenRouter(history) { entry ->
+                    Router(history) { entry ->
                         if (entry.config == LauncherConfigs.Pack) {
                             seen += rememberScopedSource(PageKeys.Entry).valueOrNull() to rememberScopedSource(PackSettingsPage.key).valueOrNull()
                         }
@@ -134,5 +158,34 @@ class ScreenRouterTest {
         assertEquals(listOf<Pair<HistoryEntry?, String?>>(noted.current to "Version"), back.distinct())
         assertEquals(setOf(pack.current, noted.current), seen.map { it.first }.toSet())
         assertEquals(1, seen.filter { it.first == noted.current }.map { it.second }.distinct().size, "no pass with the new entry read the old note")
+    }
+
+    @Test
+    fun `content no entry holds as its own is one content and keeps its state across entries`() {
+        val counts = ArrayList<Int>()
+        val errors = route(pack, { show(LauncherConfigs.packVersions("a")) }, { back() }) { history ->
+            Router(history, own = { false }) { _ ->
+                var composed by remember { mutableStateOf(0) }
+                SideEffect { composed++ }
+                counts += composed
+            }
+        }
+        assertEquals(emptyList(), errors)
+        assertEquals(counts.sorted(), counts, "never started over: $counts")
+    }
+
+    @Test
+    fun `content that becomes an entry's own swaps onto that entry's page`() {
+        val seen = ArrayList<Pair<HistoryEntry, Boolean>>()
+        val errors = route(pack, { show(LauncherConfigs.packVersions("a")) }) { history ->
+            inComposition {
+                Router(history, own = { it.config == LauncherConfigs.PackVersions }) { entry ->
+                    seen += entry to (LocalScope.current?.level == ScopeLevel.Page)
+                }
+            }
+        }
+        assertEquals(emptyList(), errors)
+        assertEquals(setOf(false), seen.filter { it.first.config == LauncherConfigs.Pack }.map { it.second }.toSet(), "shared content has no page")
+        assertEquals(setOf(true), seen.filter { it.first.config == LauncherConfigs.PackVersions }.map { it.second }.toSet(), "its own content is on its page")
     }
 }

@@ -5,13 +5,16 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import hivens.themes.Themes
 import hivens.themes.api.ThemesKeys
+import hivens.ui.ConfigView
 import hivens.ui.FRAME_NANOS
-import hivens.ui.ScreenRouter
+import hivens.ui.Standing
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.onEventThread
@@ -19,8 +22,11 @@ import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
+import hivens.widget.api.CompositeWidgetRegistry
 import hivens.widget.api.CompositionKeys
-import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.SlotRenderer
+import hivens.widget.api.WidgetDescriptor
+import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetCommandRegistry
@@ -34,10 +40,20 @@ import hivens.widget.api.WidgetScope
 import hivens.widget.api.command
 import hivens.widget.api.flowSource
 import hivens.widget.api.rememberLatestCommand
-import hivens.widget.model.DefaultLayout
+import hivens.widget.model.Composition
+import hivens.widget.model.Config
+import hivens.widget.model.ConfigLayout
+import hivens.widget.model.Document
 import hivens.widget.model.History
+import hivens.widget.model.LayoutId
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.Show
+import hivens.widget.model.SlotContent
+import hivens.widget.model.SlotId
+import hivens.widget.model.StandardDocument
+import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetKind
+import hivens.widget.model.widgets
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.koin.dsl.koinApplication
@@ -51,8 +67,9 @@ import kotlin.test.assertEquals
  * choice not yet applied is the page's, so it is still there after going back and forward again, and
  * a picker opened afresh starts at the theme in use.
  *
- * The picker is drawn the way the launcher draws it: the host's frame, the bundled layout's slots, and
- * the colour provider's controls in them.
+ * The picker is drawn the way the launcher draws it: the standard document's picker, its slots holding
+ * the colour provider's controls, held as a config's own in a frame the composition has once, and
+ * drawn by the config view.
  */
 @OptIn(ExperimentalComposeUiApi::class)
 class ThemePickerApplyTest {
@@ -90,8 +107,7 @@ class ThemePickerApplyTest {
                         LocalWidgetDataRegistry provides data,
                         LocalWidgetCommandRegistry provides commands,
                         LocalScope provides app,
-                        LocalLayoutGraph provides DefaultLayout.load(),
-                        LocalWidgetRegistry provides launcherAndControls,
+                        LocalWidgetRegistry provides CompositeWidgetRegistry(listOf(launcherAndControls, FrameRegistry)),
                         LocalSurfaceFamilies provides SurfaceFamilies(),
                     ) {
                         ChildLevel(ScopeLevel.Composition) {
@@ -109,7 +125,7 @@ class ThemePickerApplyTest {
         val world = World(answerApply)
         onEventThread {
             val scene = ImageComposeScene(900, 700, density = Density(1f)) {
-                world.Draw { ChildLevel(ScopeLevel.Page) { ThemePickerSurface() } }
+                world.Draw { ChildLevel(ScopeLevel.Page) { Standing(picker) { ThemePickerSurface(it) } } }
             }
             try {
                 repeat(8) { scene.render(it * FRAME_NANOS).close() }
@@ -140,9 +156,7 @@ class ThemePickerApplyTest {
         var history by mutableStateOf(History(LauncherConfigs.Home).show(Show(LauncherConfigs.Themes)))
         onEventThread {
             val scene = ImageComposeScene(900, 700, density = Density(1f)) {
-                world.Draw {
-                    ScreenRouter(history) { if (it.config == LauncherConfigs.Themes) ThemePickerSurface() }
-                }
+                world.Draw { ConfigView(LauncherConfigs.Composition, document, history) }
             }
             var t = 0L
             fun frames(count: Int) = repeat(count) {
@@ -181,5 +195,51 @@ class ThemePickerApplyTest {
             listOf("apply ${Themes.default.id}", "back"),
             pickLeaveAndReturn(away = { show(LauncherConfigs.section(LauncherConfigs.About)) }, returning = { show(Show(LauncherConfigs.Themes)) }),
         )
+    }
+
+    /** The picker as the standard document has it. */
+    private val picker: WidgetInstance =
+        StandardDocument.load().compositions.values.flatMap { it.widgets().toList() }.first { it.kind.value == "screen.theme.picker" }
+
+    /** A frame the composition has once, whose body each config holds as its own: the picker in the picker's config. */
+    private val document: Document = run {
+        fun stands(vararg body: WidgetInstance) = WidgetInstance(FRAME, "frame", children = mapOf(BODY to SlotContent(body.toList())))
+        fun config(vararg body: WidgetInstance) = Config(layouts = listOf(ConfigLayout(LayoutId("main"), SlotContent(listOf(stands(*body))))))
+        Document(
+            start = LauncherConfigs.Composition,
+            compositions = mapOf(
+                LauncherConfigs.Composition to Composition(
+                    start = LauncherConfigs.Home,
+                    singles = mapOf(FRAME to WidgetInstance(FRAME, "frame", children = mapOf(BODY to SlotContent()))),
+                    configs = mapOf(
+                        LauncherConfigs.Home to config(),
+                        LauncherConfigs.About to config(),
+                        LauncherConfigs.Themes to config(picker),
+                    ),
+                ),
+            ),
+        )
+    }
+
+    private object Frame : WidgetDescriptor {
+        override val kind = FRAME
+        override val displayName = "frame"
+        override val removable = false
+        override val slots = listOf(BODY)
+        override val pages = listOf(BODY)
+
+        @Composable
+        override fun Render(instance: WidgetInstance) = SlotRenderer(instance, BODY, Modifier.fillMaxSize())
+    }
+
+    private object FrameRegistry : WidgetRegistry {
+        override fun all(): Map<WidgetKind, WidgetDescriptor> = mapOf(FRAME to Frame)
+
+        override fun get(kind: WidgetKind): WidgetDescriptor? = Frame.takeIf { it.kind == kind }
+    }
+
+    private companion object {
+        val FRAME = WidgetKind("test.frame")
+        val BODY = SlotId("body")
     }
 }
