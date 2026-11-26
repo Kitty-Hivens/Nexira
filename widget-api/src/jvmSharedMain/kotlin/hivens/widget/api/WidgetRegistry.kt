@@ -31,6 +31,11 @@ interface WidgetDescriptor {
     val slots: List<SlotId>
         get() = emptyList()
 
+    // Of [slots], the ones that hold a page of the config shown. Populated by the KSP
+    // processor from @Widget(pages = ...).
+    val pages: List<SlotId>
+        get() = emptyList()
+
     // The plane this widget sits on when nothing has said otherwise. Populated by
     // the KSP processor from @Widget(surface = ...); null means the widget draws
     // no plane of its own. See [resolveSurface] for how it meets an instance's.

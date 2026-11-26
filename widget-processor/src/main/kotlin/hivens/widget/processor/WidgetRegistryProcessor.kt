@@ -43,6 +43,7 @@ class WidgetRegistryProcessor(
                     removable = extracted.removable,
                     drawsOwnSurface = extracted.drawsOwnSurface,
                     slots = extracted.slots,
+                    pages = extracted.pages,
                     propsClassFqn = extracted.propsClassFqn,
                     functionFqn = if (packageName.isEmpty()) funcName else "$packageName.$funcName",
                     takesInstance = extracted.takesInstance,

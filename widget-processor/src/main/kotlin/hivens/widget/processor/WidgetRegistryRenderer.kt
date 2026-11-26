@@ -57,6 +57,8 @@ internal data class WidgetModel(
     val needs: List<String> = emptyList(),
     /** The id of the Boolean source the widget is shown under, already checked, or null for none. */
     val shownWhen: String? = null,
+    /** Of [slots], the ones that hold a page. */
+    val pages: List<String> = emptyList(),
 )
 
 /**
@@ -149,6 +151,7 @@ internal fun renderRegistry(
         appendLine("            override val removable: Boolean = ${entry.removable}")
         if (entry.drawsOwnSurface) appendLine("            override val drawsOwnSurface: Boolean = true")
         appendLine("            override val slots: List<SlotId> = ${entry.slots.toSlotIdListLiteral()}")
+        if (entry.pages.isNotEmpty()) appendLine("            override val pages: List<SlotId> = ${entry.pages.toSlotIdListLiteral()}")
         // Only when the widget said something. A literal of six zeroes on every
         // descriptor would be the same value the interface already defaults to,
         // written out ninety times.

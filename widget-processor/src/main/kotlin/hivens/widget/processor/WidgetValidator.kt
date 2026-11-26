@@ -38,6 +38,8 @@ internal object WidgetValidator {
         val removable: Boolean,
         val drawsOwnSurface: Boolean,
         val slots: List<String>,
+        /** Of [slots], the ones that hold a page. */
+        val pages: List<String>,
         // FQN of the @Serializable props class, or null for Unit::class
         // (a propless widget).
         val propsClassFqn: String?,
@@ -121,6 +123,7 @@ internal object WidgetValidator {
         val drawsOwnSurface = (args["drawsOwnSurface"] as? Boolean) ?: false
         // KSP reports Array<String> annotation values as List<*>.
         val rawSlots = (args["slots"] as? List<*>).orEmpty().filterIsInstance<String>()
+        val pages = (args["pages"] as? List<*>).orEmpty().filterIsInstance<String>()
         val rawSurface = (args["surface"] as? String).orEmpty().trim()
 
         if (id.isBlank()) {
@@ -150,6 +153,11 @@ internal object WidgetValidator {
                 return null
             }
             sanitized.add(raw)
+        }
+        val undeclared = pages.filter { it !in seen }
+        if (undeclared.isNotEmpty()) {
+            env.logger.error("@Widget '$id' names pages that are not among its slots: $undeclared", symbol)
+            return null
         }
         // A container reaches its child slots through its own instance id, so slots
         // on a declaration that takes no instance are places nothing can render.
@@ -273,6 +281,7 @@ internal object WidgetValidator {
             removable = removable,
             drawsOwnSurface = drawsOwnSurface,
             slots = sanitized,
+            pages = pages.distinct(),
             propsClassFqn = propsClassFqn,
             takesInstance = takesInstance,
             provides = symbol.serviceContracts(PROVIDES_SERVICE_FQN, "classes"),
