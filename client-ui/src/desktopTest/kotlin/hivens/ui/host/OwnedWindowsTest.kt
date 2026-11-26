@@ -9,6 +9,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import hivens.ui.ProvideComposition
+import hivens.ui.layout.DocumentStore
 import hivens.ui.navigation.CompositionHistory
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.onEventThread
@@ -27,6 +28,8 @@ import hivens.widget.model.Document
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.StandardDocument
 import kotlinx.coroutines.Dispatchers
+import java.nio.file.Path
+import java.util.UUID
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import kotlin.test.AfterTest
@@ -45,6 +48,8 @@ class OwnedWindowsTest {
         modules(
             module {
                 single<Document> { StandardDocument.load() }
+                // Nobody here edits, so the person's own file is never written and never there.
+                single { DocumentStore(Path.of(System.getProperty("java.io.tmpdir"), "owned-windows-${UUID.randomUUID()}", "interface.json"), { get<Document>() }) }
                 single { WidgetScope.app(WidgetDataRegistry(), KoinLevelServicesHost.app(this), Dispatchers.Unconfined) }
             },
         )

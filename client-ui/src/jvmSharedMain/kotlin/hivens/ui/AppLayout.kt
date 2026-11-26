@@ -131,9 +131,12 @@ fun AppLayout(
  */
 @Composable
 internal fun ProvideComposition(history: CompositionHistory, show: (Show) -> Unit, content: @Composable () -> Unit) {
-    val document: Document = koinInject()
+    val store: DocumentStore = koinInject()
+    // Read as it is when a window is asked for, so a document changed by an edit does not
+    // make the windows anew and close the ones open.
+    val document by rememberUpdatedState(store.document.collectAsState().value)
     // The composition the launcher starts in has its window already.
-    val owned = remember(document) { CompositionWindows { it in document.compositions && it != document.start } }
+    val owned = remember { CompositionWindows { it in document.compositions && it != document.start } }
     val openOwned by owned.open.collectAsState()
     ProvideScoped(CompositionKeys.History, history.now) {
     ProvideScopedCommand(CompositionKeys.Show, rememberLatestCommand(show)) {
