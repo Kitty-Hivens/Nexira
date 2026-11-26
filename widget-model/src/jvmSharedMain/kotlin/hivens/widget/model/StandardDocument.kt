@@ -6,7 +6,8 @@ private const val STANDARD_DOCUMENT_RESOURCE = "/widget/standard-document.json"
  * The document the launcher ships: the interface of whoever has none of their own. Part of the jar, so one that cannot
  * be read is a broken build and throws.
  *
- * So far it says what each composition asks of its window and nothing of what it draws, which [DefaultLayout] says.
+ * It says what each composition asks of its window and what each config holds. The launcher draws from [DefaultLayout]
+ * for as long as that ships, and the two hold the same widgets config by config.
  */
 object StandardDocument {
     fun load(): Document {
