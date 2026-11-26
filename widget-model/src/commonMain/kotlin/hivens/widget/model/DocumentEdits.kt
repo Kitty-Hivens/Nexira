@@ -7,6 +7,12 @@ sealed interface NodeRoot {
 
     /** The composition's residents. */
     data object Residents : NodeRoot
+
+    /**
+     * A slot of a surface of the [LayoutGraph], as [SlotPath] names it. Read from the graph and never from a document:
+     * a document holds no surfaces, so [contentAt] answers null for it and [edit] leaves the document as it is.
+     */
+    data class Surface(val surface: SurfaceId, val slot: SlotId, val family: FamilyId = FamilyId.GENERAL) : NodeRoot
 }
 
 /**
@@ -110,6 +116,7 @@ private fun Composition.stand(content: SlotContent): SlotContent = content.stand
 private fun Composition.rootContent(root: NodeRoot): SlotContent? = when (root) {
     is NodeRoot.Layout -> configs[root.config]?.layouts?.firstOrNull { it.id == root.layout }?.root
     NodeRoot.Residents -> residents
+    is NodeRoot.Surface -> null
 }
 
 private fun Composition.withRoot(root: NodeRoot, content: SlotContent): Composition = when (root) {
@@ -119,6 +126,8 @@ private fun Composition.withRoot(root: NodeRoot, content: SlotContent): Composit
         copy(configs = configs + (root.config to config.copy(layouts = layouts)))
     }
     NodeRoot.Residents -> copy(residents = content)
+    // Never reached: a surface's root has no content here, so nothing is edited under it.
+    is NodeRoot.Surface -> this
 }
 
 /**

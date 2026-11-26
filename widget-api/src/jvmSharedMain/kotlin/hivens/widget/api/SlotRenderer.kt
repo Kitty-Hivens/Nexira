@@ -98,8 +98,8 @@ import hivens.widget.model.Entrance
 import hivens.widget.model.FlowPlacement
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
+import hivens.widget.model.NodePath
 import hivens.widget.model.Placement
-import hivens.widget.model.SlotAddress
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
@@ -110,18 +110,24 @@ import hivens.widget.model.ViewportMode
 import hivens.widget.model.WidgetSizing
 import hivens.widget.model.anchorHorizontalBias
 import hivens.widget.model.anchorVerticalBias
+import hivens.widget.model.contentAt
 import hivens.widget.model.clampPlacementAxis
 import hivens.widget.model.flowPlacement
 import hivens.widget.model.parseAnchor
+import hivens.widget.model.slotPath
+import hivens.widget.model.toNodePath
 import hivens.widget.model.traverse
 import hivens.widget.model.viewportMode
 
-// Renders every widget at the addressed slot. Two entry forms:
+// Renders every widget at the addressed slot. Three entry forms:
 //
 //   * Top-level: SlotRenderer(surface, slot) -- used by surface
 //     composables (NewHomeScreen, LibraryScreen, AppLayout rails, ...).
 //     Initialises LocalSlotPath at the surface root, inside whichever
-//     family that surface is currently showing.
+//     family that surface is currently showing, and reads the layout graph.
+//
+//   * Top-level: SlotRenderer(path) -- a root of a document: a config's
+//     layout or a composition's residents, read from LocalDocument.
 //
 //   * Nested: SlotRenderer(parent, slot) -- used by container widgets
 //     inside their @Composable body. Extends LocalSlotPath with the
@@ -160,7 +166,7 @@ fun SlotRenderer(
     // that switches families does not have to thread the id through every slot it
     // declares, and so a slot declared before families existed keeps meaning the
     // general one without saying so.
-    val path = SlotPath(surface, slot, family = activeFamilyOf(surface))
+    val path = SlotPath(surface, slot, family = activeFamilyOf(surface)).toNodePath()
     val mounted = LocalMountedSurfaces.current
     // Open above already: this slot is inside its own surface, through some widget
     // that opens it. Refused rather than drawn, because drawing it draws it again.
@@ -173,6 +179,18 @@ fun SlotRenderer(
     }
     val nowMounted = remember(mounted, surface) { mounted + surface }
     CompositionLocalProvider(LocalSlotPath provides path, LocalMountedSurfaces provides nowMounted) {
+        RenderSlotContent(path, modifier, spacing, contentPadding)
+    }
+}
+
+@Composable
+fun SlotRenderer(
+    path: NodePath,
+    modifier: Modifier = Modifier,
+    spacing: Dp = 0.dp,
+    contentPadding: PaddingValues = NO_PADDING,
+) {
+    CompositionLocalProvider(LocalSlotPath provides path) {
         RenderSlotContent(path, modifier, spacing, contentPadding)
     }
 }
@@ -200,11 +218,10 @@ private fun Modifier.inset(padding: PaddingValues): Modifier =
     if (padding == NO_PADDING) this else this.padding(padding)
 
 @Composable
-private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp, contentPadding: PaddingValues) {
-    val graph = LocalLayoutGraph.current
+private fun RenderSlotContent(path: NodePath, modifier: Modifier, spacing: Dp, contentPadding: PaddingValues) {
     val slotChrome = LocalSlotChromeModifier.current
 
-    val stored: SlotContent = graph.traverse(path) ?: SlotContent()
+    val stored: SlotContent = storedAt(path) ?: SlotContent()
     val chrome = slotChrome(path, stored)
     val content = shownOf(stored)
 
@@ -213,7 +230,7 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp, c
         // so an empty slot keeps its place; the empty decorator paints the
         // edit-mode placeholder, or nothing.
         val emptyDecorator = LocalEmptySlotDecorator.current
-        Box(chrome.then(modifier)) { emptyDecorator(path.leafAddress) }
+        Box(chrome.then(modifier)) { emptyDecorator(path) }
         return
     }
 
@@ -259,6 +276,13 @@ private fun RenderSlotContent(path: SlotPath, modifier: Modifier, spacing: Dp, c
     }
 }
 
+/** What is stored at [path]: under a surface in the layout graph, anywhere else in the document. */
+@Composable
+private fun storedAt(path: NodePath): SlotContent? {
+    val surfacePath = path.slotPath
+    return if (surfacePath != null) LocalLayoutGraph.current.traverse(surfacePath) else LocalDocument.current?.contentAt(path)
+}
+
 /**
  * [content] less the widgets whose show condition does not hold here
  * ([WidgetDescriptor.shownWhen]), unless somebody is arranging, who sees them dimmed in
@@ -294,7 +318,7 @@ private val WidgetInstance.isPinned: Boolean get() = placement?.pinned == true
  */
 @Composable
 private fun PinnedFlowFrame(
-    path: SlotPath,
+    path: NodePath,
     content: SlotContent,
     horizontal: Boolean,
     outer: Modifier,
@@ -311,14 +335,14 @@ private fun PinnedFlowFrame(
     if (horizontal) {
         Row(outer, horizontalArrangement = Arrangement.spacedBy(spacing)) {
             Row(Modifier.withoutLeadingGap(spacing, Orientation.Horizontal)) {
-                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural, Modifier.childGap(spacing, Orientation.Horizontal))
+                FlowWidgets(path, pinned, registry, decorator, unknownDecorator, natural, Modifier.childGap(spacing, Orientation.Horizontal))
             }
             scrolled(Modifier.weight(1f).fillMaxHeight())
         }
     } else {
         Column(outer, verticalArrangement = Arrangement.spacedBy(spacing)) {
             Column(Modifier.withoutLeadingGap(spacing, Orientation.Vertical)) {
-                FlowWidgets(path.leafAddress, pinned, registry, decorator, unknownDecorator, natural, Modifier.childGap(spacing, Orientation.Vertical))
+                FlowWidgets(path, pinned, registry, decorator, unknownDecorator, natural, Modifier.childGap(spacing, Orientation.Vertical))
             }
             scrolled(Modifier.weight(1f).fillMaxWidth())
         }
@@ -331,11 +355,10 @@ private fun PinnedFlowFrame(
  * means a corner of the window again, as it does in a slot that does not move.
  */
 @Composable
-private fun BoxScope.PinnedPlacement(path: SlotPath, content: SlotContent, spacing: Dp) {
+private fun BoxScope.PinnedPlacement(path: NodePath, content: SlotContent, spacing: Dp) {
     PlacementSlot(
         path = path,
         content = content,
-        address = path.leafAddress,
         registry = LocalWidgetRegistry.current,
         decorator = LocalWidgetDecorator.current,
         unknownDecorator = LocalUnknownWidgetDecorator.current,
@@ -349,7 +372,7 @@ private fun BoxScope.PinnedPlacement(path: SlotPath, content: SlotContent, spaci
 
 @Composable
 private fun SlotBody(
-    path: SlotPath,
+    path: NodePath,
     content: SlotContent,
     outer: Modifier,
     spacing: Dp,
@@ -359,12 +382,11 @@ private fun SlotBody(
     val registry = LocalWidgetRegistry.current
     val decorator = LocalWidgetDecorator.current
     val unknownDecorator = LocalUnknownWidgetDecorator.current
-    val address = path.leafAddress
     val flow = content.flow
     if (flow == null) {
-        PlacementSlot(path, content, address, registry, decorator, unknownDecorator, outer, spacing, scroll, include)
+        PlacementSlot(path, content, registry, decorator, unknownDecorator, outer, spacing, scroll, include)
     } else {
-        FlowSlot(flow, content, address, registry, decorator, unknownDecorator, outer, spacing, LocalSlotMotionMs.current, scroll, include)
+        FlowSlot(flow, content, path, registry, decorator, unknownDecorator, outer, spacing, LocalSlotMotionMs.current, scroll, include)
     }
 }
 
@@ -636,7 +658,7 @@ private val MAP_HOME_MARGIN = 24.dp
  * composed again, for every pixel the plane moves.
  */
 @Composable
-private fun MapPlacement(path: SlotPath, content: SlotContent, pan: State<Offset>, inView: MutableState<Boolean>) {
+private fun MapPlacement(path: NodePath, content: SlotContent, pan: State<Offset>, inView: MutableState<Boolean>) {
     val registry = LocalWidgetRegistry.current
     val decorator = LocalWidgetDecorator.current
     val unknownDecorator = LocalUnknownWidgetDecorator.current
@@ -644,7 +666,6 @@ private fun MapPlacement(path: SlotPath, content: SlotContent, pan: State<Offset
     val withdrawSlotBounds = LocalSlotBoundsWithdrawal.current
     DisposableEffect(path, withdrawSlotBounds) { onDispose { withdrawSlotBounds(path) } }
     val extent = LocalViewportExtent.current
-    val address = path.leafAddress
     val slotDp = Size(extent.width.value, extent.height.value)
     val bounds = PlacementBounds(unboundedX = true, unboundedY = true)
     // The plane's origin on screen, reported with what is visible so a drop converts
@@ -671,10 +692,10 @@ private fun MapPlacement(path: SlotPath, content: SlotContent, pan: State<Offset
                             val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
                             PlacedBox(p, 0, 0f, 0f, slotDp, sizing, bounds, { Modifier.layoutId(it) }) {
                                 if (descriptor == null) {
-                                    RenderUnknown(unknownDecorator, address, index, instance)
+                                    RenderUnknown(unknownDecorator, path, index, instance)
                                 } else {
                                     val movable = rememberWidgetMovable(descriptor, instance, index)
-                                    decorator(address, index, descriptor, instance) { movable() }
+                                    decorator(path, index, descriptor, instance) { movable() }
                                 }
                             }
                         }
@@ -736,7 +757,7 @@ private fun totalWeight(line: List<WidgetInstance>): Float =
 private fun FlowSlot(
     flow: FlowSpec,
     content: SlotContent,
-    address: SlotAddress,
+    path: NodePath,
     registry: WidgetRegistry,
     decorator: WidgetDecorator,
     unknownDecorator: UnknownWidgetDecorator,
@@ -762,13 +783,13 @@ private fun FlowSlot(
             Row(outer.withoutLeadingGap(spacing, Orientation.Horizontal)) {
                 val weigh: Weigh = alongScroll(true)?.let { viewportShare(it, totalWeight(drawn)) }
                     ?: { w, _ -> Modifier.weight(w) }
-                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh, Modifier.childGap(spacing, Orientation.Horizontal))
+                FlowWidgets(path, items, registry, decorator, unknownDecorator, weigh, Modifier.childGap(spacing, Orientation.Horizontal))
             }
         } else {
             Column(outer.withoutLeadingGap(spacing, Orientation.Vertical)) {
                 val weigh: Weigh = alongScroll(false)?.let { viewportShare(it, totalWeight(drawn)) }
                     ?: { w, _ -> Modifier.weight(w) }
-                FlowWidgets(address, items, registry, decorator, unknownDecorator, weigh, Modifier.childGap(spacing, Orientation.Vertical))
+                FlowWidgets(path, items, registry, decorator, unknownDecorator, weigh, Modifier.childGap(spacing, Orientation.Vertical))
             }
         }
         return
@@ -792,7 +813,7 @@ private fun FlowSlot(
                     val weigh: Weigh = alongScroll(true)?.let { viewportShare(it, lineLength.toFloat()) }
                         ?: { w, _ -> Modifier.weight(w) }
                     val gap = Modifier.childGap(spacing, Orientation.Horizontal)
-                    WrappedLine(address, line, flow.uniform, registry, decorator, unknownDecorator, weigh, gap)
+                    WrappedLine(path, line, flow.uniform, registry, decorator, unknownDecorator, weigh, gap)
                     if (flow.uniform) repeat(lineLength - line.size) { Spacer(gap.then(weigh(1f, WidgetSizing.UNDECLARED))) }
                 }
             }
@@ -804,7 +825,7 @@ private fun FlowSlot(
                     val weigh: Weigh = alongScroll(false)?.let { viewportShare(it, lineLength.toFloat()) }
                         ?: { w, _ -> Modifier.weight(w) }
                     val gap = Modifier.childGap(spacing, Orientation.Vertical)
-                    WrappedLine(address, line, flow.uniform, registry, decorator, unknownDecorator, weigh, gap)
+                    WrappedLine(path, line, flow.uniform, registry, decorator, unknownDecorator, weigh, gap)
                     if (flow.uniform) repeat(lineLength - line.size) { Spacer(gap.then(weigh(1f, WidgetSizing.UNDECLARED))) }
                 }
             }
@@ -862,7 +883,7 @@ fun Modifier.withoutLeadingGap(gap: Dp, orientation: Orientation): Modifier = if
 
 @Composable
 private fun FlowWidgets(
-    address: SlotAddress,
+    path: NodePath,
     widgets: List<IndexedValue<WidgetInstance>>,
     registry: WidgetRegistry,
     decorator: WidgetDecorator,
@@ -875,7 +896,7 @@ private fun FlowWidgets(
         key(instance.instanceId) {
             val descriptor = registry[instance.kind]
             if (descriptor == null) {
-                Box(gap) { RenderUnknown(unknownDecorator, address, index, instance) }
+                Box(gap) { RenderUnknown(unknownDecorator, path, index, instance) }
             } else {
                 val movable = rememberWidgetMovable(descriptor, instance, index)
                 // Outer spacing around the widget, from its placement so a flow
@@ -885,13 +906,13 @@ private fun FlowWidgets(
                 // testable without a composition.
                 when (val placement = instance.flowPlacement()) {
                     is FlowPlacement.Weighted -> Box(gap.then(weigh(placement.weight, descriptor.sizing)).then(pad)) {
-                        decorator(address, index, descriptor, instance) { movable() }
+                        decorator(path, index, descriptor, instance) { movable() }
                     }
                     is FlowPlacement.Bounded -> Box(gap.then(boundedModifier(placement, descriptor.sizing)).then(pad)) {
-                        decorator(address, index, descriptor, instance) { movable() }
+                        decorator(path, index, descriptor, instance) { movable() }
                     }
                     FlowPlacement.Natural -> Box(gap.then(pad)) {
-                        decorator(address, index, descriptor, instance) { movable() }
+                        decorator(path, index, descriptor, instance) { movable() }
                     }
                 }
             }
@@ -904,7 +925,7 @@ private fun FlowWidgets(
 // address it by. [gap] is what each cell wears for the line's gap, outside its share.
 @Composable
 private fun WrappedLine(
-    address: SlotAddress,
+    path: NodePath,
     line: List<IndexedValue<WidgetInstance>>,
     uniform: Boolean,
     registry: WidgetRegistry,
@@ -919,10 +940,10 @@ private fun WrappedLine(
             val cell: Modifier = if (uniform) weigh(1f, descriptor?.sizing ?: WidgetSizing.UNDECLARED) else Modifier
             Box(gap.then(cell)) {
                 if (descriptor == null) {
-                    RenderUnknown(unknownDecorator, address, index, instance)
+                    RenderUnknown(unknownDecorator, path, index, instance)
                 } else {
                     val movable = rememberWidgetMovable(descriptor, instance, index)
-                    Box(Modifier.outerPadding(instance.placement?.padding)) { decorator(address, index, descriptor, instance) { movable() } }
+                    Box(Modifier.outerPadding(instance.placement?.padding)) { decorator(path, index, descriptor, instance) { movable() } }
                 }
             }
         }
@@ -1043,9 +1064,8 @@ private class OuterPaddingNode(var start: Dp, var top: Dp, var end: Dp, var bott
 // move", and the lattice grows along the side that does.
 @Composable
 private fun PlacementSlot(
-    path: SlotPath,
+    path: NodePath,
     content: SlotContent,
-    address: SlotAddress,
     registry: WidgetRegistry,
     decorator: WidgetDecorator,
     unknownDecorator: UnknownWidgetDecorator,
@@ -1121,10 +1141,10 @@ private fun PlacementSlot(
                         val sizing = descriptor?.sizing ?: WidgetSizing.UNDECLARED
                         PlacedBox(p, columns, cell, spacing.value, clampSize, sizing, placementBounds, position) {
                             if (descriptor == null) {
-                                RenderUnknown(unknownDecorator, address, index, instance)
+                                RenderUnknown(unknownDecorator, path, index, instance)
                             } else {
                                 val movable = rememberWidgetMovable(descriptor, instance, index)
-                                decorator(address, index, descriptor, instance) { movable() }
+                                decorator(path, index, descriptor, instance) { movable() }
                             }
                         }
                     }
@@ -1506,9 +1526,9 @@ private fun RenderWidget(descriptor: WidgetDescriptor, instance: WidgetInstance,
  * answer for it too.
  */
 @Composable
-private fun RenderUnknown(decorator: UnknownWidgetDecorator, address: SlotAddress, index: Int, instance: WidgetInstance) {
+private fun RenderUnknown(decorator: UnknownWidgetDecorator, path: NodePath, index: Int, instance: WidgetInstance) {
     val ceiling = WidgetSizing.UNDECLARED.unboundedAxisCeiling(LocalViewportExtent.current)
-    if (ceiling == null) decorator(address, index, instance) else Box(ceiling) { decorator(address, index, instance) }
+    if (ceiling == null) decorator(path, index, instance) else Box(ceiling) { decorator(path, index, instance) }
 }
 
 /**

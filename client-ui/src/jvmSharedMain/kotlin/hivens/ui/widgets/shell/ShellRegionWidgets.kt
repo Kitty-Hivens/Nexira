@@ -90,6 +90,7 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import hivens.widget.model.slotPath
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -402,13 +403,14 @@ fun ShellRightRegion(instance: WidgetInstance) {
     // and with none. Its opacity and blur are
     // the editable pair.
     val editing = LocalEditMode.current is EditModeState.On
-    val path = LocalSlotPath.current
+    // Where the rail's record is kept in the layout graph, null where it stands in no surface.
+    val path = LocalSlotPath.current.slotPath
     val controller: EditModeController = koinInject()
     val toggleCollapse: () -> Unit = {
         // Flipped from the props as they are when the write lands, not as this
         // composition last saw them: a slider in the prop panel writes the same
         // record, and a flip built on an older copy undid it, or was undone by it.
-        controller.updatePropsFrom(path, instance.instanceId, historyKey = "collapsed") { stored ->
+        if (path != null) controller.updatePropsFrom(path, instance.instanceId, historyKey = "collapsed") { stored ->
             val collapsed = (stored["collapsed"] as? JsonPrimitive)?.booleanOrNull ?: ShellRightRegionProps().collapsed
             JsonObject(stored + ("collapsed" to JsonPrimitive(!collapsed)))
         }
@@ -421,7 +423,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
     // created with skipped the write after Ctrl+N had changed them: the rail shut on
     // screen and stayed open in the file, so the next Ctrl+N did nothing visible.
     val setCollapsed: (Boolean) -> Unit = { collapse ->
-        controller.updatePropsFrom(path, instance.instanceId, historyKey = "collapsed") { stored ->
+        if (path != null) controller.updatePropsFrom(path, instance.instanceId, historyKey = "collapsed") { stored ->
             JsonObject(stored + ("collapsed" to JsonPrimitive(collapse)))
         }
     }

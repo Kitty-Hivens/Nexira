@@ -16,11 +16,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.Dp
+import hivens.widget.model.Document
 import hivens.widget.model.Entrance
 import hivens.widget.model.LayoutGraph
-import hivens.widget.model.SlotAddress
+import hivens.widget.model.NodePath
 import hivens.widget.model.SlotContent
-import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
@@ -43,6 +43,16 @@ import hivens.widget.model.WidgetSizing
 val LocalLayoutGraph: ProvidableCompositionLocal<LayoutGraph> =
     compositionLocalOf { LayoutGraph.EMPTY }
 
+/**
+ * The document the slots of a composition's configs render from, null where none is drawn. A slot addressed under a
+ * surface reads [LocalLayoutGraph] instead.
+ *
+ * Dynamic, for the reason [LocalLayoutGraph] is: an edit replaces it on every frame of a gesture, and only the slots
+ * that read it should recompose.
+ */
+val LocalDocument: ProvidableCompositionLocal<Document?> =
+    compositionLocalOf { null }
+
 // Static: the registry is built once at startup and a module registering into it
 // is a whole-tree event, which is the case static is actually for.
 
@@ -57,7 +67,7 @@ val LocalWidgetRegistry: ProvidableCompositionLocal<WidgetRegistry> =
 // remove buttons. Keeps widget-api editor-agnostic; the implementation
 // lives in :client-ui.
 typealias WidgetDecorator = @Composable (
-    address: SlotAddress,
+    path: NodePath,
     index: Int,
     descriptor: WidgetDescriptor,
     instance: WidgetInstance,
@@ -109,7 +119,7 @@ val LocalWidgetEntrance: ProvidableCompositionLocal<WidgetEntrance> =
 // (production behavior: empty slot stays invisible). The editor swaps
 // in a placeholder that says "drop here" and registers the slot bounds
 // with the DropTargetRegistry, making empty slots valid drop targets.
-typealias EmptySlotDecorator = @Composable (address: SlotAddress) -> Unit
+typealias EmptySlotDecorator = @Composable (path: NodePath) -> Unit
 
 val LocalEmptySlotDecorator: ProvidableCompositionLocal<EmptySlotDecorator> =
     staticCompositionLocalOf { {} }
@@ -120,7 +130,7 @@ val LocalEmptySlotDecorator: ProvidableCompositionLocal<EmptySlotDecorator> =
 // disk (non-destructive). The editor swaps in an "unsupported widget" placeholder
 // so the user can see the orphan and remove it; the schema-bump prune reaps the
 // truly-dead ones. Kept editor-agnostic here; the implementation lives in :client-ui.
-typealias UnknownWidgetDecorator = @Composable (address: SlotAddress, index: Int, instance: WidgetInstance) -> Unit
+typealias UnknownWidgetDecorator = @Composable (path: NodePath, index: Int, instance: WidgetInstance) -> Unit
 
 val LocalUnknownWidgetDecorator: ProvidableCompositionLocal<UnknownWidgetDecorator> =
     staticCompositionLocalOf { { _, _, _ -> } }
@@ -160,7 +170,7 @@ val LocalHiddenWidget: ProvidableCompositionLocal<HiddenWidgetDecorator?> =
 // control displaced the edited content. Production default is the identity Modifier
 // (no cost). Returns a plain Modifier so no nx-ui / editor type crosses into
 // widget-api; the implementation lives in :client-ui.
-typealias SlotChromeModifier = (path: SlotPath, content: SlotContent) -> Modifier
+typealias SlotChromeModifier = (path: NodePath, content: SlotContent) -> Modifier
 
 val LocalSlotChromeModifier: ProvidableCompositionLocal<SlotChromeModifier> =
     staticCompositionLocalOf { { _, _ -> Modifier } }
@@ -168,10 +178,10 @@ val LocalSlotChromeModifier: ProvidableCompositionLocal<SlotChromeModifier> =
 // Current path the surrounding SlotRenderer is rendering. Container
 // widgets read this implicitly through the nested SlotRenderer
 // overload; chrome / empty-placeholder use it to register drop-target
-// bounds against the canonical path rather than just the leaf
-// (SurfaceId, SlotId) pair, so nested containers do not collide on the
-// registry. Must be inside a SlotRenderer to read.
-val LocalSlotPath: ProvidableCompositionLocal<SlotPath> =
+// bounds against the whole path rather than just the slot's own name,
+// so nested containers do not collide on the registry. Must be inside a
+// SlotRenderer to read.
+val LocalSlotPath: ProvidableCompositionLocal<NodePath> =
     staticCompositionLocalOf {
         error("LocalSlotPath not provided -- read inside a SlotRenderer body")
     }
@@ -443,7 +453,7 @@ val LocalMapControls: ProvidableCompositionLocal<MapControls> = staticCompositio
 // screen, clipped to the viewport, and is what a pointer can be over. [content]
 // is the whole placement box, most of it off screen, and is what a point converts
 // against: a drop on a page scrolled down by a screen lands a screen down.
-typealias SlotBoundsReporter = (path: SlotPath, visible: Rect, content: Rect) -> Unit
+typealias SlotBoundsReporter = (path: NodePath, visible: Rect, content: Rect) -> Unit
 
 val LocalSlotBoundsReporter: ProvidableCompositionLocal<SlotBoundsReporter> =
     staticCompositionLocalOf { { _, _, _ -> } }
@@ -451,5 +461,5 @@ val LocalSlotBoundsReporter: ProvidableCompositionLocal<SlotBoundsReporter> =
 // Editor-only, the other half of [LocalSlotBoundsReporter]: the slot that reported
 // under this path has left the composition. Without it a report outlived the screen
 // it described, and a drop near where that slot had been landed in it.
-val LocalSlotBoundsWithdrawal: ProvidableCompositionLocal<(SlotPath) -> Unit> =
+val LocalSlotBoundsWithdrawal: ProvidableCompositionLocal<(NodePath) -> Unit> =
     staticCompositionLocalOf { { _ -> } }

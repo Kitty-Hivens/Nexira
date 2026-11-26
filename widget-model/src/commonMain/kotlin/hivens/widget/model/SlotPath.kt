@@ -56,3 +56,16 @@ data class NestedSegment(
 )
 
 fun SlotAddress.toPath(): SlotPath = SlotPath(surface, slot)
+
+/**
+ * The same slot as a [NodePath], the address the slot renderer reads by. A surface belongs to no composition of a
+ * document, so every such path names the same empty one and two of them are equal exactly where the two [SlotPath]s
+ * are.
+ */
+fun SlotPath.toNodePath(): NodePath = NodePath(SURFACES, NodeRoot.Surface(surface, rootSlot, family), nested)
+
+/** The [SlotPath] of a slot addressed under a surface, or null for a slot of a document. */
+val NodePath.slotPath: SlotPath?
+    get() = (root as? NodeRoot.Surface)?.let { SlotPath(it.surface, it.slot, nested, it.family) }
+
+private val SURFACES = CompositionName("")

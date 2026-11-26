@@ -2,7 +2,9 @@ package hivens.widget.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
+import kotlin.test.assertSame
 
 class SlotPathTest {
 
@@ -88,5 +90,38 @@ class SlotPathTest {
         val general = SlotPath(surface, main)
         val project = SlotPath(surface, main, family = FamilyId("projectView"))
         kotlin.test.assertNotEquals(general, project)
+    }
+
+    @Test
+    fun `a slot path and its node path name the same slot`() {
+        val deep = SlotPath(surface, main, family = FamilyId("projectView")).child("c1", body)
+        assertEquals(deep, deep.toNodePath().slotPath)
+        assertEquals(deep.child("c2", main).toNodePath(), deep.toNodePath().child("c2", main))
+    }
+
+    @Test
+    fun `two node paths are equal exactly where their slot paths are`() {
+        val a = SlotPath(surface, main).child("c1", body)
+        assertEquals(a.toNodePath(), SlotPath(surface, main).child("c1", body).toNodePath())
+        assertNotEquals(a.toNodePath(), SlotPath(surface, main).child("c2", body).toNodePath())
+        assertNotEquals(a.toNodePath(), SlotPath(surface, main, family = FamilyId("projectView")).child("c1", body).toNodePath())
+    }
+
+    @Test
+    fun `a path into a document has no slot path`() {
+        assertNull(NodePath(CompositionName("launcher"), NodeRoot.Residents).slotPath)
+        assertNull(NodePath(CompositionName("launcher"), NodeRoot.Layout(ConfigId("home"), LayoutId("main"))).child("c1", body).slotPath)
+    }
+
+    @Test
+    fun `a document holds nothing under a surface and is not edited there`() {
+        val launcher = CompositionName("")
+        val document = Document(
+            start = launcher,
+            compositions = mapOf(launcher to Composition(start = ConfigId("home"), residents = SlotContent(widgets = listOf(WidgetInstance(WidgetKind("a"), "a"))))),
+        )
+        val path = SlotPath(surface, main).toNodePath()
+        assertNull(document.contentAt(path))
+        assertSame(document, document.edit(path) { SlotContent() })
     }
 }

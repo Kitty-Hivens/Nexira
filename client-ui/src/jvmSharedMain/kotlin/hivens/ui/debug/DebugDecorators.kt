@@ -12,6 +12,8 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.WidgetDecorator
+import hivens.widget.model.NodePath
+import hivens.widget.model.NodeRoot
 
 // Debug seams provided at the shell root, but only on non-release builds -- on a
 // release build the identity defaults below stand and nothing is wrapped. Both are
@@ -74,7 +76,7 @@ fun debugSlotChromeModifier(state: DebugOverlayState): SlotChromeModifier =
                 val axis = if (f.horizontal) "row" else "col"
                 if (f.wrap > 0) "$axis/${f.wrap}" else axis
             } ?: if (content.grid > 0) "grid/${content.grid}" else "free"
-            val label = "${path.leafSlot.value} [$mode]"
+            val label = "${slotName(path)} [$mode]"
             DisposableEffect(key) { onDispose { state.bounds.remove(key) } }
             Modifier.onGloballyPositioned { coords ->
                 if (state.enabled) {
@@ -83,3 +85,10 @@ fun debugSlotChromeModifier(state: DebugOverlayState): SlotChromeModifier =
             }
         }
     }
+
+/** The slot's own name: the one it has in its container, or the one its root gives it. */
+private fun slotName(path: NodePath): String = path.nested.lastOrNull()?.slot?.value ?: when (val root = path.root) {
+    is NodeRoot.Surface -> root.slot.value
+    is NodeRoot.Layout -> root.config.value
+    NodeRoot.Residents -> "residents"
+}

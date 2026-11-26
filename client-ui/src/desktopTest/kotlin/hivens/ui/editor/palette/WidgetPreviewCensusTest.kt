@@ -29,6 +29,7 @@ import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
+import hivens.widget.model.toNodePath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
@@ -88,7 +89,7 @@ class WidgetPreviewCensusTest {
             LocalWidgetCommandRegistry provides WidgetCommandRegistry(),
             LocalWidgetServiceRegistry provides WidgetServiceRegistry(),
             LocalWidgetStateHost provides NoState,
-            LocalSlotPath provides SlotPath(SurfaceId("home.new"), SlotId("main")),
+            LocalSlotPath provides SlotPath(SurfaceId("home.new"), SlotId("main")).toNodePath(),
             LocalWidgetSurfaceRenderer provides { spec, inner -> WidgetSurface(spec, inner) },
         ) {
             content()

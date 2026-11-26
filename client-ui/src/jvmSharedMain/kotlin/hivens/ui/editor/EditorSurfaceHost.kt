@@ -121,7 +121,6 @@ import hivens.widget.api.LocalSlotBoundsReporter
 import hivens.widget.api.LocalSlotBoundsWithdrawal
 import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalSlotMotionMs
-import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.LocalWidgetRegistry
@@ -137,10 +136,12 @@ import hivens.widget.model.FlowSpec
 import hivens.widget.model.FamilyId
 import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScreenSpec
+import hivens.widget.model.NodePath
 import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.screen
 import hivens.widget.model.screenOn
+import hivens.widget.model.slotPath
 import hivens.widget.model.traverse
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
@@ -448,12 +449,10 @@ fun EditorSurfaceHost(
     // suppresses all chrome so the user can see the real look without
     // leaving edit mode.
     //
-    // The decorator reads LocalSlotPath inside the @Composable lambda
-    // body (the lambda runs in composition because it's invoked from
-    // SlotRenderer's render path). The path identifies the full nested
+    // The path the slot renderer hands over identifies the full nested
     // address of the widget being rendered; chrome uses it both as the
     // registry key for drop-target bounds and to compose into nested
-    // slots correctly.
+    // slots correctly. Only a slot under a surface is arranged here.
     // When NOT editing, chain to whatever the shell root provided (the dev-debug
     // decorator, or identity) instead of hardcoding identity: this host wraps the
     // entire widget tree, so a hardcoded identity here shadows that root decorator
@@ -462,12 +461,12 @@ fun EditorSurfaceHost(
     val chromeDecorator: WidgetDecorator = remember(state, previewing, parentWidgetDecorator) {
         if (state is EditModeState.On && !previewing) {
             val selected = state.surface
-            decorator@{ address, index, descriptor, instance, content ->
-                if (address.surface != selected) {
+            decorator@{ nodePath, index, descriptor, instance, content ->
+                val path = nodePath.slotPath
+                if (path == null || path.surface != selected) {
                     content()
                     return@decorator
                 }
-                val path = LocalSlotPath.current
                 val graph = LocalLayoutGraph.current
                 // A slot that is not there at all reads as a plain column, which is
                 // what an absent slot has always rendered as. A slot that IS there
@@ -551,9 +550,8 @@ fun EditorSurfaceHost(
     // at the same (surface, slot) leaf coords.
     val emptyDecorator: EmptySlotDecorator = remember(state, registry, previewing) {
         if (state is EditModeState.On && !previewing) {
-            { _ ->
-                val path = LocalSlotPath.current
-                EmptySlotPlaceholder(path = path, registry = registry)
+            { nodePath ->
+                nodePath.slotPath?.let { EmptySlotPlaceholder(path = it, registry = registry) }
             }
         } else {
             {}
@@ -567,11 +565,11 @@ fun EditorSurfaceHost(
     // nothing and the instance keeps its props / children on disk.
     val unknownDecorator: UnknownWidgetDecorator = remember(state, previewing) {
         if (state is EditModeState.On && !previewing) {
-            { _, _, instance ->
-                val path = LocalSlotPath.current
+            { nodePath, _, instance ->
+                val path = nodePath.slotPath
                 UnsupportedWidgetPlaceholder(
                     instance = instance,
-                    onRemove = { controller.removeWidget(path, instance.instanceId) },
+                    onRemove = { if (path != null) controller.removeWidget(path, instance.instanceId) },
                 )
             }
         } else {
@@ -588,8 +586,9 @@ fun EditorSurfaceHost(
     val slotChromeFactory: SlotChromeModifier = remember(state, previewing, parentSlotChrome) {
         if (state is EditModeState.On && !previewing) {
             val selected = state.surface
-            { path, _ ->
-                if (path.surface == selected) {
+            { nodePath, _ ->
+                val path = nodePath.slotPath
+                if (path != null && path.surface == selected) {
                     slotChromeModifier(
                         path          = path,
                         selectedSlot  = selectedSlotState,
@@ -637,13 +636,13 @@ fun EditorSurfaceHost(
 
     val slotBoundsReporter: SlotBoundsReporter = remember(state, previewing, registry) {
         if (state is EditModeState.On && !previewing) {
-            { path, visible, content -> registry.registerSlot(path, visible, content) }
+            { path, visible, content -> path.slotPath?.let { registry.registerSlot(it, visible, content) } }
         } else {
             { _, _, _ -> }
         }
     }
 
-    val slotBoundsWithdrawal: (SlotPath) -> Unit = remember(registry) { { path -> registry.withdrawSlot(path) } }
+    val slotBoundsWithdrawal: (NodePath) -> Unit = remember(registry) { { path -> path.slotPath?.let { registry.withdrawSlot(it) } } }
 
     CompositionLocalProvider(
         LocalShellChromeBounds  provides chromeBounds,

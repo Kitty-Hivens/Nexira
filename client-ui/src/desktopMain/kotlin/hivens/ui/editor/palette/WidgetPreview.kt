@@ -54,6 +54,7 @@ import hivens.widget.api.resolveSurface
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotId
 import hivens.widget.model.SlotPath
+import hivens.widget.model.toNodePath
 import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
@@ -470,7 +471,7 @@ private fun fitToRaster(box: Size, density: Float): Size {
 /** A ceiling on the bitmap, so a widget declaring a huge preferred size costs a tile and not a screen. */
 private const val MAX_PX = 1024
 
-private val PREVIEW_PATH = SlotPath(SurfaceId("preview"), SlotId("preview"))
+private val PREVIEW_PATH = SlotPath(SurfaceId("preview"), SlotId("preview")).toNodePath()
 
 /**
  * One host per palette, holding its cache for as long as the palette is open.
