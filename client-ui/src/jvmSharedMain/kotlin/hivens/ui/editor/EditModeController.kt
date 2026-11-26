@@ -92,7 +92,7 @@ class EditModeController(
     // Every edit passes through here, so this is where it can be taken back.
     // Touched only from [writeDispatcher], which is single-threaded, so the
     // deques inside need no locking of their own.
-    private val history = EditHistory()
+    private val history = EditHistory<LayoutGraph>()
 
     // Whether an edit session is open, as the write thread sees it. Set by a write
     // queued behind every edit submitted before the session changed, so an edit

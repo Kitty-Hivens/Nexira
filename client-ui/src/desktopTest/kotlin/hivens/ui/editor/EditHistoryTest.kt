@@ -23,8 +23,7 @@ import kotlin.test.assertTrue
  */
 class EditHistoryTest {
 
-    private var clock = 0L
-    private fun history(limit: Int = 64) = EditHistory(limit = limit, now = { clock })
+    private fun history(limit: Int = 64) = EditHistory<LayoutGraph>(limit = limit)
 
     /** Graphs that differ by the number of widgets in one slot, so equality is cheap to reason about. */
     private fun graph(widgets: Int): LayoutGraph = LayoutGraph(
@@ -63,7 +62,6 @@ class EditHistoryTest {
             val next = graph(frame + 1)
             h.record("offset:w0", current, next)
             current = next
-            clock += 16
         }
 
         assertEquals(1, h.depth, "a drag is one thing the person did")
@@ -71,13 +69,13 @@ class EditHistoryTest {
     }
 
     @Test
-    fun `a gap longer than the window starts a new step`() {
+    fun `a gesture that ended is one step, and the next drag of the same widget another`() {
         val h = history()
         h.record("offset:w0", graph(0), graph(1))
-        clock += 5_000
+        h.close()
         h.record("offset:w0", graph(1), graph(2))
 
-        assertEquals(2, h.depth, "a pause long enough to be persisted separately is long enough to undo separately")
+        assertEquals(2, h.depth, "two drags of one widget are two things the person did, however quick")
     }
 
     @Test
@@ -92,7 +90,7 @@ class EditHistoryTest {
     @Test
     fun `a structural edit never merges`() {
         val h = history()
-        // Two drops in the same instant. Null key, so no coalescing whatever the clock says.
+        // Two drops one after the other. Null key, so no coalescing.
         h.record(key = null, before = graph(0), after = graph(1))
         h.record(key = null, before = graph(1), after = graph(2))
 
@@ -131,7 +129,7 @@ class EditHistoryTest {
         val h = history()
         h.record("offset:w0", graph(0), graph(1))
         h.undo(graph(1))
-        // Same key, same instant, but the run was broken by the undo.
+        // Same key, but the run was broken by the undo.
         h.record("offset:w0", graph(1), graph(2))
 
         assertEquals(1, h.depth)
@@ -158,7 +156,6 @@ class EditHistoryTest {
         val h = history()
         h.record(key = null, before = graph(5), after = graph(6))
         h.record("offset:w0", graph(6), graph(7))
-        clock += 16
         h.record("offset:w0", graph(7), graph(8))
 
         h.recordRestore(before = graph(8), after = graph(6))
