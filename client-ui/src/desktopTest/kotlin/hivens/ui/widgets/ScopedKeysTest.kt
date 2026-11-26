@@ -1,5 +1,9 @@
 package hivens.ui.widgets
 
+import hivens.widget.model.CompositionName
+import hivens.widget.model.Document
+import hivens.ui.layout.DocumentStore
+import hivens.ui.editor.DocumentEditor
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -11,11 +15,9 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import hivens.themes.Themes
-import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.onEventThread
 import hivens.ui.settle
@@ -60,7 +62,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.serialization.json.Json
 import java.nio.file.Files
 import org.jetbrains.skia.Bitmap
 import org.koin.dsl.koinApplication
@@ -238,12 +239,12 @@ class ScopedKeysTest {
 
     // ── The placeholder ───────────────────────────────────────────────
 
-    /** A controller over a layout file of its own, for an editor that is on. */
-    private fun editController(): EditModeController {
+    /** An editor over a document of its own, for an editor that is on. */
+    private fun editor(): DocumentEditor {
         val dir = Files.createTempDirectory("scoped-keys-test")
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-        val repo = LayoutGraphRepository(dir.resolve("layout-graph.json"), Json { ignoreUnknownKeys = true }, scope) { LayoutGraph.EMPTY }
-        return EditModeController(repo, scope)
+        val document = Document(start = CompositionName("test"))
+        return DocumentEditor(DocumentStore(dir.resolve("interface.json"), { document }), scope)
     }
 
     private val kind = WidgetKind("test.needy")
@@ -315,7 +316,7 @@ class ScopedKeysTest {
 
     @Test
     fun `the launcher's warning card draws in the theme in the editor, and nothing throws`() {
-        val editing = EditModeState.On(SurfaceId("s"), editController())
+        val editing = EditModeState.On(editor())
         val inked = onEventThread {
             val scene = ImageComposeScene(240, 80, density = Density(1f)) {
                 ShippedLanguageProvider("en") {

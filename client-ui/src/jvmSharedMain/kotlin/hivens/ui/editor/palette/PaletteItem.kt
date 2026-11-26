@@ -47,7 +47,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import hivens.ui.editor.EditModeController
+import hivens.ui.editor.DocumentEditor
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
@@ -59,15 +59,14 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.LocalMonoFamily
-import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalDocument
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.FlowSpec
+import hivens.widget.model.Placement
 import hivens.widget.model.ViewportMode
-import hivens.widget.model.latticeTransposed
 import hivens.widget.model.viewportMode
-import hivens.widget.model.seedPlacement
 import hivens.widget.model.WidgetSizing
-import hivens.widget.model.traverse
+import hivens.widget.model.contentAt
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 
@@ -83,7 +82,7 @@ fun PaletteItem(
     descriptor: WidgetDescriptor,
     controller: DragController,
     registry: DropTargetRegistry,
-    editController: EditModeController,
+    editor: DocumentEditor,
     previews: WidgetPreviewHost,
 ) {
     val interaction = remember { MutableInteractionSource() }
@@ -92,11 +91,9 @@ fun PaletteItem(
     // The drop handler lives inside a gesture the row starts once and never
     // restarts -- its pointerInput is keyed on the payload, which is the same
     // value for the row's whole life -- so a plain read here would freeze the
-    // graph at the first drag from this row. Every drop after that resolved the
-    // target slot's mode and widget count from a layout that had since
-    // moved on: three widgets from one row into a canvas all seeded from the same
-    // count and landed on top of each other.
-    val graph by rememberUpdatedState(LocalLayoutGraph.current)
+    // document at the first drag from this row and resolve every later drop
+    // against a slot that had since moved on.
+    val document by rememberUpdatedState(LocalDocument.current)
     val s = nexiraStrings()
     // Resolve the widget's label via key-indirection (see Strings.widgetLabel).
     val label = widgetLabel(descriptor.kind, descriptor.displayName)
@@ -126,15 +123,15 @@ fun PaletteItem(
                 },
                 onDragEnd             = { pointer ->
                     val targetPath = registry.slotForPoint(pointer) ?: return@dragSource
-                    val target = graph.traverse(targetPath)
+                    val target = document?.contentAt(targetPath)
                     if (target != null && target.flow == null) {
                         // A placement slot needs the widget to arrive somewhere, and
                         // where depends on what it measures in. A free slot takes the
                         // release point, converted from the window through the slot's
-                        // reported origin. A lattice takes the first free cell instead:
-                        // the pointer names a dp, and turning that into a cell needs
-                        // geometry this row does not have and the model already knows.
-                        val seed = seedPlacement(target.widgets.size, target.grid, target.widgets, target.latticeTransposed)
+                        // reported origin. A lattice takes the first free cell instead,
+                        // which the editor finds in the slot as it is when the drop
+                        // lands: the pointer names a dp, and turning that into a cell
+                        // needs geometry this row does not have and the model knows.
                         // The whole slot rather than the part on screen: on a page that
                         // has been scrolled, the slot's origin is above the window, and a
                         // drop converted against the visible top would land a scroll
@@ -145,7 +142,7 @@ fun PaletteItem(
                         val onMap = target.viewportMode == ViewportMode.Map
                         val placement = if (onMap && slotRect != null) {
                             val (xDp, yDp) = windowPointToSlotDp(pointer.x, pointer.y, slotRect.left, slotRect.top, density)
-                            seed.copy(x = xDp, y = yDp)
+                            Placement(x = xDp, y = yDp)
                         } else if (target.grid == 0 && slotRect != null) {
                             val (xDp, yDp) = windowPointToSlotDp(
                                 pointer.x, pointer.y, slotRect.left, slotRect.top, density,
@@ -162,18 +159,15 @@ fun PaletteItem(
                             // setting was then clipped by the size it arrived at.
                             // The resize handle does not need it either, it reads
                             // the measured bounds when there is no claim.
-                            seed.copy(
+                            Placement(
                                 x = xDp.coerceIn(0f, ((slotRect.width / density) - DROP_INSET_DP).coerceAtLeast(0f)),
                                 y = yDp.coerceIn(0f, ((slotRect.height / density) - DROP_INSET_DP).coerceAtLeast(0f)),
                             )
                         } else {
-                            seed
+                            null
                         }
-                        editController.addWidget(
-                            targetPath, descriptor.kind, descriptor.slots,
-                            index     = target.widgets.size,
-                            placement = placement,
-                        )
+                        // At the end, which is paint order on top, wherever the slot's end is when the drop lands.
+                        editor.add(targetPath, descriptor.kind, descriptor.slots, index = Int.MAX_VALUE, placement = placement)
                     } else {
                         val flow = target?.flow ?: FlowSpec.Column
                         val index = registry.insertionIndexInSlot(targetPath, pointer, flow)
@@ -181,7 +175,7 @@ fun PaletteItem(
                         // declaration whenever the instance names none, the same as for a
                         // widget the bundled layout places. A copy froze today's declaration
                         // into it and drifted the first time the widget's own changed.
-                        editController.addWidget(targetPath, descriptor.kind, descriptor.slots, index)
+                        editor.add(targetPath, descriptor.kind, descriptor.slots, index)
                     }
                 },
             )
@@ -378,12 +372,6 @@ private fun PaletteGhostChip(displayName: String) {
                     style      = MaterialTheme.typography.bodyMedium,
                     color      = ink,
                     fontWeight = FontWeight.SemiBold,
-                )
-                Spacer(Modifier.width(10.dp))
-                Text(
-                    text  = "→ drop",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = NxColor.wash(ink, 0.75f),
                 )
             }
         }

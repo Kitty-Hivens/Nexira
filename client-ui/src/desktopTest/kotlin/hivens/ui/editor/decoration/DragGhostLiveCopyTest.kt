@@ -17,28 +17,31 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.test.stopThenDelete
 import hivens.themes.Themes
-import hivens.ui.editor.EditModeController
+import hivens.ui.editor.DocumentEditor
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
-import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.editor.dnd.EditFocus
+import hivens.ui.layout.DocumentStore
 import hivens.ui.theme.NxThemed
 import hivens.widget.api.WidgetDescriptor
+import hivens.widget.model.CompositionName
+import hivens.widget.model.ConfigId
+import hivens.widget.model.Document
 import hivens.widget.model.FlowSpec
-import hivens.widget.model.LayoutGraph
-import hivens.widget.model.SlotId
-import hivens.widget.model.SlotPath
-import hivens.widget.model.SurfaceId
+import hivens.widget.model.LayoutId
+import hivens.widget.model.NodePath
+import hivens.widget.model.NodeRoot
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 /**
@@ -66,11 +69,11 @@ class DragGhostLiveCopyTest {
     @OptIn(ExperimentalComposeUiApi::class)
     @Test
     fun `dragging a widget does not compose a second copy of it`() {
-        val repo = LayoutGraphRepository(dir.resolve("layout.json"), Json, scope) { LayoutGraph.EMPTY }
-        val edit = EditModeController(repo, scope)
+        val composition = CompositionName("test")
+        val edit = DocumentEditor(DocumentStore(dir.resolve("interface.json"), { Document(start = composition) }), scope)
         val drag = DragController()
         val registry = DropTargetRegistry()
-        val path = SlotPath(SurfaceId("s"), SlotId("main"))
+        val path = NodePath(composition, NodeRoot.Layout(ConfigId("home"), LayoutId("main")))
         val instance = WidgetInstance(Descriptor.kind, "i1", JsonObject(emptyMap()))
 
         var live = 0
@@ -83,8 +86,9 @@ class DragGhostLiveCopyTest {
                     Column {
                         EditableWidgetChrome(
                             path = path, index = 0, descriptor = Descriptor, instance = instance,
-                            controller = drag, editController = edit, registry = registry,
-                            flow = FlowSpec(), onRemove = {}, onEditProps = {}, onCommitDrop = {},
+                            controller = drag, editor = edit, registry = registry, focus = EditFocus(),
+                            flow = FlowSpec(), dropTarget = null, dropIndex = -1,
+                            onRemove = {}, onEditProps = {}, onCommitDrop = {},
                         ) {
                             DisposableEffect(Unit) {
                                 live++
@@ -110,6 +114,44 @@ class DragGhostLiveCopyTest {
             }
             assertTrue(sawDrag, "the drag never started, so the test proved nothing")
             assertEquals(1, mostAtOnce, "copies of the widget composed at once during the drag")
+        } finally {
+            scene.close()
+        }
+    }
+
+    /** A fast first move crosses the slop a long way from the press, and the ghost has to stay where it was taken. */
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
+    fun `the ghost is held where the widget was pressed, however far the first move jumps`() {
+        val composition = CompositionName("test")
+        val edit = DocumentEditor(DocumentStore(dir.resolve("interface.json"), { Document(start = composition) }), scope)
+        val drag = DragController()
+        val path = NodePath(composition, NodeRoot.Layout(ConfigId("home"), LayoutId("main")))
+        val instance = WidgetInstance(Descriptor.kind, "i1", JsonObject(emptyMap()))
+        val scene = ImageComposeScene(width = 300, height = 300, density = Density(1f)) {
+            NxThemed(Themes.default, dark = true) {
+                Column {
+                    EditableWidgetChrome(
+                        path = path, index = 0, descriptor = Descriptor, instance = instance,
+                        controller = drag, editor = edit, registry = DropTargetRegistry(), focus = EditFocus(),
+                        flow = FlowSpec(), dropTarget = null, dropIndex = -1,
+                        onRemove = {}, onEditProps = {}, onCommitDrop = {},
+                    ) {
+                        Box(Modifier.size(100.dp))
+                    }
+                }
+            }
+        }
+        try {
+            var t = 0L
+            fun frame() { t += 16_000_000L; scene.render(t) }
+            frame()
+            scene.sendPointerEvent(PointerEventType.Press, Offset(30f, 40f))
+            frame()
+            scene.sendPointerEvent(PointerEventType.Move, Offset(30f, 240f))
+            frame()
+            val active = assertNotNull(drag.active, "the drag never started, so the test proved nothing")
+            assertEquals(Offset(0f, 200f), active.pointerInWindow - active.pickupOffset, "the ghost's corner, moved as far as the pointer")
         } finally {
             scene.close()
         }

@@ -17,27 +17,31 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.test.stopThenDelete
 import hivens.themes.Themes
-import hivens.ui.editor.EditModeController
+import hivens.ui.editor.DocumentEditor
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
-import hivens.ui.layout.LayoutGraphRepository
+import hivens.ui.editor.dnd.EditFocus
+import hivens.ui.layout.DocumentStore
 import hivens.ui.theme.NxThemed
 import hivens.widget.api.WidgetDescriptor
-import hivens.widget.model.LayoutGraph
+import hivens.widget.model.Composition
+import hivens.widget.model.CompositionName
+import hivens.widget.model.Config
+import hivens.widget.model.ConfigId
+import hivens.widget.model.ConfigLayout
+import hivens.widget.model.Document
+import hivens.widget.model.LayoutId
+import hivens.widget.model.NodePath
+import hivens.widget.model.NodeRoot
 import hivens.widget.model.Placement
 import hivens.widget.model.SlotContent
-import hivens.widget.model.SlotId
-import hivens.widget.model.SlotPath
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
-import hivens.widget.model.traverse
+import hivens.widget.model.contentAt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
-import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.nio.file.Files
 import kotlin.test.AfterTest
@@ -69,30 +73,24 @@ class CutGestureRestoreTest {
         override fun Render(instance: WidgetInstance) = Unit
     }
 
-    private val path = SlotPath(SurfaceId("s"), SlotId("main"))
+    private val composition = CompositionName("test")
+    private val path = NodePath(composition, NodeRoot.Layout(ConfigId("home"), LayoutId("main")))
     private val start = Placement(x = 10f, y = 10f)
     private val instance = WidgetInstance(Descriptor.kind, "i1", JsonObject(emptyMap()), placement = start)
 
-    private fun repo(): LayoutGraphRepository {
-        val repo = LayoutGraphRepository(dir.resolve("layout.json"), Json, scope) { LayoutGraph.EMPTY }
-        runBlocking {
-            repo.update {
-                LayoutGraph(surfaces = mapOf(
-                    SurfaceId("s") to SurfaceLayout(slots = mapOf(
-                        SlotId("main") to SlotContent(widgets = listOf(instance), flow = null),
-                    )),
-                ))
-            }
-        }
-        return repo
+    private fun store(): DocumentStore {
+        val root = SlotContent(widgets = listOf(instance), flow = null)
+        val config = Config(layouts = listOf(ConfigLayout(LayoutId("main"), root)))
+        val document = Document(start = composition, compositions = mapOf(composition to Composition(start = ConfigId("home"), configs = mapOf(ConfigId("home") to config))))
+        return DocumentStore(dir.resolve("interface.json"), { document }).also { it.takeOwn() }
     }
 
-    private fun LayoutGraphRepository.placement(): Placement? =
-        value().traverse(path)?.widgets?.single()?.placement
+    private fun DocumentStore.placement(): Placement? =
+        document.value.contentAt(path)?.widgets?.single()?.placement
 
     /** Presses the widget, drags it, and then lets go or takes the chrome away mid-drag. */
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun drag(repo: LayoutGraphRepository, edit: EditModeController, letGo: Boolean) {
+    private fun drag(store: DocumentStore, edit: DocumentEditor, letGo: Boolean) {
         var shown by mutableStateOf(true)
         val drag = DragController()
         val registry = DropTargetRegistry()
@@ -102,8 +100,9 @@ class CutGestureRestoreTest {
                     if (shown) {
                         EditableWidgetChrome(
                             path = path, index = 0, descriptor = Descriptor, instance = instance,
-                            controller = drag, editController = edit, registry = registry,
-                            flow = null, onRemove = {}, onEditProps = {}, onCommitDrop = {},
+                            controller = drag, editor = edit, registry = registry, focus = EditFocus(),
+                            flow = null, dropTarget = null, dropIndex = -1,
+                            onRemove = {}, onEditProps = {}, onCommitDrop = {},
                         ) {
                             Box(Modifier.size(100.dp))
                         }
@@ -122,7 +121,7 @@ class CutGestureRestoreTest {
                 frame()
             }
             runBlocking { edit.awaitWrites() }
-            assertNotEquals(start, repo.placement(), "the drag never moved the widget, so the test proved nothing")
+            assertNotEquals(start, store.placement(), "the drag never moved the widget, so the test proved nothing")
 
             if (letGo) {
                 scene.sendPointerEvent(PointerEventType.Release, Offset(100f, 90f))
@@ -140,25 +139,25 @@ class CutGestureRestoreTest {
 
     @Test
     fun `a drag cut short puts the widget back and leaves nothing to undo`() {
-        val repo = repo()
-        val edit = EditModeController(repo, scope)
+        val store = store()
+        val edit = DocumentEditor(store, scope)
         edit.reportEditing(true)
 
-        drag(repo, edit, letGo = false)
+        drag(store, edit, letGo = false)
 
-        assertEquals(start, repo.placement())
+        assertEquals(start, store.placement())
         assertFalse(edit.canUndo, "undo would only lead back into the move that was abandoned")
     }
 
     @Test
     fun `a drag let go keeps its move as one step`() {
-        val repo = repo()
-        val edit = EditModeController(repo, scope)
+        val store = store()
+        val edit = DocumentEditor(store, scope)
         edit.reportEditing(true)
 
-        drag(repo, edit, letGo = true)
+        drag(store, edit, letGo = true)
 
-        assertEquals(Placement(x = 60f, y = 50f), repo.placement())
+        assertEquals(Placement(x = 60f, y = 50f), store.placement())
         assertTrue(edit.canUndo)
     }
 }

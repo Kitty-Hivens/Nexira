@@ -21,21 +21,14 @@ import androidx.compose.foundation.gestures.awaitLongPressOrCancellation
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.drag
-import androidx.compose.foundation.hoverable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -82,7 +75,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EdgeAutoScroll
-import hivens.ui.editor.EditModeController
+import hivens.ui.editor.DocumentEditor
 import hivens.ui.editor.ResizeBounds
 import hivens.ui.editor.ResizeEdge
 import hivens.ui.editor.canvasResize
@@ -93,6 +86,9 @@ import hivens.ui.editor.gridResizeSpan
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
+import hivens.ui.editor.dnd.EditFocus
+import hivens.ui.editor.dnd.WidgetKey
+import hivens.ui.editor.dnd.pressBelongsTo
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.nx.NxAlertDialog
@@ -101,7 +97,7 @@ import hivens.ui.nx.NxMenuItem
 import hivens.ui.theme.Motion
 import hivens.widget.api.LocalPlacementSlotSizeDp
 import hivens.widget.api.LocalGridGeometry
-import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalDocument
 import hivens.widget.api.LocalPlacementBounds
 import hivens.widget.api.LocalViewport
 import hivens.widget.api.WidgetDescriptor
@@ -113,41 +109,47 @@ import hivens.widget.model.anchorHorizontalBias
 import hivens.widget.model.anchorVerticalBias
 import hivens.widget.model.clampPlacementAxis
 import hivens.widget.model.parseAnchor
-import hivens.widget.model.SlotPath
+import hivens.widget.model.NodePath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.ViewportMode
-import hivens.widget.model.traverse
+import hivens.widget.model.contentAt
 import hivens.widget.model.viewportMode
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status
 
-// Wraps a single widget with edit-mode chrome: whole-body drag overlay,
-// remove button (hover-only, hidden when non-removable), configure "tune"
-// gear (hover -- opens props + the universal backing controls), a resize
-// handle, faint border outline, and a drop indicator.
+// Wraps a single widget with edit-mode chrome: whole-body drag surface, resize
+// handles while it is the widget meant ([EditFocus]), a faint border outline,
+// and a drop indicator drawn on its own edge.
 //
-// The chrome follows the slot's mode. In a vertical flow it wraps in a Column
-// with horizontal drop bars above and below; in an unwrapped horizontal flow, a
-// Row with vertical bars; in a placement slot, neither, because an insertion
-// index means nothing where position is stored rather than derived. The hover
-// affordances live in a Box-scoped inner section so they use plain BoxScope
-// `.align` whatever the outer wrapper turned out to be.
+// Nothing of it changes the layout: the outline, the guides and the drop
+// indicator are drawn over the widget's own bounds, so the arrangement being
+// edited is the arrangement as it shows. In a flow the indicator is a bar on the
+// leading or the trailing edge, in a placement slot there is none, because an
+// insertion index means nothing where position is stored rather than derived.
 //
-// The whole wrapper is also a drop-target bounds-reporter for its own
-// rect -- the registry uses this to compute insertion-index hit-tests
-// during a drag.
+// A widget that holds slots of its own lays its drag surface under what it holds,
+// so a press on a widget or a slot inside it reaches that and only a press on
+// the container's own body moves the container. A leaf lays it over its content,
+// so a press arranges the widget rather than operating it.
+//
+// The wrapper also reports its own rect, which tells where in its slot a drop
+// goes and which widget the pointer is over.
 @Composable
 fun EditableWidgetChrome(
-    path: SlotPath,
+    path: NodePath,
     index: Int,
     descriptor: WidgetDescriptor,
     instance: WidgetInstance,
     controller: DragController,
-    editController: EditModeController,
+    editor: DocumentEditor,
     registry: DropTargetRegistry,
+    focus: EditFocus,
+    /** The slot's arrangement, and the drop target the host worked out for the drag under way: one answer per frame. */
     flow: FlowSpec?,
+    dropTarget: NodePath?,
+    dropIndex: Int,
     onRemove: () -> Unit,
     onEditProps: () -> Unit,
     onCommitDrop: (committedPointer: Offset) -> Unit,
@@ -156,9 +158,9 @@ fun EditableWidgetChrome(
     val s = nexiraStrings()
     val haptics = LocalHapticFeedback.current
     val chromeMotionMs = Motion.fade.durationMs
-    val interaction = remember { MutableInteractionSource() }
-    val isHovered by interaction.collectIsHoveredAsState()
-    val touchSelected = editController.touchSelected.value == instance.instanceId
+    val key = WidgetKey(path, instance.instanceId)
+    val isHovered = focus.hovered == key
+    val touchSelected = focus.touched == key
     var widgetWindowBounds by remember { mutableStateOf<Rect?>(null) }
     // The widget's own measured size, unclipped by ancestors. boundsInWindow is
     // intersected with every clipping parent, so a widget bleeding past the content
@@ -169,7 +171,7 @@ fun EditableWidgetChrome(
     var forceRemoveOpen by remember { mutableStateOf(false) }
     val activeDrag = controller.active
     val isThisDragging = (activeDrag?.payload as? DragPayload.ExistingWidget)
-        ?.instance?.instanceId == instance.instanceId
+        ?.let { it.source == path && it.instance.instanceId == instance.instanceId } == true
 
     val isRow = flow?.rowLike == true
     val resizable = flow?.uniformGrid != true
@@ -177,6 +179,8 @@ fun EditableWidgetChrome(
     // cells or in dp is the lattice geometry's answer, published by the renderer
     // and null when the slot is free.
     val isPlaced = flow == null
+    // A widget that holds slots: what is inside it gets the press before its own body does.
+    val container = descriptor.slots.isNotEmpty()
     // Live placement read from inside the long-lived drag gesture: the
     // pointerInput is keyed only on instanceId so it does not restart
     // mid-drag, and without this the gesture would capture a stale start
@@ -189,7 +193,9 @@ fun EditableWidgetChrome(
     // latest values. Null in a free placement slot, where the unit is already the
     // dp. latticeDrag is the in-flight visual translation, committed to a cell on
     // release.
-    val gridGeo = rememberUpdatedState(LocalGridGeometry.current)
+    // Only a placement slot publishes it. A flow inside a container that stands in a lattice reads its parent's, which
+    // is not about this widget.
+    val gridGeo = rememberUpdatedState(if (isPlaced) LocalGridGeometry.current else null)
     // Same reason, for the values the flow-reorder branch hands on: a gesture that
     // does not restart between drags would announce the position the widget held
     // when it was first dragged, and commit through the host's first drop handler
@@ -238,19 +244,13 @@ fun EditableWidgetChrome(
     // Cursor anchor for the right-click context menu (null = closed).
     var menuAnchor by remember { mutableStateOf<Offset?>(null) }
 
-    // Drop-indicator hit test. Reading controller.active recomposes on
-    // every pointer update; traverse + registry queries are O(depth +
-    // widgets-in-slot) and cheap enough to do per-frame for the few
-    // dozen widgets a surface can hold.
-    val graph = LocalLayoutGraph.current
-    val slotCount = graph.traverse(path)?.widgets?.size ?: 0
+    // The drop indicator, from the target the host works out once per frame for every widget.
+    val slotCount = LocalDocument.current?.contentAt(path)?.widgets?.size ?: 0
     val isLastInSlot = index == slotCount - 1
-    val dropTargetPath = activeDrag?.let { registry.slotForPoint(it.pointerInWindow) }
-    val dropInsertionIdx = if (activeDrag != null && dropTargetPath == path) {
-        registry.insertionIndexInSlot(path, activeDrag.pointerInWindow, flow)
-    } else -1
-    val showIndicatorBefore = dropInsertionIdx == index
-    val showIndicatorAfter  = isLastInSlot && dropInsertionIdx == slotCount
+    val dropInsertionIdx = if (dropTarget == path) dropIndex else -1
+    val showIndicatorBefore = !isPlaced && dropInsertionIdx == index
+    val showIndicatorAfter  = !isPlaced && isLastInSlot && dropInsertionIdx == slotCount
+    val indicatorColor = NxColor.lead()
 
     // Nesting depth -> subtle border alpha boost. Depth 0 (root surface
     // slot) keeps the original 0.18/0.55 alpha; each level adds 0.06
@@ -293,15 +293,15 @@ fun EditableWidgetChrome(
     // Captured here because NxColor.lead() is a @Composable read. The draw lambda
     // applies the animated alpha (a snapshot read, so it redraws without recomposing).
     val borderColor = NxColor.lead()
-    // The corner the resize pivots on, which is the corner the guides hang from.
-    val guideAnchor = instance.placement?.anchor ?: Placement.TOP_START
+    // The corner the resize pivots on, which is the corner the guides hang from: the origin on a map.
+    val guideAnchor = anchorOf(instance.placement)
     val hBiasForGuides = anchorHorizontalBias(parseAnchor(guideAnchor))
     val vBiasForGuides = anchorVerticalBias(parseAnchor(guideAnchor))
 
     // Being landed on. Free placement lets widgets overlap and will keep letting
     // them, so this is the warning and not a refusal: the border turns while the
     // gesture is live, and where it goes is still the person's call.
-    val isOverlapped = instance.instanceId in registry.overlapped
+    val isOverlapped = key in registry.overlapped
     val overlapColor = NxColor.status(Status.Error)
     val overlapAlpha by animateFloatAsState(
         targetValue   = if (isOverlapped) 0.9f else 0f,
@@ -323,7 +323,6 @@ fun EditableWidgetChrome(
                 .then(if (isPlaced && gridGeo.value != null) Modifier.fillMaxSize() else Modifier)
                 // Live lattice-move translation; zero except while dragging in one.
                 .graphicsLayer { translationX = latticeDrag.x; translationY = latticeDrag.y }
-                .hoverable(interaction)
                 // Hover border drawn INSIDE the widget's own bounds (drawWithContent,
                 // not Modifier.border on a padded box) so edit mode never reflows the
                 // layout -- the old padding(4) + padding(2) added ~12dp per widget and
@@ -397,6 +396,20 @@ fun EditableWidgetChrome(
                             style        = Stroke(width = warn),
                         )
                     }
+                    // Where a drop lands, on this widget's own edge, so showing it moves nothing.
+                    if (showIndicatorBefore || showIndicatorAfter) {
+                        val bar = 2.dp.toPx()
+                        val inset = 4.dp.toPx()
+                        fun bar(after: Boolean) = if (isRow) {
+                            val x = if (after) size.width - bar else 0f
+                            drawRect(indicatorColor, Offset(x, inset), Size(bar, size.height - 2 * inset))
+                        } else {
+                            val y = if (after) size.height - bar else 0f
+                            drawRect(indicatorColor, Offset(inset, y), Size(size.width - 2 * inset, bar))
+                        }
+                        if (showIndicatorBefore) bar(after = false)
+                        if (showIndicatorAfter) bar(after = true)
+                    }
                 }
                 .onGloballyPositioned { coords: LayoutCoordinates ->
                     // Register the widget's own bounds for the drop hit-test.
@@ -409,26 +422,29 @@ fun EditableWidgetChrome(
                     registry.registerWidget(path, instance.instanceId, index, rect)
                 },
         ) {
-            Box(
-                Modifier
-                    .alpha(sourceAlpha)
-                    .drawWithContent {
-                        contentLayer.record { this@drawWithContent.drawContent() }
-                        drawLayer(contentLayer)
-                    },
-            ) { content() }
+            val drawn: @Composable () -> Unit = {
+                Box(
+                    Modifier
+                        .alpha(sourceAlpha)
+                        .drawWithContent {
+                            contentLayer.record { this@drawWithContent.drawContent() }
+                            drawLayer(contentLayer)
+                        },
+                ) { content() }
+            }
+            // A leaf's content lies under its drag surface: a press arranges the widget rather than operating it.
+            if (!container) drawn()
 
-            // Whole-widget drag surface -- no separate handle. A press anywhere
-            // on the body (above the content, below the hover affordances) drags
-            // the widget: reorder in a flow slot, absolute move on a Canvas slot.
-            // The gesture consumes the press, so the widget's own controls stay
-            // inert while editing -- you arrange the widget, you do not operate
-            // it. The corner affordances sit above this overlay and still tap.
+            // The whole widget is the drag surface, there is no separate handle. A
+            // press anywhere on the body drags the widget: reorder in a flow slot,
+            // absolute move in a placement slot. The gesture consumes the press, so
+            // a leaf's own controls stay inert while editing: the widget is arranged,
+            // not operated. The resize handles sit above it and still take theirs.
             Box(
                 Modifier
                     .matchParentSize()
                     .dragCursor(moving)
-                    .pointerInput(instance.instanceId) {
+                    .pointerInput(instance.instanceId, path) {
                         // Right-click detection. The drag gesture below starts with
                         // awaitFirstDown, which fires ONLY on the primary (left) button --
                         // so a bare right-click never reached the widget and fell through to
@@ -440,9 +456,11 @@ fun EditableWidgetChrome(
                             while (true) {
                                 val event = awaitPointerEvent()
                                 val change = event.changes.firstOrNull() ?: continue
-                                if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed && !change.isConsumed) {
+                                if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed && !change.isConsumed &&
+                                    pressBelongsTo(key, registry.widgetForPoint(widgetOrigin + change.position))
+                                ) {
                                     change.consume()
-                                    widgetWindowBounds?.let { menuAnchor = it.topLeft + change.position }
+                                    menuAnchor = widgetOrigin + change.position
                                 }
                             }
                         }
@@ -458,15 +476,17 @@ fun EditableWidgetChrome(
                             // and resize handle stacked above (each consumes its
                             // own press), so resizing does not also drag the body.
                             val down = awaitFirstDown(requireUnconsumed = true)
+                            // A press that reached this layer and others is the named widget's, left unconsumed for it.
+                            if (!pressBelongsTo(key, registry.widgetForPoint(widgetOrigin + down.position))) return@awaitEachGesture
                             // Claim the press so a tap never reaches the content.
                             down.consume()
                             if (down.type == PointerType.Touch) {
-                                editController.selectByTouch(instance.instanceId)
+                                focus.touched = key
                                 // A finger holding still is the right click: it opens the widget's menu.
                                 // Moving cancels the wait and the drag below takes over.
                                 if (awaitLongPressOrCancellation(down.id) != null) {
                                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    widgetWindowBounds?.let { menuAnchor = it.topLeft + down.position }
+                                    menuAnchor = widgetOrigin + down.position
                                     waitForUpOrCancellation()
                                     return@awaitEachGesture
                                 }
@@ -508,7 +528,7 @@ fun EditableWidgetChrome(
                                     // frame, so they put back the placement they started from.
                                     try {
                                         moving = true
-                                        drag(down.id) { change ->
+                                        val released = drag(down.id) { change ->
                                             acc += change.positionChange()
                                             pointer += change.positionChange()
                                             autoScroll.move(pointer)
@@ -516,18 +536,21 @@ fun EditableWidgetChrome(
                                             change.consume()
                                         }
                                         autoScroll.stop()
-                                        gridGeo.value?.let { geo ->
-                                            val (col, row) = gridDragCell(
-                                                start.x.toInt(), start.y.toInt(),
-                                                acc.x * signX, acc.y * signY, density,
-                                                geo.cellDp, geo.gutterDp, geo.columns, geo.transposed,
-                                            )
-                                            editController.moveWidgetInGrid(path, instance.instanceId, col, row, geo.columns)
+                                        if (released) {
+                                            gridGeo.value?.let { geo ->
+                                                val (col, row) = gridDragCell(
+                                                    start.x.toInt(), start.y.toInt(),
+                                                    acc.x * signX, acc.y * signY, density,
+                                                    geo.cellDp, geo.gutterDp, geo.columns, geo.transposed,
+                                                )
+                                                editor.moveInGrid(path, instance.instanceId, col, row, geo.columns)
+                                            }
                                         }
                                     } finally {
                                         moving = false
                                         autoScroll.stop()
                                         latticeDrag = Offset.Zero
+                                        editor.closeStep()
                                     }
                                 }
                                 isPlaced -> {
@@ -562,7 +585,7 @@ fun EditableWidgetChrome(
                                     autoScroll.start(pointer) { moved ->
                                         curX += moved.x / density * signX
                                         curY += moved.y / density * signY
-                                        editController.setWidgetOffset(path, instance.instanceId, curX, curY)
+                                        editor.offset(path, instance.instanceId, curX, curY)
                                         wrote = true
                                     }
                                     try {
@@ -585,7 +608,7 @@ fun EditableWidgetChrome(
                                             )
                                             curX = nx
                                             curY = ny
-                                            editController.setWidgetOffset(path, instance.instanceId, nx, ny)
+                                            editor.offset(path, instance.instanceId, nx, ny)
                                             wrote = true
                                             // Who this is currently on top of, said while the
                                             // gesture is live. The bounds are a frame behind the
@@ -600,7 +623,8 @@ fun EditableWidgetChrome(
                                         moving = false
                                         autoScroll.stop()
                                         registry.publishOverlap(emptySet())
-                                        if (wrote && !released) editController.restoreWidgetPlacement(path, instance.instanceId, p)
+                                        if (wrote && !released) editor.restorePlacement(path, instance.instanceId, p)
+                                        editor.closeStep()
                                     }
                                 }
                                 else -> {
@@ -611,33 +635,30 @@ fun EditableWidgetChrome(
                                     val bounds = widgetWindowBounds ?: return@awaitEachGesture
                                     controller.begin(
                                         payload         = DragPayload.ExistingWidget(path, liveIndex.value, liveInstance.value),
-                                        pointerInWindow = bounds.topLeft + slop.position,
-                                        pickupOffset    = slop.position,
+                                        pointerInWindow = widgetOrigin + slop.position,
+                                        // Held where it was pressed, not where the slop was crossed: after a fast first move
+                                        // the two are a jump apart and the ghost trailed the pointer by it.
+                                        pickupOffset    = down.position,
                                         widgetSize      = Offset(bounds.width, bounds.height),
                                         ghost           = { RecordedGhost(contentLayer) },
                                     )
-                                    // Accumulated from the start, not re-read from the
-                                    // widget's live bounds each frame. The drop indicator
-                                    // is a real layout child, so the moment the hit-test
-                                    // names this slot the widget shifts by its height --
-                                    // and a pointer measured against the widget's own
-                                    // origin then jumped by that much, flipping the
-                                    // hit-test back. The two branches above already do it
-                                    // this way; this one was the odd one out.
-                                    var last = bounds.topLeft + slop.position
+                                    // Accumulated from the start, not re-read from the widget's live bounds each frame: the
+                                    // widget moves while it is dragged (the page scrolls under it, a neighbour reflows), and
+                                    // a pointer measured against its own origin would report that movement as the person's.
+                                    var last = widgetOrigin + slop.position
                                     // Nothing to carry along: the ghost follows the pointer on
                                     // screen, and the drop is read off where the slots are,
                                     // which moves with the page by itself.
                                     autoScroll.start(last) { }
                                     try {
-                                        drag(slop.id) { change ->
+                                        val released = drag(slop.id) { change ->
                                             last += change.positionChange()
                                             autoScroll.move(last)
                                             controller.update(last)
                                             change.consume()
                                         }
                                         autoScroll.stop()
-                                        liveCommitDrop.value(last)
+                                        if (released) liveCommitDrop.value(last)
                                     } finally {
                                         autoScroll.stop()
                                         controller.end()
@@ -647,6 +668,8 @@ fun EditableWidgetChrome(
                         }
                     },
             )
+            // A container's body lies over its drag surface, so what it holds gets the press first.
+            if (container) drawn()
 
             // Resize handles (hover-only). In a placement slot they size the widget,
             // in dp or in whole cells depending on what the slot measures in; in an
@@ -666,7 +689,12 @@ fun EditableWidgetChrome(
             // disturb a neighbour, so a leading edge there is a different gesture
             // rather than the same one mirrored. Free placement is what the shell
             // ships and what this is for.
-            val edges = if (gridGeo.value != null) listOf(ResizeEdge.SouthEast) else ResizeEdge.entries
+            // A flow decides where a widget starts, so only the trailing edges, which change its size, are offered there.
+            val edges = when {
+                gridGeo.value != null -> listOf(ResizeEdge.SouthEast)
+                !isPlaced -> if (isRow) listOf(ResizeEdge.East) else listOf(ResizeEdge.South, ResizeEdge.SouthEast, ResizeEdge.East)
+                else -> ResizeEdge.entries
+            }
             edges.forEach { edge ->
                 AnimatedVisibility(
                     visible  = (isHovered || touchSelected) && resizable,
@@ -746,7 +774,7 @@ fun EditableWidgetChrome(
                                                 accX, accY, density,
                                                 geo.cellDp, geo.gutterDp, geo.columns, geo.transposed,
                                             )
-                                            editController.resizeWidgetInGrid(path, instance.instanceId, cw, ch, geo.columns)
+                                            editor.resizeInGrid(path, instance.instanceId, cw, ch, geo.columns)
                                         } else {
                                             val slot = liveSlotSize.value
                                             // Read live off the unclipped layout: the widget
@@ -776,9 +804,9 @@ fun EditableWidgetChrome(
                                             )
                                             // One write, so the offset and the size cannot
                                             // land a frame apart and the history sees one step.
-                                            editController.setWidgetBounds(
-                                                path, instance.instanceId, r.x, r.y, r.w, r.h,
-                                            )
+                                            // In a flow only the size: where it starts is the flow's.
+                                            if (isPlaced) editor.bounds(path, instance.instanceId, r.x, r.y, r.w, r.h)
+                                            else editor.size(path, instance.instanceId, r.w, r.h)
                                             registry.publishOverlap(
                                                 widgetWindowBounds
                                                     ?.let { registry.overlapping(path, it, instance.instanceId) }
@@ -807,7 +835,8 @@ fun EditableWidgetChrome(
                                         autoScroll.stop()
                                         resizing = false
                                         registry.publishOverlap(emptySet())
-                                        if (wrote && !released) editController.restoreWidgetPlacement(path, instance.instanceId, p)
+                                        if (wrote && !released) editor.restorePlacement(path, instance.instanceId, p)
+                                        editor.closeStep()
                                     }
                                 }
                             },
@@ -840,22 +869,7 @@ fun EditableWidgetChrome(
         }
     }
 
-    when {
-        // Canvas: the widget is positioned by SlotRenderer's outer offset Box.
-        // No flow wrapper and no drop bars -- insertion index is meaningless
-        // under free placement.
-        isPlaced -> widgetBox()
-        isRow -> Row(modifier = Modifier.fillMaxHeight(), verticalAlignment = Alignment.Top) {
-            if (showIndicatorBefore) DropIndicator(isRow = true)
-            widgetBox()
-            if (showIndicatorAfter) DropIndicator(isRow = true)
-        }
-        else -> Column(modifier = Modifier.fillMaxWidth()) {
-            if (showIndicatorBefore) DropIndicator(isRow = false)
-            widgetBox()
-            if (showIndicatorAfter) DropIndicator(isRow = false)
-        }
-    }
+    widgetBox()
 
     // Right-click context menu (replaces the old hover affordance buttons): the
     // widget's actions, anchored at the cursor. Any secondary press opens it,
@@ -868,7 +882,7 @@ fun EditableWidgetChrome(
                 removable      = descriptor.removable,
                 path           = path,
                 instanceId     = instance.instanceId,
-                editController = editController,
+                editor         = editor,
                 onConfigure    = { menuAnchor = null; onEditProps() },
                 onRemove       = { menuAnchor = null; onRemove() },
                 onForceRemove  = { menuAnchor = null; forceRemoveOpen = true },
@@ -916,34 +930,30 @@ private fun WidgetContextMenuContent(
     isPlaced: Boolean,
     anchorsIgnored: Boolean,
     removable: Boolean,
-    path: SlotPath,
+    path: NodePath,
     instanceId: String,
-    editController: EditModeController,
+    editor: DocumentEditor,
     onConfigure: () -> Unit,
     onRemove: () -> Unit,
     onForceRemove: () -> Unit,
     onClose: () -> Unit,
 ) {
     val s = nexiraStrings()
-    val graph = LocalLayoutGraph.current
     NxMenuItem(s.text("editorConfigure")) { onConfigure() }
     // Only where something moves: in a slot that does not, a widget is already
     // where it stays, and the item would do nothing anybody could see.
-    val slot = graph.traverse(path)
+    val slot = LocalDocument.current?.contentAt(path)
     if (slot != null && slot.viewportMode != ViewportMode.Static) {
         val pinned = slot.widgets.firstOrNull { it.instanceId == instanceId }?.placement?.pinned == true
         NxMenuItem(if (pinned) s.text("editorUnpin") else s.text("editorPin")) {
-            editController.setWidgetPinned(path, instanceId, !pinned); onClose()
+            editor.pinned(path, instanceId, !pinned); onClose()
         }
     }
     if (isPlaced) {
         // The corner an offset is measured from. It is the whole reason a widget
         // parked at the bottom right survives a window that grows, and until now
         // the only way to set it was to edit the layout file by hand.
-        val current = parseAnchor(
-            graph.traverse(path)?.widgets?.firstOrNull { it.instanceId == instanceId }?.placement?.anchor
-                ?: Placement.TOP_START,
-        )
+        val current = parseAnchor(slot?.widgets?.firstOrNull { it.instanceId == instanceId }?.placement?.anchor ?: Placement.TOP_START)
         // Not on a map: every widget there counts from the plane's origin, so a
         // corner picked here would change nothing anybody could see.
         if (!anchorsIgnored) {
@@ -953,15 +963,15 @@ private fun WidgetContextMenuContent(
                 color    = NxInk.quiet,
                 modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 2.dp),
             )
-            AnchorGrid(current) { editController.setWidgetAnchor(path, instanceId, it); onClose() }
+            AnchorGrid(current) { editor.anchor(path, instanceId, it); onClose() }
         }
         NxMenuItem(s.text("editorToFront")) {
-            val maxZ = graph.traverse(path)?.widgets?.maxOfOrNull { it.placement?.z ?: 0 } ?: 0
-            editController.setWidgetZ(path, instanceId, maxZ + 1); onClose()
+            val maxZ = slot?.widgets?.maxOfOrNull { it.placement?.z ?: 0 } ?: 0
+            editor.z(path, instanceId, maxZ + 1); onClose()
         }
         NxMenuItem(s.text("editorToBack")) {
-            val minZ = graph.traverse(path)?.widgets?.minOfOrNull { it.placement?.z ?: 0 } ?: 0
-            editController.setWidgetZ(path, instanceId, minZ - 1); onClose()
+            val minZ = slot?.widgets?.minOfOrNull { it.placement?.z ?: 0 } ?: 0
+            editor.z(path, instanceId, minZ - 1); onClose()
         }
     }
     if (removable) NxMenuItem(s.text("editorDelete")) { onRemove() }
@@ -1027,29 +1037,6 @@ private fun anchorLabel(anchor: String, s: Strings): String = when (anchor) {
 private fun RecordedGhost(layer: GraphicsLayer) {
     val size = with(LocalDensity.current) { DpSize(layer.size.width.toDp(), layer.size.height.toDp()) }
     Spacer(Modifier.size(size).drawBehind { drawLayer(layer) })
-}
-
-// Drop insertion bar. Horizontal (full width, 2dp tall) for a Column
-// slot; vertical (full height, 2dp wide) for a Row slot.
-@Composable
-private fun DropIndicator(isRow: Boolean) {
-    if (isRow) {
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .width(2.dp)
-                .padding(vertical = 4.dp)
-                .background(NxColor.lead()),
-        )
-    } else {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(2.dp)
-                .padding(horizontal = 4.dp)
-                .background(NxColor.lead()),
-        )
-    }
 }
 
 // ── Resize handles ───────────────────────────────────────────────────

@@ -25,7 +25,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.input.pointer.PointerEvent
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.isPrimaryPressed
@@ -33,8 +35,15 @@ import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.node.ModifierNodeElement
+import androidx.compose.ui.node.PointerInputModifierNode
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.snapshotFlow
+import hivens.ui.editor.dnd.DropTargetRegistry
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import hivens.i18n.api.Strings
 import hivens.ui.i18n.nexiraStrings
@@ -47,13 +56,13 @@ import hivens.ui.nx.NxMenuItem
 import hivens.ui.press.clickable
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
-import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalDocument
 import hivens.widget.model.SlotContent
 import hivens.widget.model.FlowSpec
-import hivens.widget.model.SlotPath
+import hivens.widget.model.NodePath
 import hivens.widget.model.ViewportMode
 import hivens.widget.model.ViewportSpec
-import hivens.widget.model.traverse
+import hivens.widget.model.contentAt
 import hivens.widget.model.viewportMode
 import kotlin.math.roundToInt
 import hivens.ui.theme.NxInk
@@ -67,18 +76,23 @@ import hivens.ui.theme.NxColor
 private val SLOT_HANDLE_SIZE = 26.dp
 
 /**
- * A zero-footprint modifier applied to a slot's flow root. It highlights the slot
- * when selected (a snapshot-read draw -- no recomposition of the slot tree), reports
- * the selected slot's window bounds to the host (so the handle can anchor), and
- * routes a background primary press to selection / a secondary press to the context
- * menu at the cursor. A primary press already consumed by a child widget (its own
- * drag handle) is ignored, so this never steals widget interactions.
+ * A zero-footprint modifier applied to every slot's root. It tells [registry] where the slot is on screen, which is
+ * what a drop is aimed by, highlights the slot when selected, reports the selected slot's window bounds to the host
+ * (so the handle can anchor), and routes a background primary press to selection and a secondary press to the
+ * context menu at the cursor. A press a widget already took is ignored, so this never steals widget interactions,
+ * and of nested slots only the innermost under the pointer acts.
+ *
+ * Whether it is selected is read where it is drawn and where its rect is reported, never while composing, so a change
+ * of selection redraws two slots and recomposes none.
  */
 internal fun slotChromeModifier(
-    path: SlotPath,
-    selectedSlot: State<SlotPath?>,
-    onSelect: (SlotPath) -> Unit,
-    onContextMenu: (SlotPath, Offset) -> Unit,
+    path: NodePath,
+    /** Whether the slot holds nothing, which is drawn as an outline round the room it has. */
+    empty: Boolean,
+    registry: DropTargetRegistry,
+    selectedSlot: State<NodePath?>,
+    onSelect: (NodePath) -> Unit,
+    onContextMenu: (NodePath, Offset) -> Unit,
     onReportRect: (Rect) -> Unit,
 ): Modifier = Modifier.composed {
     val accent   = NxColor.lead()
@@ -86,19 +100,32 @@ internal fun slotChromeModifier(
     val strokePx = with(LocalDensity.current) { 2.dp.toPx() }
     var bounds by remember { mutableStateOf(Rect.Zero) }
     var originInWindow by remember { mutableStateOf(Offset.Zero) }
-    val isSelected = selectedSlot.value == path
+    DisposableEffect(path, registry) { onDispose { registry.withdrawSlot(path) } }
     // Push the rect to the host when this slot becomes (or moves while) selected --
     // onGloballyPositioned alone would miss a selection change with no layout change.
-    LaunchedEffect(isSelected, bounds) { if (isSelected) onReportRect(bounds) }
+    LaunchedEffect(path) {
+        snapshotFlow { (selectedSlot.value == path) to bounds }.collect { (selected, rect) -> if (selected) onReportRect(rect) }
+    }
     Modifier
         .onGloballyPositioned { coords ->
             val b = coords.boundsInWindow()
             bounds = b
-            originInWindow = b.topLeft
+            originInWindow = coords.positionInWindow()
+            registry.registerSlot(path, b)
         }
         .drawWithContent {
             drawContent()
-            if (isSelected) {
+            if (empty) {
+                val inset = strokePx / 2f
+                drawRoundRect(
+                    color        = accent.copy(alpha = 0.45f),
+                    topLeft      = Offset(inset, inset),
+                    size         = Size(size.width - strokePx, size.height - strokePx),
+                    cornerRadius = CornerRadius(cornerPx, cornerPx),
+                    style        = Stroke(width = strokePx / 2f, pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 5.dp.toPx()))),
+                )
+            }
+            if (selectedSlot.value == path) {
                 val inset = strokePx / 2f
                 drawRoundRect(
                     color        = accent,
@@ -120,6 +147,8 @@ internal fun slotChromeModifier(
                     val event = awaitPointerEvent(PointerEventPass.Final)
                     if (event.type != PointerEventType.Press) continue
                     val change = event.changes.first()
+                    // The Final pass runs outer slots first, so a press in a nested slot is the nested one's.
+                    if (registry.slotForPoint(originInWindow + change.position) != path) continue
                     when {
                         event.buttons.isSecondaryPressed && !change.isConsumed -> {
                             onContextMenu(path, originInWindow + change.position)
@@ -133,6 +162,24 @@ internal fun slotChromeModifier(
                 }
             }
         }
+        .then(ShareWithLayersBeneath)
+}
+
+/**
+ * Lets a press go on to what is drawn beneath the slot as well. A slot drawn over another, the centre's floating lane
+ * over the page, covers the whole of it while what stands in it may draw nothing at rest, and Compose hands a press to
+ * the uppermost of overlapping siblings only. So a press meant for a widget on the page went to the lane's. Shared,
+ * every chrome under the pointer sees the press and the one the registry names takes it.
+ */
+private data object ShareWithLayersBeneath : ModifierNodeElement<ShareWithLayersBeneathNode>() {
+    override fun create() = ShareWithLayersBeneathNode()
+    override fun update(node: ShareWithLayersBeneathNode) = Unit
+}
+
+private class ShareWithLayersBeneathNode : Modifier.Node(), PointerInputModifierNode {
+    override fun onPointerEvent(pointerEvent: PointerEvent, pass: PointerEventPass, bounds: IntSize) = Unit
+    override fun onCancelPointerInput() = Unit
+    override fun sharePointerInputWithSiblings(): Boolean = true
 }
 
 /**
@@ -143,11 +190,11 @@ internal fun slotChromeModifier(
  */
 @Composable
 internal fun SlotSelectionOverlay(
-    selectedSlot: SlotPath?,
+    selectedSlot: NodePath?,
     selectedSlotRect: Rect?,
     handleMenuOpen: Boolean,
     cursorAnchor: Offset?,
-    controller: EditModeController,
+    editor: DocumentEditor,
     onOpenHandleMenu: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -168,13 +215,13 @@ internal fun SlotSelectionOverlay(
             ) {
                 SlotSelectionHandle(onClick = onOpenHandleMenu)
                 NxContextMenu(expanded = handleMenuOpen, onDismissRequest = onDismiss) {
-                    SlotLayoutMenuContent(selectedSlot, controller, onDismiss)
+                    SlotLayoutMenuContent(selectedSlot, editor, onDismiss)
                 }
             }
         }
         if (cursorAnchor != null) {
             NxContextMenu(anchorInWindow = cursorAnchor, expanded = true, onDismissRequest = onDismiss) {
-                SlotLayoutMenuContent(selectedSlot, controller, onDismiss)
+                SlotLayoutMenuContent(selectedSlot, editor, onDismiss)
             }
         }
     }
@@ -200,18 +247,18 @@ private fun SlotSelectionHandle(onClick: () -> Unit) {
 /**
  * The layout menu body: a header, the four shapes the two parameters make (the
  * active one marked), and the one stepper, pointed at whichever number the current
- * mode has. Reads the slot's content live from [LocalLayoutGraph] so the mark and
- * the count track the model; the stepper nudges race-free via the controller and
- * leaves the menu open.
+ * mode has. Reads the slot's content live from [LocalDocument] so the mark and
+ * the count track the model. The stepper nudges through the editor, which applies
+ * one edit after another, and leaves the menu open.
  */
 @Composable
 internal fun SlotLayoutMenuContent(
-    path: SlotPath,
-    controller: EditModeController,
+    path: NodePath,
+    editor: DocumentEditor,
     onClose: () -> Unit,
 ) {
     val s = nexiraStrings()
-    val live = LocalLayoutGraph.current.traverse(path) ?: SlotContent()
+    val live = LocalDocument.current?.contentAt(path) ?: SlotContent()
     val flow = live.flow
 
     Text(
@@ -225,18 +272,18 @@ internal fun SlotLayoutMenuContent(
     // arranging a screen thinks in the four shapes those make, so the menu keeps
     // offering them by name.
     NxMenuItem(s.text("editorSlotStack"), selected = flow != null && !flow.horizontal && flow.wrap == 0) {
-        controller.setFlow(path, FlowSpec.Column); onClose()
+        editor.flow(path, FlowSpec.Column); onClose()
     }
     NxMenuItem(s.text("editorSlotRow"), selected = flow != null && flow.horizontal && flow.wrap == 0) {
-        controller.setFlow(path, FlowSpec.Row); onClose()
+        editor.flow(path, FlowSpec.Row); onClose()
     }
     NxMenuItem(s.text("editorSlotGrid"), selected = flow != null && flow.wrap > 0) {
-        controller.setFlow(path, FlowSpec.grid(DEFAULT_WRAP)); onClose()
+        editor.flow(path, FlowSpec.grid(DEFAULT_WRAP)); onClose()
     }
     // Canvas is always adaptive now: it scales its arrangement to fit rather than
     // clipping, so there is no per-slot mode to offer here.
     NxMenuItem(s.text("editorSlotCanvas"), selected = flow == null) {
-        controller.setFlow(path, null); onClose()
+        editor.flow(path, null); onClose()
     }
 
     // The one stepper, pointed at whichever number the current mode has. A flow
@@ -246,10 +293,10 @@ internal fun SlotLayoutMenuContent(
     // behind you: stepping a grid down to a row used to take the control away
     // with it, and the only way back was the menu item, which reset the number.
     if (flow != null) {
-        SlotNumberRow(s.text("editorSlotGridColumns"), flow.wrap, s, { controller.nudgeWrap(path, -1) }, { controller.nudgeWrap(path, 1) })
+        SlotNumberRow(s.text("editorSlotGridColumns"), flow.wrap, s, { editor.nudgeWrap(path, -1) }, { editor.nudgeWrap(path, 1) })
     } else if (live.viewportMode != ViewportMode.Map) {
         // Not on a map, which has no width for a lattice to divide.
-        SlotNumberRow(s.text("editorSlotGridColumns"), live.grid, s, { controller.nudgeGrid(path, -1) }, { controller.nudgeGrid(path, 1) })
+        SlotNumberRow(s.text("editorSlotGridColumns"), live.grid, s, { editor.nudgeGrid(path, -1) }, { editor.nudgeGrid(path, 1) })
     }
 
     // How the slot shows what does not fit, which is a separate question from how
@@ -263,18 +310,18 @@ internal fun SlotLayoutMenuContent(
     val scrollKind = if (paged) ViewportSpec.PAGES else ViewportSpec.SCROLL
     MenuSectionTitle(s.text("editorSlotViewportTitle"))
     NxMenuItem(s.text("editorViewportStatic"), selected = mode == ViewportMode.Static) {
-        controller.setViewport(path, null); onClose()
+        editor.viewport(path, null); onClose()
     }
     NxMenuItem(s.text("editorViewportDown"), selected = mode is ViewportMode.Scroll && !mode.horizontal) {
-        controller.setViewport(path, ViewportSpec(scrollKind, ViewportSpec.VERTICAL, bar)); onClose()
+        editor.viewport(path, ViewportSpec(scrollKind, ViewportSpec.VERTICAL, bar)); onClose()
     }
     NxMenuItem(s.text("editorViewportRight"), selected = mode is ViewportMode.Scroll && mode.horizontal) {
-        controller.setViewport(path, ViewportSpec(scrollKind, ViewportSpec.HORIZONTAL, bar)); onClose()
+        editor.viewport(path, ViewportSpec(scrollKind, ViewportSpec.HORIZONTAL, bar)); onClose()
     }
     // A plane with no edges. It holds placed widgets, so a flow put on one becomes
     // a canvas in the same step.
     NxMenuItem(s.text("editorViewportMap"), selected = mode == ViewportMode.Map) {
-        controller.setViewport(path, ViewportSpec.Map); onClose()
+        editor.viewport(path, ViewportSpec.Map); onClose()
     }
     // Stays open: it is a setting of the scroll just picked, and a reader flipping
     // it wants to see the bar come and go without reopening the menu.
@@ -282,10 +329,10 @@ internal fun SlotLayoutMenuContent(
     if (mode is ViewportMode.Scroll && current != null) {
         // A whole screen at a time: the wheel turns a page, a scroll settles on one.
         NxMenuItem(s.text("editorViewportPaged"), selected = paged) {
-            controller.setViewport(path, current.copy(kind = if (paged) ViewportSpec.SCROLL else ViewportSpec.PAGES))
+            editor.viewport(path, current.copy(kind = if (paged) ViewportSpec.SCROLL else ViewportSpec.PAGES))
         }
         NxMenuItem(s.text("editorViewportScrollbar"), selected = bar) {
-            controller.setViewport(path, current.copy(scrollbar = !bar))
+            editor.viewport(path, current.copy(scrollbar = !bar))
         }
     }
 }

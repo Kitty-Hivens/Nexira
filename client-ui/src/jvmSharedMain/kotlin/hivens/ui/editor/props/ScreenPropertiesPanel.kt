@@ -24,7 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import hivens.ui.editor.EditModeController
+import hivens.ui.editor.DocumentEditor
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
@@ -41,24 +41,28 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status
-import hivens.widget.model.ScreenSpec
+import hivens.widget.model.CompositionName
+import hivens.widget.model.Config
+import hivens.widget.model.ConfigId
+
+/** A screen of the document, as its settings panel sees it: where it is, what it is, and whether somebody made it. */
+internal data class ScreenTarget(val composition: CompositionName, val id: ConfigId, val config: Config, val made: Boolean) {
+    val title: String get() = config.title
+    val icon: String get() = config.icon
+}
 
 /**
- * What a screen somebody made is called, what it wears on the rail, and the way
- * to delete it.
+ * What a screen is called, what it wears on the rail, and, for one somebody made, the way to delete it.
  *
- * Opened from the same settings chip a region's own settings use, because a made
- * screen's settings are the screen's and not any widget's. Every edit writes at
- * once and goes through the editor's history, so a rename is undone the way a
- * moved widget is.
+ * Every edit writes at once and goes through the editor's history, so a rename is undone the way a moved widget is.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun ScreenPropertiesPanel(
     visible: Boolean,
-    spec: ScreenSpec?,
-    controller: EditModeController,
-    onDelete: (ScreenSpec) -> Unit,
+    spec: ScreenTarget?,
+    editor: DocumentEditor,
+    onDelete: (ScreenTarget) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -76,7 +80,7 @@ internal fun ScreenPropertiesPanel(
         // lands on another thread a frame later, and a field fed from it would put
         // the caret back at the end under somebody typing in the middle.
         var draft by remember(current.id) { mutableStateOf(current.title) }
-        val rename: (String) -> Unit = { draft = it; controller.updateScreen(current.id, title = it) }
+        val rename: (String) -> Unit = { draft = it; editor.updateScreen(current.composition, current.id, title = it) }
 
         SectionLabel(s.text("screenTitleLabel"))
         NxField(
@@ -103,7 +107,7 @@ internal fun ScreenPropertiesPanel(
                         .clip(RoundedCornerShape(8.dp))
                         .background(fill)
                         .border(1.dp, if (selected) NxColor.lead() else NxInk.line, RoundedCornerShape(8.dp))
-                        .clickable { controller.updateScreen(current.id, icon = name) }
+                        .clickable { editor.updateScreen(current.composition, current.id, icon = name) }
                         .semantics { contentDescription = name },
                     contentAlignment = Alignment.Center,
                 ) {
@@ -116,19 +120,22 @@ internal fun ScreenPropertiesPanel(
                         )
                     }
                 }
-                PuppetClick("screen.icon.$name") { controller.updateScreen(current.id, icon = name) }
+                PuppetClick("screen.icon.$name") { editor.updateScreen(current.composition, current.id, icon = name) }
             }
         }
 
-        Spacer(Modifier.height(12.dp))
-        NxButton(
-            label    = s.text("screenDelete"),
-            onClick  = { confirmDelete = true },
-            style    = NxButtonStyle.Destructive,
-            icon     = NxIcon.Delete,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        PuppetClick("screen.delete") { confirmDelete = true }
+        // Only a screen somebody made: the launcher's own come back with a reset, not a delete.
+        if (current.made) {
+            Spacer(Modifier.height(12.dp))
+            NxButton(
+                label    = s.text("screenDelete"),
+                onClick  = { confirmDelete = true },
+                style    = NxButtonStyle.Destructive,
+                icon     = NxIcon.Delete,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            PuppetClick("screen.delete") { confirmDelete = true }
+        }
     }
 
     val doomed = spec

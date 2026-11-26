@@ -25,8 +25,8 @@ import hivens.ui.background.BackgroundSettings
 import hivens.ui.components.LauncherUpdateState
 import hivens.ui.components.SignOutRequests
 import hivens.ui.debug.DebugOverlayState
-import hivens.ui.editor.EditModeController
-import hivens.ui.editor.WidgetAdmission
+import hivens.ui.editor.DocumentEditor
+import hivens.ui.editor.ShellSignals
 import hivens.ui.editor.presets.PresetRepository
 import hivens.ui.feature.catalogue.browse.CataloguePackPageSource
 import hivens.ui.feature.catalogue.browse.sampleCataloguePackPage
@@ -511,19 +511,9 @@ fun uiCoreModule(
     // shutdown flush for its debounced writes.
     single { BackgroundManager(get<Path>(), get()) }
 
-    // Editor mutation facade. Holds no state itself; fires LayoutGraph
-    // updates into the shared CoroutineScope so callers stay
-    // fire-and-forget. It refuses a widget where what it reads has no answer,
-    // asking the scope tree's registries where each key lives.
-    single {
-        val appLevel: WidgetScope = get()
-        val widgets: WidgetRegistry = get()
-        EditModeController(
-            repo      = get(),
-            scope     = get(),
-            admission = WidgetAdmission(appLevel::declarationOf) { kind -> widgets[kind]?.needs.orEmpty() },
-        )
-    }
+    // The editor's one way to change the document, and the presses the window hands to the editor and the rail.
+    single { DocumentEditor(store = get(), scope = get()) }
+    single { ShellSignals() }
 
 
     // Preset storage. One file per preset under <dataDir>/presets/.

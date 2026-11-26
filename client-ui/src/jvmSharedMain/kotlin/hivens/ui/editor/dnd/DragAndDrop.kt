@@ -6,6 +6,7 @@ import androidx.compose.foundation.gestures.awaitTouchSlopOrCancellation
 import androidx.compose.foundation.gestures.drag
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -18,11 +19,8 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import hivens.widget.model.FlowSpec
-import hivens.widget.model.SlotPath
+import hivens.widget.model.NodePath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 
@@ -30,13 +28,12 @@ import hivens.widget.model.WidgetKind
 
 sealed class DragPayload {
     data class ExistingWidget(
-        val source: SlotPath,
+        val source: NodePath,
         val sourceIndex: Int,
         val instance: WidgetInstance,
     ) : DragPayload()
 
-    // Palette-originated drag. Resolves to an EditModeController.addWidget
-    // at drop time; the target SlotPath comes from the registry hit-test.
+    // A drag out of the palette. It becomes an add when dropped, into the slot the registry finds under the pointer.
     data class PaletteWidget(val kind: WidgetKind) : DragPayload()
 }
 
@@ -81,31 +78,65 @@ class DragController {
     }
 }
 
+// ── Which widget is meant ───────────────────────────────────────────────────
+
+/** One widget where it stands: a name is unique within a composition, a path says where it is drawn now. */
+data class WidgetKey(val path: NodePath, val instanceId: String)
+
+/**
+ * Whether a press is [key]'s to take, [named] being the widget the registry names under the pointer.
+ *
+ * Every chrome under a press that reaches several layers sees it, and the one the registry names, the one the hover
+ * outline is drawn on, takes it. Widgets in one slot do not share a press, so where the named one is another widget of
+ * this slot, or inside one, it cannot hear the press and the uppermost keeps it. Inside this widget the named one has
+ * had the press first.
+ */
+fun pressBelongsTo(key: WidgetKey, named: WidgetKey?): Boolean {
+    if (named == null || named == key) return true
+    val mine = key.path
+    val there = named.path
+    val depth = mine.nested.size
+    val inMySlot = there.composition == mine.composition && there.root == mine.root &&
+        there.nested.size >= depth && there.nested.subList(0, depth) == mine.nested
+    if (!inMySlot) return false
+    return there.nested.size == depth || there.nested[depth].parentInstanceId != key.instanceId
+}
+
+/**
+ * The widget the pointer is over and the one a finger last pressed, each one widget for the whole editor.
+ *
+ * Asked of every widget's own hover, a container and the widget inside it were both hovered at once, and the
+ * container's handles, drawn above the inner one's, took the press where their edges met. One answer for the editor,
+ * the innermost widget under the pointer, gives each place one owner. A finger cannot hover, so the widget it last
+ * pressed keeps its handles until another is pressed.
+ */
+@Stable
+class EditFocus {
+    var hovered: WidgetKey? by mutableStateOf(null)
+    var touched: WidgetKey? by mutableStateOf(null)
+
+    /** Whether [key] shows its handles now. */
+    fun shows(key: WidgetKey): Boolean = hovered == key || touched == key
+}
+
 // ── Drop target registry ────────────────────────────────────────────────────
 
 data class WidgetBounds(val index: Int, val rect: Rect)
 
-// Hierarchical drop targets. Keys are SlotPath (full address through
-// nested containers), so a drop into "container body" on home.new is
-// distinct from a drop into the same slot id on the right rail.
+// Where every slot and widget the editor decorates is drawn, keyed by NodePath, the full address through nested
+// containers, so a drop into a container's "body" is told from the same slot of another.
 //
-// slotForPoint returns the INNERMOST slot whose rect (widget rect,
-// vertical span fallback, or empty-slot placeholder rect) contains the
-// pointer -- "innermost" = smallest area. Without that ordering, a
-// container's outer rect would always win over its own children and
-// the user could never drop into a nested slot.
+// The slot a point is over is answered from the slots alone: every slot reports its own rect, so a gap in a flow is
+// inside its slot and a container's rect never stands in for the slot it holds. The innermost, smallest by area, wins.
+// Widget rects answer where in its slot a drop goes and who a moving widget lands on, and which widget is under the
+// pointer.
 class DropTargetRegistry {
-    private val widgets: SnapshotStateMap<SlotPath, SnapshotStateMap<String, WidgetBounds>> =
+    private val widgets: SnapshotStateMap<NodePath, SnapshotStateMap<String, WidgetBounds>> =
         mutableStateMapOf()
-    private val slotBounds: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
+    private val slotBounds: SnapshotStateMap<NodePath, Rect> = mutableStateMapOf()
     // The whole placement box where it is larger than what is on screen, which is
     // a slot that scrolls. Absent means the two are the same rect.
-    private val slotContent: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
-    // An empty slot's placeholder, kept apart from what the slot itself reports.
-    // The two report the same path and leave the composition at different times:
-    // the placeholder goes when the first widget arrives and the slot stays, so one
-    // map would have the placeholder's withdrawal take the slot's bounds with it.
-    private val placeholderBounds: SnapshotStateMap<SlotPath, Rect> = mutableStateMapOf()
+    private val slotContent: SnapshotStateMap<NodePath, Rect> = mutableStateMapOf()
 
     /**
      * Which widgets the one being moved is currently sitting on top of.
@@ -119,139 +150,90 @@ class DropTargetRegistry {
      * landed on say so while the gesture is still live and the drop is still the
      * person's to make.
      */
-    var overlapped: Set<String> by mutableStateOf(emptySet())
+    var overlapped: Set<WidgetKey> by mutableStateOf(emptySet())
         private set
 
-    fun publishOverlap(ids: Set<String>) {
-        if (overlapped != ids) overlapped = ids
+    fun publishOverlap(keys: Set<WidgetKey>) {
+        if (overlapped != keys) overlapped = keys
     }
 
     /**
-     * Ids in [path] whose rect meets [rect], leaving out [movingId] itself.
+     * Widgets in [path] whose rect meets [rect], leaving out [movingId] itself.
      *
      * Touching edges do not count. A widget laid flush against its neighbour is
      * the arrangement somebody wanted, and reporting it as a collision would
      * leave the warning colour on half the surface.
      */
-    fun overlapping(path: SlotPath, rect: Rect, movingId: String): Set<String> {
+    fun overlapping(path: NodePath, rect: Rect, movingId: String): Set<WidgetKey> {
         val byId = widgets[path] ?: return emptySet()
         return byId.entries
             .filter { (id, bounds) -> id != movingId && bounds.rect.overlapsStrictly(rect) }
-            .mapTo(mutableSetOf()) { it.key }
+            .mapTo(mutableSetOf()) { WidgetKey(path, it.key) }
     }
 
-    /**
-     * Where a slot is. [rect] is what is on screen and is what a pointer can be
-     * over. [content] is the whole box, for a slot that scrolls, and is what a
-     * point inside it converts against.
-     */
-    fun registerSlot(path: SlotPath, rect: Rect, content: Rect = rect) {
+    /** Where a slot is on screen, which is what a pointer can be over. */
+    fun registerSlot(path: NodePath, rect: Rect) {
         slotBounds[path] = rect
-        if (content == rect) slotContent.remove(path) else slotContent[path] = content
     }
 
     /**
-     * The slot that reported [path] has left the composition. Kept, its rectangle
+     * The whole of a placement slot, most of it off screen in a slot that scrolls, which is what a point inside it
+     * converts against.
+     */
+    fun registerSlotContent(path: NodePath, content: Rect) {
+        if (content == slotBounds[path]) slotContent.remove(path) else slotContent[path] = content
+    }
+
+    /**
+     * The slot that reported under [path] has left the composition. Kept, its rectangle
      * went on answering the hit-test after its screen had gone, and since the
      * smallest rectangle wins, a stale one beat the live pane beneath it.
      */
-    fun withdrawSlot(path: SlotPath) {
+    fun withdrawSlot(path: NodePath) {
         slotBounds.remove(path)
         slotContent.remove(path)
     }
 
-    /** Where an empty slot's placeholder is, until [withdrawPlaceholder]. */
-    fun registerPlaceholder(path: SlotPath, rect: Rect) {
-        placeholderBounds[path] = rect
-    }
-
-    fun withdrawPlaceholder(path: SlotPath) {
-        placeholderBounds.remove(path)
-    }
-
-    fun registerWidget(path: SlotPath, instanceId: String, index: Int, rect: Rect) {
+    fun registerWidget(path: NodePath, instanceId: String, index: Int, rect: Rect) {
         val byId = widgets.getOrPut(path) { mutableStateMapOf() }
         byId[instanceId] = WidgetBounds(index, rect)
     }
 
-    fun unregisterWidget(path: SlotPath, instanceId: String) {
+    fun unregisterWidget(path: NodePath, instanceId: String) {
         widgets[path]?.remove(instanceId)
     }
 
-    // Window-coord rect of one registered widget. Used by the Phase G
-    // slot dividers to read the two neighbors' main-axis px at drag start.
-    fun widgetRect(path: SlotPath, instanceId: String): Rect? =
-        widgets[path]?.get(instanceId)?.rect
-
-    // Window-coord top-left of a registered slot (Canvas slots report bounds via
-    // LocalSlotBoundsReporter). Lets a palette drop land at the release point.
-    // Null when the slot has not reported bounds.
-    fun slotOrigin(path: SlotPath): Offset? = slotRect(path)?.topLeft
-
     /** The part of a slot that is on screen. */
-    fun slotRect(path: SlotPath): Rect? = slotBounds[path] ?: placeholderBounds[path]
+    fun slotRect(path: NodePath): Rect? = slotBounds[path]
 
     /**
      * The whole of a slot, on screen or not, for a drop that converts the pointer
      * into the slot's own coordinates. On a page scrolled down by a screen this
      * starts a screen above the window, which is where the page's origin is.
      */
-    fun slotContentRect(path: SlotPath): Rect? = slotContent[path] ?: slotRect(path)
+    fun slotContentRect(path: NodePath): Rect? = slotContent[path] ?: slotRect(path)
 
-    // Two passes:
-    //   1) exact rect hit across all registered sources (widget rects +
-    //      empty-slot placeholder bounds), innermost (smallest area)
-    //      wins. Both kinds compete in the same pass so a nested empty
-    //      slot beats its enclosing container's widget rect.
-    //   2) vertical-span-with-12px-tolerance fallback for "in-between"
-    //      gap drops where the pointer is in a slot's vertical bracket
-    //      but not over any of its widgets. Only consulted when pass 1
-    //      finds no exact hit.
-    // Returns null when the pointer is outside every registered slot.
-    fun slotForPoint(pointInWindow: Offset): SlotPath? {
-        var best: SlotPath? = null
+    /**
+     * The innermost slot under [pointInWindow], smallest by area, ties to the deeper path so the answer does not
+     * flicker between two of one size. Null outside every slot.
+     */
+    fun slotForPoint(pointInWindow: Offset): NodePath? = innermost(slotBounds.entries.map { it.key to it.value }, pointInWindow) { it.nested.size }
+
+    /** The innermost widget under [pointInWindow], or null where there is none. */
+    fun widgetForPoint(pointInWindow: Offset): WidgetKey? =
+        innermost(widgets.flatMap { (path, byId) -> byId.map { (id, b) -> WidgetKey(path, id) to b.rect } }, pointInWindow) { it.path.nested.size }
+
+    private fun <K> innermost(candidates: List<Pair<K, Rect>>, point: Offset, depth: (K) -> Int): K? {
+        var best: K? = null
         var bestArea = Float.POSITIVE_INFINITY
-
-        fun consider(rect: Rect, path: SlotPath) {
-            if (!rect.contains(pointInWindow)) return
+        for ((key, rect) in candidates) {
+            if (!rect.contains(point)) continue
             val area = rect.width * rect.height
-            // Tie-break by nested depth so two overlapping rects of
-            // identical area resolve deterministically -- without this
-            // the winner depends on SnapshotStateMap iteration order
-            // (unspecified), and a hit-test that flickers between two
-            // candidates would feel like the editor is jumping.
             val current = best
-            val currentDepth = current?.nested?.size ?: -1
-            if (area < bestArea || (area == bestArea && path.nested.size > currentDepth)) {
-                best = path
+            if (area < bestArea || (area == bestArea && current != null && depth(key) > depth(current))) {
+                best = key
                 bestArea = area
             }
-        }
-
-        // Pass 1: every exact rect competes by area. Crucially, the
-        // empty-slot placeholder rect of a container's child slot must
-        // be eligible against the container widget's own rect -- the
-        // child slot is strictly smaller and the user means to drop
-        // INTO it.
-        widgets.forEach { (path, byId) ->
-            byId.values.forEach { wb -> consider(wb.rect, path) }
-        }
-        slotBounds.forEach { (path, rect) -> consider(rect, path) }
-        placeholderBounds.forEach { (path, rect) -> consider(rect, path) }
-        if (best != null) return best
-
-        // Pass 2: vertical-span fallback. Per-slot virtual bounding
-        // rect across all that slot's widgets, with horizontal extent
-        // matching widest widget and vertical padding for gap drops.
-        val tolerance = 12f
-        widgets.forEach { (path, byId) ->
-            val items = byId.values
-            if (items.isEmpty()) return@forEach
-            val minY = items.minOf { it.rect.top } - tolerance
-            val maxY = items.maxOf { it.rect.bottom } + tolerance
-            val minX = items.minOf { it.rect.left }
-            val maxX = items.maxOf { it.rect.right }
-            consider(Rect(minX, minY, maxX, maxY), path)
         }
         return best
     }
@@ -268,7 +250,7 @@ class DropTargetRegistry {
     // No default for [flow]: it decides between "insert here" and "append", and a
     // forgotten argument would move a widget the user never touched.
     fun insertionIndexInSlot(
-        path: SlotPath,
+        path: NodePath,
         pointInWindow: Offset,
         flow: FlowSpec?,
     ): Int {
@@ -310,12 +292,16 @@ val LocalDragController: ProvidableCompositionLocal<DragController> =
 val LocalDropTargetRegistry: ProvidableCompositionLocal<DropTargetRegistry> =
     staticCompositionLocalOf { error("LocalDropTargetRegistry not provided -- mount EditorSurfaceHost") }
 
+val LocalEditFocus: ProvidableCompositionLocal<EditFocus> =
+    staticCompositionLocalOf { error("LocalEditFocus not provided -- mount EditorSurfaceHost") }
+
 // ── Drag-source modifier ────────────────────────────────────────────────────
 
 // Attach to the drag handle, not the whole widget -- prevents accidental
 // drag of an interactive control (button, slider). The lambda
 // widgetBoundsProvider returns the widget's window-coord bounds so the
-// ghost can position itself at the right pickup offset.
+// ghost can position itself at the right pickup offset. A drag cut off
+// before it was let go drops nothing.
 fun Modifier.dragSource(
     controller: DragController,
     payload: DragPayload,
@@ -328,11 +314,12 @@ fun Modifier.dragSource(
         val drag = awaitTouchSlopOrCancellation(down.id) { change, _ -> change.consume() }
             ?: return@awaitEachGesture
         val bounds = widgetBoundsProvider() ?: return@awaitEachGesture
-        val pickup = drag.position - Offset(0f, 0f)
+        // Held where it was pressed. Where the pointer crossed the slop is a whole jump further on after a fast
+        // first move, and the ghost then trailed the pointer by that jump for the rest of the drag.
         controller.begin(
             payload         = payload,
             pointerInWindow = bounds.topLeft + drag.position,
-            pickupOffset    = pickup,
+            pickupOffset    = down.position,
             widgetSize      = Offset(bounds.width, bounds.height),
             ghost           = ghost,
         )
@@ -344,27 +331,16 @@ fun Modifier.dragSource(
         // mid-gesture, ran nothing after this, and the ghost and the hidden cursor
         // it draws stayed up over the whole window. A cut-off drag drops nothing.
         try {
-            drag(drag.id) { change: PointerInputChange ->
+            val released = drag(drag.id) { change: PointerInputChange ->
                 lastPointer += change.positionChange()
                 controller.update(lastPointer)
                 change.consume()
             }
-            onDragEnd(lastPointer)
+            if (released) onDragEnd(lastPointer)
         } finally {
             controller.end()
         }
     }
-}
-
-// ── Drop-target modifier ────────────────────────────────────────────────────
-
-fun Modifier.widgetBounds(
-    registry: DropTargetRegistry,
-    path: SlotPath,
-    instanceId: String,
-    index: Int,
-): Modifier = this.onGloballyPositioned { coords: LayoutCoordinates ->
-    registry.registerWidget(path, instanceId, index, coords.boundsInWindow())
 }
 
 /**

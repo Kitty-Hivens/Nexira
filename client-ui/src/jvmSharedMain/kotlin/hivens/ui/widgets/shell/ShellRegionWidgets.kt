@@ -66,7 +66,7 @@ import hivens.ui.chrome.LocalWindowFrame
 import hivens.ui.chrome.WindowControlsMode
 import hivens.ui.chrome.resolved
 import hivens.ui.components.rememberSignOutRequest
-import hivens.ui.editor.EditModeController
+import hivens.ui.editor.ShellSignals
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
 import hivens.ui.editor.LocalShellChromeBounds
@@ -402,7 +402,7 @@ fun ShellRightRegion(instance: WidgetInstance) {
     // and with none. Its opacity and blur are
     // the editable pair.
     val editing = LocalEditMode.current is EditModeState.On
-    val controller: EditModeController = koinInject()
+    val signals: ShellSignals = koinInject()
     // Whether the rail is folded is the rail's own state, kept for it between runs, and
     // not its arrangement: folding it is no edit of the interface. Until it is folded or
     // opened the arrangement's word stands.
@@ -431,8 +431,8 @@ fun ShellRightRegion(instance: WidgetInstance) {
     var overlayOpen by remember { mutableStateOf(false) }
     val currentOverlayHost by rememberUpdatedState(overlayHost)
     LaunchedEffect(Unit) {
-        var seen = controller.rightRailToggleSignal.value
-        snapshotFlow { controller.rightRailToggleSignal.value }.collect { tick ->
+        var seen = signals.railToggle.value
+        snapshotFlow { signals.railToggle.value }.collect { tick ->
             if (tick == seen) return@collect
             seen = tick
             // Over the content the signal opens and shuts the overlay and leaves the saved
@@ -624,7 +624,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
 
     // Fixed chrome, like the glyph: where the right rail lies over the content instead of beside
     // it, this brings it up through the same signal Ctrl+N fires.
-    val railController: EditModeController = koinInject()
+    val railSignals: ShellSignals = koinInject()
     val railWidthDp = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.width.toDp() }
     val railOverlay = LocalRightRailSheet.current && railWidthDp < AUTO_COLLAPSE_BELOW
 
@@ -634,7 +634,7 @@ fun ShellTopRegion(instance: WidgetInstance) {
             NxIconButton(
                 icon = NxIcon.ViewSidebar,
                 contentDescription = null,
-                onClick = railController::requestRightRailToggle,
+                onClick = railSignals::requestRailToggle,
                 tooltip = false,
             )
         }

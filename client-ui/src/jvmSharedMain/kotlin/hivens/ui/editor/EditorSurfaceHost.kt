@@ -9,22 +9,19 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,14 +29,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.snapshotFlow
-import androidx.compose.runtime.State
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -47,10 +45,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.PointerType
 import androidx.compose.ui.input.pointer.isSecondaryPressed
 import androidx.compose.ui.input.pointer.pointerHoverIcon
 import androidx.compose.ui.input.pointer.pointerInput
@@ -58,64 +56,60 @@ import androidx.compose.ui.layout.SubcomposeLayout
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import hivens.i18n.api.Strings
-import hivens.ui.i18n.nexiraStrings
-import hivens.ui.platform.SystemActions
+import hivens.config.Branding
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.decoration.EditableWidgetChrome
 import hivens.ui.editor.decoration.EmptySlotPlaceholder
 import hivens.ui.editor.decoration.UnsupportedWidgetPlaceholder
 import hivens.ui.editor.dnd.DragController
-import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
+import hivens.ui.editor.dnd.EditFocus
 import hivens.ui.editor.dnd.LocalDragController
 import hivens.ui.editor.dnd.LocalDropTargetRegistry
+import hivens.ui.editor.dnd.LocalEditFocus
+import hivens.ui.editor.dnd.WidgetKey
 import hivens.ui.editor.palette.WidgetPalettePanel
-import hivens.ui.editor.presets.PresetEnvelope
-import hivens.ui.editor.presets.PresetManagerPanel
-import hivens.ui.editor.presets.PresetMeta
-import hivens.ui.editor.presets.PresetRepository
 import hivens.ui.editor.props.ScreenPropertiesPanel
-import hivens.ui.editor.props.WidgetModulesPanel
+import hivens.ui.editor.props.ScreenTarget
 import hivens.ui.editor.props.SurfacePropertiesPanel
+import hivens.ui.editor.props.WidgetModulesPanel
 import hivens.ui.editor.props.WidgetPropPanel
+import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
-import hivens.ui.layout.LayoutGraphRepository
-import hivens.ui.layout.LayoutReconcile
-import hivens.ui.nx.NxAlertDialog
-import hivens.ui.nx.NxContextMenu
-import hivens.ui.nx.NxMenuItem
-import hivens.ui.nx.WidthClass
-import hivens.ui.press.TextButton
-import hivens.ui.press.clickable
-import hivens.ui.theme.Motion
-import hivens.ui.surface.NxSurface
-import hivens.ui.surface.SurfaceKind
-import hivens.config.Branding
+import hivens.ui.layout.DocumentStore
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifAction
 import hivens.ui.notifications.NotificationCenter
 import hivens.ui.notifications.Severity
+import hivens.ui.nx.NxAlertDialog
+import hivens.ui.nx.NxContextMenu
+import hivens.ui.nx.NxMenuItem
+import hivens.ui.press.TextButton
+import hivens.ui.press.clickable
+import hivens.ui.screens.custom.ScreenIcons
+import hivens.ui.surface.NxSurface
+import hivens.ui.surface.SurfaceKind
+import hivens.ui.theme.Motion
+import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.OnFill
+import hivens.ui.theme.Status
 import hivens.ui.widgets.HiddenWidget
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.widget.api.EmptySlotDecorator
+import hivens.widget.api.LocalDocument
 import hivens.widget.api.LocalEmptySlotDecorator
-import hivens.widget.api.LocalFamilyOverrides
 import hivens.widget.api.LocalHiddenWidget
-import hivens.widget.api.LocalLayoutGraph
-import hivens.widget.api.LocalPlacementReflow
 import hivens.widget.api.LocalMapPanOnPrimary
+import hivens.widget.api.LocalPlacementReflow
 import hivens.widget.api.LocalRefusedMount
 import hivens.widget.api.LocalSlotBoundsReporter
 import hivens.widget.api.LocalSlotBoundsWithdrawal
@@ -128,51 +122,43 @@ import hivens.widget.api.SlotBoundsReporter
 import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
-import hivens.widget.model.BundledPresets
+import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
-import hivens.widget.model.DefaultLayout
-import hivens.widget.model.withSurfacesFrom
+import hivens.widget.model.Document
 import hivens.widget.model.FlowSpec
-import hivens.widget.model.FamilyId
-import hivens.widget.model.LayoutGraph
-import hivens.widget.model.ScreenSpec
 import hivens.widget.model.NodePath
-import hivens.widget.model.SlotPath
 import hivens.widget.model.SurfaceId
+import hivens.widget.model.WidgetKind
+import hivens.widget.model.contentAt
 import hivens.widget.model.screen
-import hivens.widget.model.screenOn
 import hivens.widget.model.slotPath
-import hivens.widget.model.traverse
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.CoroutineScope as KotlinCoroutineScope
-import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
-import hivens.ui.theme.NxInk
-import hivens.ui.theme.NxColor
-import hivens.ui.theme.Status
 
-// EditorSurfaceHost is the single coordinator for everything edit-mode
-// related on the active surface. It:
-//   * resolves which SurfaceId the active Screen maps to
-//   * holds DragController + DropTargetRegistry per surface
-//   * provides LocalEditMode, LocalDragController, LocalDropTargetRegistry,
-//     and LocalWidgetDecorator (the decorator wraps each widget with
-//     chrome only while edit mode is on)
-//   * paints the optional "Edit layout" pill at the top
-//   * paints the drag ghost following the pointer when a drag is active
-//   * backs out of edit mode a step at a time on Escape and back, through entries
-//     on the window's dismiss stack (see EditorBackOut), and toggles it on Ctrl+E,
-//     claimed at window level (see ShellChord) and handed over through the
-//     controller's signal. There is no edit-mode button and no key handler here.
+// The editor over one composition's window. Everything drawn from the document is arranged at once: every widget
+// wears its chrome while it is the one the pointer is over, every slot can be selected and dropped into, and the frame
+// is arranged where it stands. There are no tabs to pick a surface by, because there are no surfaces.
+//
+// It provides LocalEditMode and the editor's hooks into the kernel (the widget, empty-slot and unknown-widget
+// decorators, the slot chrome, the bounds reports) only while somebody is arranging and not previewing, and the
+// kernel's defaults otherwise. It paints the pill, the docked panels, the drag ghost and the vignette, asks for the
+// person's word before the first edit of the standard document, and backs out one step at a time on Escape and back
+// (see EditorBackOut). Ctrl+E is claimed at window level and handed over through [ShellSignals].
 
-// Which widget instance the prop panel is currently editing.
-private data class PropTarget(val path: SlotPath, val instanceId: String)
+/** What the panel at the right edge shows: one thing at a time, so two panels never fight for the corner. */
+private sealed interface Dock {
+    data object Palette : Dock
+    data class Props(val key: WidgetKey) : Dock
+    data object Screen : Dock
+    data object RailStyle : Dock
+    data object Nothing : Dock
+}
 
 private val log = LoggerFactory.getLogger("EditorSurfaceHost")
 
 @Composable
 fun EditorSurfaceHost(
+    composition: CompositionName,
     config: ConfigId,
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
@@ -180,82 +166,35 @@ fun EditorSurfaceHost(
     onOpen: (ConfigId) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
-    val graphForSurfaces = LocalLayoutGraph.current
-    // The host wraps the WHOLE shell Row (rails included) so its decorators reach
-    // rail widgets, and its overlays then have to be put back over the content
-    // pane. The regions report where they landed; see [ShellChromeBounds] for why
-    // the two constants this replaces could not be right.
-    val chromeBounds = remember { ShellChromeBounds() }
-    val hostRect = remember { mutableStateOf(Rect.Zero) }
-    val availableSurfaces: List<SurfaceId> = remember(config, graphForSurfaces) {
-        EditorSurfaces.availableFor(config, graphForSurfaces)
-    }
-    // Which of those tabs point at something folded away. Separate from the tab
-    // set on purpose: the editor's whole state is keyed on that set, and folding a
-    // rail does not change what is editable. While the fold was part of it, a rail
-    // collapsed from its own panel re-keyed every remember in this function and
-    // dropped the reader out of edit mode mid-edit.
-    val foldedSurfaces: Set<SurfaceId> = remember(availableSurfaces, graphForSurfaces) {
-        availableSurfaces.filterTo(mutableSetOf()) { EditorSurfaces.foldedAway(it, graphForSurfaces) }
-    }
-    // The region this surface is the inside of, so its own settings are reachable
-    // from its own tab rather than from the frame that happens to hold it.
-    val ownerRegion = selectedSurfaceOwnerRegion(graphForSurfaces)
-    val controller: EditModeController = koinInject()
-    val layoutRepo: LayoutGraphRepository = koinInject()
-    val presetRepo: PresetRepository      = koinInject()
-    val widgetModules: WidgetModules      = koinInject()
-    val coroutineScope = rememberCoroutineScope()
+    val editor: DocumentEditor = koinInject()
+    val signals: ShellSignals = koinInject()
+    val store: DocumentStore = koinInject()
+    val standard: Document = koinInject()
+    val widgetModules: WidgetModules = koinInject()
+    val notifications: NotificationCenter = koinInject()
+    val document by store.document.collectAsState()
+    val widgetRegistry = LocalWidgetRegistry.current
+    val pagesOf = remember(widgetRegistry) { { kind: WidgetKind -> widgetRegistry[kind]?.pages.orEmpty() } }
     val s = nexiraStrings()
 
-    // An edit session belongs to the app, not to the screen it started on. Moving
-    // to another screen while arranging keeps the editor on: a rail or the top bar
-    // stays the selected tab, and a tab that belonged to the screen left behind
-    // gives way to the new screen's own (see the re-point below). It used to end
-    // with any move that changed the tab set, so arranging several screens meant
-    // leaving the editor and coming back for each, and deleting a screen threw the
-    // person out of the editor they were deleting it from.
-    var editing       by remember { mutableStateOf(false) }
-    var paletteOpen   by remember { mutableStateOf(true) }
-    var previewing    by remember { mutableStateOf(false) }
-    // Where a right-click landed while NOT editing, which is the only thing that
-    // opens the way in. Null closes the menu.
-    var entryMenuAt   by remember { mutableStateOf<Offset?>(null) }
-    var presetPanelOpen by remember { mutableStateOf(false) }
-    var modulesPanelOpen by remember { mutableStateOf(false) }
-    var resetSurfaceConfirm by remember { mutableStateOf(false) }
-    var resetAllConfirm by remember { mutableStateOf(false) }
-    var selectedSurface by remember { mutableStateOf(availableSurfaces.firstOrNull()) }
-    // Whether the selection is the open screen's own page rather than a rail or the
-    // top bar. Set by what the person picks, and only by that: a re-point made
-    // while a screen is half gone must not decide it, or a deleted screen leaves
-    // the selection stuck on the top bar it fell back to for one frame.
-    var followsScreen by remember { mutableStateOf(true) }
-    // Which of the selected surface's families is being arranged. Null follows the
-    // app, which is what a surface with one family always does. A family the app
-    // only enters in some state -- a rail that only shows its project view while a
-    // project is open -- would otherwise be arrangeable only by first getting the
-    // app into that state, which makes the reader hunt for their own layout.
-    var selectedFamily by remember(selectedSurface) { mutableStateOf<FamilyId?>(null) }
-    val availableFamilies: List<FamilyId> = remember(selectedSurface, graphForSurfaces) {
-        selectedSurface?.let { graphForSurfaces.surfaces[it]?.families?.keys?.toList() }.orEmpty()
-    }
+    val chromeBounds = remember { ShellChromeBounds() }
+    val hostRect = remember { mutableStateOf(Rect.Zero) }
 
-    // Prop editor target. Cleared when the selected tab is re-pointed or the widget's
-    // surface leaves the tab set, on dismiss, and on leaving edit mode; while set,
-    // the palette hides so the two right-edge panels do not overlap.
-    var propTarget by remember { mutableStateOf<PropTarget?>(null) }
-    // Surface-level settings panel (a region's, or a made screen's). Mutually
-    // exclusive with the per-widget prop panel + palette.
-    var surfaceSettingsOpen by remember { mutableStateOf(false) }
-    // Selected slot (Tier 2 slot layout chrome): the highlighted slot, its window
-    // rect (for the handle anchor), the cursor anchor for a right-click menu, and
-    // whether the handle's menu is open. selectedSlotState stays a State so the slot
-    // chrome modifier can read it without the host capturing a stale value.
-    val selectedSlotState = remember { mutableStateOf<SlotPath?>(null) }
-    var selectedSlotRect  by remember { mutableStateOf<Rect?>(null) }
-    var slotMenuCursor    by remember { mutableStateOf<Offset?>(null) }
-    var handleMenuOpen    by remember { mutableStateOf(false) }
+    var editing by remember { mutableStateOf(false) }
+    var previewing by remember { mutableStateOf(false) }
+    var paletteOpen by remember { mutableStateOf(true) }
+    var dock by remember { mutableStateOf<Dock>(Dock.Palette) }
+    var entryMenuAt by remember { mutableStateOf<Offset?>(null) }
+    var modulesPanelOpen by remember { mutableStateOf(false) }
+    var resetScreenConfirm by remember { mutableStateOf(false) }
+    var resetAllConfirm by remember { mutableStateOf(false) }
+    var standardConfirm by remember { mutableStateOf(false) }
+    var resetMenuOpen by remember { mutableStateOf(false) }
+
+    val selectedSlotState = remember { mutableStateOf<NodePath?>(null) }
+    var selectedSlotRect by remember { mutableStateOf<Rect?>(null) }
+    var slotMenuCursor by remember { mutableStateOf<Offset?>(null) }
+    var handleMenuOpen by remember { mutableStateOf(false) }
     fun clearSlotSelection() {
         selectedSlotState.value = null
         selectedSlotRect = null
@@ -263,33 +202,11 @@ fun EditorSurfaceHost(
         handleMenuOpen = false
     }
 
-    // The tab set changes under a running editor: a move to another screen, a
-    // deleted screen, a preset load or a reset. A selected tab still in the set
-    // stays selected, which is a rail or the top bar on any move. One that left
-    // gives way to the first tab, which is the new screen's own, rather than hold
-    // an id nothing answers to, which renders as an editor over nothing.
-    LaunchedEffect(availableSurfaces) {
-        val page = availableSurfaces.firstOrNull { !EditorSurfaces.isShell(it) }
-        val gone = selectedSurface !in availableSurfaces
-        if (gone || (followsScreen && page != null && selectedSurface != page)) {
-            selectedSurface = page ?: availableSurfaces.firstOrNull()
-            propTarget = null
-            surfaceSettingsOpen = false
-            // The same clean-up every other route to a new surface does. Without
-            // it the handle and its menu stay anchored to a slot on a surface that
-            // is gone, and act on a path nothing answers to.
-            clearSlotSelection()
-        } else if (propTarget?.path?.surface?.let { it !in availableSurfaces } == true) {
-            propTarget = null
-        }
-        // Nothing left to arrange, which no screen has today, but the editor would
-        // otherwise stay on over nothing.
-        if (availableSurfaces.isEmpty()) editing = false
-    }
+    val arranging = editing && !previewing
+    val dragController = remember { DragController() }
+    val registry = remember { DropTargetRegistry() }
+    val focus = remember { EditFocus() }
 
-    // One Escape or back backs out one step. The reset confirmations are modal
-    // dialogs on the window's layers, so they close first and hold these steps out
-    // of reach while they are up.
     EditorBackOut(
         editing          = editing,
         onLeave          = { editing = false },
@@ -300,397 +217,197 @@ fun EditorSurfaceHost(
         previewing       = previewing,
         onEndPreview     = { previewing = false },
     )
-    // Every way out of edit mode ends here: Escape, Ctrl+E and the editor running out
-    // of surfaces alike. Whatever the session opened goes with it, so the next entry
-    // starts clean rather than in preview, behind a confirmation, or with a panel open
-    // and the palette still hidden behind it.
+    // Every way out of edit mode ends here, so the next entry starts clean.
     LaunchedEffect(editing) {
         if (!editing) {
-            propTarget = null
-            surfaceSettingsOpen = false
+            dock = Dock.Palette
             clearSlotSelection()
             previewing = false
-            resetSurfaceConfirm = false
+            resetScreenConfirm = false
             resetAllConfirm = false
-            presetPanelOpen = false
+            standardConfirm = false
             modulesPanelOpen = false
+            focus.hovered = null
+            focus.touched = null
+        }
+    }
+    DisposableEffect(editing) {
+        editor.reportEditing(editing)
+        onDispose { editor.reportEditing(false) }
+    }
+    LaunchedEffect(Unit) {
+        var seen = signals.editToggle.value
+        snapshotFlow { signals.editToggle.value }.collect { tick ->
+            if (tick != seen) {
+                seen = tick
+                editing = !editing
+            }
         }
     }
 
-    // A window this short is a phone on its side, where the palette would cover the slots it
-    // is there to fill. It opens from the toolbar instead.
+    // What the panels and the selection point at can go under them: an undo, a removal of the container around it,
+    // another config. Checked against the document after every change.
+    LaunchedEffect(document, config) {
+        val target = (dock as? Dock.Props)?.key
+        if (target != null && document.contentAt(target.path)?.widgets?.none { it.instanceId == target.instanceId } != false) dock = Dock.Palette
+        val slot = selectedSlotState.value
+        if (slot != null && document.contentAt(slot) == null) clearSlotSelection()
+    }
+
     val hostDensity = LocalDensity.current
-    // Derived, so the host recomposes when the answer flips and not on every move of the rectangle.
     val shortWindow by remember { derivedStateOf { with(hostDensity) { hostRect.value.height.toDp() } in 1.dp..SHORT_WINDOW } }
     LaunchedEffect(editing) { if (editing && shortWindow) paletteOpen = false }
 
-    // A screen just made from the pill. Not keyed on the tab set, because opening it
-    // changes the tab set and that is exactly when this has to survive: the record
-    // lands a frame or two after the press, the screen is opened once it is there,
-    // and once its surface is a tab the editor stays on with the screen's own
-    // settings open, so the next thing the person does is name it. Declared after
-    // the exit clean-up above, which runs first on the same change and would
-    // otherwise close the panel this opens.
-    //
-    // A screen put back after a deletion takes the same road without the settings:
-    // it is not new, there is nothing to name.
-    var pendingScreen by remember { mutableStateOf<ScreenSpec?>(null) }
-    var pendingSettings by remember { mutableStateOf(true) }
-    LaunchedEffect(pendingScreen, graphForSurfaces) {
+    // A screen just made: opened once the edit lands, with its settings, so the next thing done is to name it.
+    var pendingScreen by remember { mutableStateOf<ConfigId?>(null) }
+    LaunchedEffect(pendingScreen, document) {
         val made = pendingScreen ?: return@LaunchedEffect
-        if (graphForSurfaces.screen(made.id) != null && config != ConfigId(made.id)) {
-            onOpen(ConfigId(made.id))
-        }
-    }
-    LaunchedEffect(availableSurfaces) {
-        val made = pendingScreen ?: return@LaunchedEffect
-        if (made.surface !in availableSurfaces) return@LaunchedEffect
-        editing = true
-        selectedSurface = made.surface
-        followsScreen = true
-        propTarget = null
-        surfaceSettingsOpen = pendingSettings
+        if (document.compositions[composition]?.configs?.containsKey(made) != true) return@LaunchedEffect
         pendingScreen = null
+        if (config != made) onOpen(made)
+        dock = Dock.Screen
     }
-    // A screen deleted from its own settings: said in a notice with the way back,
-    // because the editor stays on and the page the person was arranging is gone.
-    val notifications: NotificationCenter = koinInject()
-    val deleteScreen: (ScreenSpec) -> Unit = { doomed ->
-        controller.deleteScreen(doomed.id) { gone ->
+    val screen: ScreenTarget? = document.compositions[composition]?.configs?.get(config)?.let { c ->
+        ScreenTarget(composition, config, c, made = standard.compositions[composition]?.configs?.containsKey(config) != true)
+    }
+    val deleteScreen: (ScreenTarget) -> Unit = { doomed ->
+        editor.deleteScreen(doomed.composition, doomed.id) { gone ->
             notifications.push(
-                sourceKey = "screen-deleted-${doomed.id}",
+                sourceKey = "screen-deleted-${doomed.id.value}",
                 sender    = Branding.TITLE,
                 iconUrl   = null,
                 severity  = Severity.Info,
-                // Held until answered or closed: a one-shot notice is gone in five
-                // seconds, which is less time than it takes to read it and decide.
                 kind      = Kind.ActionRequired,
                 title     = s.text("screenDeletedTitle", doomed.title.ifBlank { s.text("screenUntitled") }),
                 actions   = listOf(
-                    NotifAction(id = "screen-restore-${doomed.id}", label = s.text("screenRestore")) {
-                        controller.restoreScreen(gone)
-                        pendingSettings = false
-                        pendingScreen = gone.spec
+                    NotifAction(id = "screen-restore-${doomed.id.value}", label = s.text("screenRestore")) {
+                        editor.restoreScreen(doomed.composition, doomed.id, gone)
+                        pendingScreen = doomed.id
                     },
                 ),
             )
         }
     }
-    // The selected surface's made screen, when it is one: its settings are the
-    // screen's own panel rather than a region's.
-    val selectedScreen: ScreenSpec? = selectedSurface?.let { graphForSurfaces.screenOn(it) }
 
-    // Commit the arrangement at the points where the user has finished a
-    // thought: leaving edit mode, and moving to another surface. Writes are
-    // debounced 200ms, and the only other flush is the shutdown hook, so until
-    // now a crash inside that window took the last edit with it -- and an edit
-    // session can end without the process ending at all.
-    //
-    // Per-mutation flushing stays off the table: a drag mutates the graph every
-    // frame, and a synchronous disk write per frame is worse than the gap.
-    // Keyed on both, so it fires when either changes; flush is a no-op with
-    // nothing pending, which is what entering edit mode hits.
-    LaunchedEffect(editing, selectedSurface) { layoutRepo.flush() }
-    val currentGraph = LocalLayoutGraph.current
-    // Rebuilt whenever the selected tab changes, so the chrome is always pointed at
-    // the surface being arranged and never at one a move left behind.
-    val state: EditModeState = remember(editing, selectedSurface) {
-        val sel = selectedSurface
-        if (editing && sel != null) {
-            EditModeState.On(sel, controller)
-        } else {
-            EditModeState.Off
+    // The one drop target for the drag under way, worked out once per frame for every widget.
+    val liveDocument by rememberUpdatedState(document)
+    val dropTarget by remember {
+        derivedStateOf {
+            val active = dragController.active ?: return@derivedStateOf null
+            val path = registry.slotForPoint(active.pointerInWindow) ?: return@derivedStateOf null
+            val flow = liveDocument.contentAt(path)?.flow
+            path to registry.insertionIndexInSlot(path, active.pointerInWindow, flow)
         }
     }
 
-    // Window-level Ctrl+E (AppShell onPreviewKeyEvent) bumps
-    // controller.editToggleSignal; this observer flips local edit
-    // state. `seen` initialises to the current tick before collecting
-    // so navigating into a fresh host (new remember, but the singleton
-    // tick may already be > 0) does not spuriously toggle on mount.
-    // Only editable surfaces react. What leaving resets is the exit
-    // clean-up's business, the same for this path as for every other.
-    //
-    // The signal sits on the singleton controller, so every mounted
-    // host observes it. Safe because AppLayout mounts exactly one host
-    // (its Crossfade swaps screen content *inside* the host, not the
-    // host itself) -- there is never a second, hidden host to flip into
-    // edit mode behind the user's back.
-    // The edit session: the window's key handler claims Ctrl+Z only while it is on,
-    // and the undo history lives and dies with it, so it has to be reported rather
-    // than inferred. Cleared on dispose so a host that leaves the tree while editing
-    // does not leave the session open behind it.
-    DisposableEffect(editing) {
-        controller.reportEditing(editing)
-        onDispose { controller.reportEditing(false) }
-    }
-
-    LaunchedEffect(availableSurfaces) {
-        var seen = controller.editToggleSignal.value
-        snapshotFlow { controller.editToggleSignal.value }.collect { tick ->
-            if (tick != seen) {
-                seen = tick
-                if (availableSurfaces.isNotEmpty()) editing = !editing
-            }
-        }
-    }
-
-    val dragController = remember { DragController() }
-    val registry       = remember { DropTargetRegistry() }
-    // Descriptor knowledge for the preset load below; the structural reconcile in
-    // the launcher has no registry to consult.
-    val widgetRegistry = LocalWidgetRegistry.current
-    val focusManager   = LocalFocusManager.current
-    val density        = LocalDensity.current
-
-    // Chrome decorator: identity when off OR previewing, full chrome
-    // only on widgets that belong to the currently-selected surface.
-    // Wrong-surface widgets render plain. Previewing temporarily
-    // suppresses all chrome so the user can see the real look without
-    // leaving edit mode.
-    //
-    // The path the slot renderer hands over identifies the full nested
-    // address of the widget being rendered; chrome uses it both as the
-    // registry key for drop-target bounds and to compose into nested
-    // slots correctly. Only a slot under a surface is arranged here.
-    // When NOT editing, chain to whatever the shell root provided (the dev-debug
-    // decorator, or identity) instead of hardcoding identity: this host wraps the
-    // entire widget tree, so a hardcoded identity here shadows that root decorator
-    // everywhere and makes the debug overlay's slot/widget instrumentation inert.
     val parentWidgetDecorator = LocalWidgetDecorator.current
-    val chromeDecorator: WidgetDecorator = remember(state, previewing, parentWidgetDecorator) {
-        if (state is EditModeState.On && !previewing) {
-            val selected = state.surface
-            decorator@{ nodePath, index, descriptor, instance, content ->
-                val path = nodePath.slotPath
-                if (path == null || path.surface != selected) {
-                    content()
-                    return@decorator
-                }
-                val graph = LocalLayoutGraph.current
-                // A slot that is not there at all reads as a plain column, which is
-                // what an absent slot has always rendered as. A slot that IS there
-                // and carries no flow is a placement slot, and null is its answer,
-                // so the two nulls must not be collapsed with an elvis.
-                val slotContent = graph.traverse(path)
-                val flow = if (slotContent != null) slotContent.flow else FlowSpec.Column
-                EditableWidgetChrome(
-                    path         = path,
-                    index        = index,
-                    descriptor   = descriptor,
-                    instance     = instance,
-                    controller   = dragController,
-                    editController = controller,
-                    registry     = registry,
-                    flow         = flow,
-                    onRemove     = {
-                        // Clear the prop target if it points at this widget, else
-                        // the palette stays gated off (propTarget != null) and the
-                        // user is left with neither panel.
-                        if (propTarget?.instanceId == instance.instanceId) propTarget = null
-                        controller.removeWidget(path, instance.instanceId)
-                    },
-                    onEditProps  = {
-                        // Toggle: tapping the same widget's tune again closes the
-                        // panel, matching the surface-settings gear below.
-                        if (propTarget?.instanceId == instance.instanceId) {
-                            propTarget = null
-                        } else {
-                            propTarget = PropTarget(path, instance.instanceId)
-                            surfaceSettingsOpen = false
-                        }
-                    },
-                    onCommitDrop = { committedPointer ->
-                        // Hit-test which slot received the drop. Null =
-                        // pointer is off any slot; treat as cancel.
-                        val targetPath = registry.slotForPoint(committedPointer)
-                            ?: return@EditableWidgetChrome
-                        val targetContent = graph.traverse(targetPath)
-                        val targetFlow = if (targetContent != null) targetContent.flow else FlowSpec.Column
-                        val targetIdx = registry.insertionIndexInSlot(targetPath, committedPointer, targetFlow)
-                        if (targetPath == path) {
-                            // Same slot -- reorder. -1 when moving down
-                            // because removing the source shifts indices.
-                            if (targetIdx != index) {
-                                controller.reorderInSlot(
-                                    path      = path,
-                                    fromIndex = index,
-                                    toIndex   = if (targetIdx > index) targetIdx - 1 else targetIdx,
-                                )
-                            }
-                        } else {
-                            // Cross-slot move. moveWidget removes from
-                            // source then inserts at target index; no
-                            // index adjustment needed since the source
-                            // slot is different.
-                            controller.moveWidget(
-                                from       = path,
-                                to         = targetPath,
-                                instanceId = instance.instanceId,
-                                toIndex    = targetIdx,
-                                // The kinds the shell cannot do without are the
-                                // ones that render its other surfaces, the regions,
-                                // and moved to another surface one can render itself.
-                                staysOnSurface = !descriptor.removable,
-                            )
-                        }
-                    },
-                    content      = content,
-                )
+    val chromeDecorator: WidgetDecorator = remember(arranging, parentWidgetDecorator) {
+        if (!arranging) return@remember parentWidgetDecorator
+        decorator@{ path, index, descriptor, instance, content ->
+            // A slot of a surface is the layout graph's, which this editor does not arrange.
+            if (path.slotPath != null) {
+                content()
+                return@decorator
             }
-        } else {
-            parentWidgetDecorator
+            val slot = LocalDocument.current?.contentAt(path)
+            val drop = dropTarget
+            EditableWidgetChrome(
+                path         = path,
+                index        = index,
+                descriptor   = descriptor,
+                instance     = instance,
+                controller   = dragController,
+                editor       = editor,
+                registry     = registry,
+                focus        = focus,
+                flow         = if (slot != null) slot.flow else FlowSpec.Column,
+                dropTarget   = drop?.first,
+                dropIndex    = drop?.second ?: -1,
+                onRemove     = { editor.remove(path, instance.instanceId) },
+                onEditProps  = {
+                    val key = WidgetKey(path, instance.instanceId)
+                    dock = if ((dock as? Dock.Props)?.key == key) Dock.Palette else Dock.Props(key)
+                },
+                onCommitDrop = { pointer ->
+                    val target = registry.slotForPoint(pointer) ?: return@EditableWidgetChrome
+                    val flow = liveDocument.contentAt(target)?.flow
+                    val at = registry.insertionIndexInSlot(target, pointer, flow)
+                    if (target == path) {
+                        if (at != index) editor.reorder(path, index, if (at > index) at - 1 else at)
+                    } else {
+                        editor.move(path, target, instance.instanceId, at)
+                    }
+                },
+                content      = content,
+            )
         }
     }
-
-    // Empty-slot decorator: placeholder on every editable surface
-    // while edit mode is on. Reads LocalSlotPath so a nested empty
-    // slot (container with no children) registers its bounds against
-    // the nested path key rather than colliding with another container
-    // at the same (surface, slot) leaf coords.
-    val emptyDecorator: EmptySlotDecorator = remember(state, registry, previewing) {
-        if (state is EditModeState.On && !previewing) {
-            { nodePath ->
-                nodePath.slotPath?.let { EmptySlotPlaceholder(path = it, registry = registry) }
-            }
-        } else {
-            {}
-        }
+    val emptyDecorator: EmptySlotDecorator = remember(arranging) {
+        if (arranging) { path -> if (path.slotPath == null) EmptySlotPlaceholder() } else { _ -> }
     }
-
-    // Unknown-widget decorator: an "unsupported widget" placeholder for any
-    // instance whose kind left the registry (rename / removal / a plugin not
-    // loaded), shown on every surface while editing so the orphan is visible
-    // and one-tap removable. Identity off / previewing -- production renders
-    // nothing and the instance keeps its props / children on disk.
-    val unknownDecorator: UnknownWidgetDecorator = remember(state, previewing) {
-        if (state is EditModeState.On && !previewing) {
-            { nodePath, _, instance ->
-                val path = nodePath.slotPath
-                UnsupportedWidgetPlaceholder(
-                    instance = instance,
-                    onRemove = { if (path != null) controller.removeWidget(path, instance.instanceId) },
-                )
-            }
+    val unknownDecorator: UnknownWidgetDecorator = remember(arranging) {
+        if (arranging) {
+            { path, _, instance -> UnsupportedWidgetPlaceholder(instance = instance, onRemove = { editor.remove(path, instance.instanceId) }) }
         } else {
             { _, _, _ -> }
         }
     }
-
-    // Slot chrome modifier: a zero-footprint Modifier applied to each slot's flow
-    // root on the selected surface. It highlights the selected slot, reports its
-    // bounds for the handle anchor, and routes a background / right-click press to
-    // selection + the layout menu. Identity off / previewing / foreign surface, so
-    // other surfaces and production pay nothing.
     val parentSlotChrome = LocalSlotChromeModifier.current
-    val slotChromeFactory: SlotChromeModifier = remember(state, previewing, parentSlotChrome) {
-        if (state is EditModeState.On && !previewing) {
-            val selected = state.surface
-            { nodePath, _ ->
-                val path = nodePath.slotPath
-                if (path != null && path.surface == selected) {
-                    slotChromeModifier(
-                        path          = path,
-                        selectedSlot  = selectedSlotState,
-                        onSelect      = { selectedSlotState.value = it; handleMenuOpen = false; slotMenuCursor = null },
-                        onContextMenu = { p, off -> selectedSlotState.value = p; slotMenuCursor = off; handleMenuOpen = false },
-                        onReportRect  = { selectedSlotRect = it },
-                    )
-                } else {
-                    Modifier
-                }
+    val slotChromeFactory: SlotChromeModifier = remember(arranging, parentSlotChrome) {
+        if (!arranging) return@remember parentSlotChrome
+        { path, slotContent ->
+            if (path.slotPath != null) {
+                Modifier
+            } else {
+                slotChromeModifier(
+                    path          = path,
+                    empty         = slotContent.widgets.isEmpty(),
+                    registry      = registry,
+                    selectedSlot  = selectedSlotState,
+                    onSelect      = { selectedSlotState.value = it; handleMenuOpen = false; slotMenuCursor = null },
+                    onContextMenu = { p, off -> selectedSlotState.value = p; slotMenuCursor = off; handleMenuOpen = false },
+                    onReportRect  = { selectedSlotRect = it },
+                )
             }
-        } else {
-            parentSlotChrome
         }
     }
-
-    // Remembered, not built inline: the Local is a dynamic one, and a fresh map
-    // each recompose would invalidate every slot that reads it -- which is all of
-    // them -- for a value that changes only when the editor picks a family.
-    val familyOverrides: Map<SurfaceId, FamilyId> = remember(editing, selectedSurface, selectedFamily) {
-        val sid = selectedSurface
-        val fid = selectedFamily
-        if (editing && sid != null && fid != null) mapOf(sid to fid) else emptyMap()
+    val refusedMount: @Composable (SurfaceId) -> Unit = remember(arranging) {
+        if (arranging) { _ -> RefusedMountPlaceholder() } else { _ -> }
     }
-
-    /**
-     * Remembered, and that is not a micro-optimisation.
-     *
-     * [LocalSlotBoundsReporter] is a STATIC local, so a new value recomposes the
-     * whole subtree it is provided over rather than the places that read it. A
-     * lambda literal built inline here is a new value on any recomposition the
-     * compiler cannot prove away, and this function recomposes on every frame of
-     * a drag. That put a second whole-shell invalidation per pointer move next to
-     * the one the layout graph was already causing.
-     */
-    // Where a surface refused to open inside itself. Said only while arranging,
-    // which is the only time somebody can have caused it and can undo it.
-    val refusedMount: @Composable (SurfaceId) -> Unit = remember(state, previewing) {
-        if (state is EditModeState.On && !previewing) {
-            { _ -> RefusedMountPlaceholder() }
-        } else {
-            { _ -> }
-        }
+    // Remembered: a static local changed on every recomposition of this host would recompose the whole shell.
+    val slotBoundsReporter: SlotBoundsReporter = remember(arranging, registry) {
+        if (arranging) { path, _, contentRect -> registry.registerSlotContent(path, contentRect) } else { _, _, _ -> }
     }
-
-    val slotBoundsReporter: SlotBoundsReporter = remember(state, previewing, registry) {
-        if (state is EditModeState.On && !previewing) {
-            { path, visible, content -> path.slotPath?.let { registry.registerSlot(it, visible, content) } }
-        } else {
-            { _, _, _ -> }
-        }
-    }
-
-    val slotBoundsWithdrawal: (NodePath) -> Unit = remember(registry) { { path -> path.slotPath?.let { registry.withdrawSlot(it) } } }
+    val slotBoundsWithdrawal: (NodePath) -> Unit = remember(registry) { { path -> registry.withdrawSlot(path) } }
+    val state: EditModeState = remember(editing) { if (editing) EditModeState.On(editor) else EditModeState.Off }
 
     CompositionLocalProvider(
+        // The panels, the palette and the slot menu stand outside the config view that provides it to the widgets.
+        LocalDocument           provides document,
         LocalShellChromeBounds  provides chromeBounds,
         LocalEditMode           provides state,
         LocalDragController     provides dragController,
         LocalDropTargetRegistry provides registry,
+        LocalEditFocus          provides focus,
         LocalWidgetDecorator    provides chromeDecorator,
         LocalEmptySlotDecorator provides emptyDecorator,
         LocalUnknownWidgetDecorator provides unknownDecorator,
         LocalSlotChromeModifier provides slotChromeFactory,
-        // Shows the family being arranged in place of the one the app would.
-        // Empty while not editing, so nothing the editor picked survives the exit.
-        LocalFamilyOverrides provides familyOverrides,
-        // Edit-mode reflow duration: slot add / remove / resize animates while
-        // editing, and nothing elsewhere.
-        LocalSlotMotionMs provides if (state is EditModeState.On && !previewing) {
-            Motion.panelSlide.durationMs
-        } else 0,
-        // Reflow is a view-time fit, so it is off while editing: a widget capped to
-        // its slot cannot be resized past it. Preview turns it back on to check the
-        // fit, and it is always on outside the editor.
-        LocalPlacementReflow provides !(state is EditModeState.On && !previewing),
-        // Placement slots report their window bounds so palette drops land at the
-        // release point (PaletteItem reads slotOrigin to convert the pointer).
+        LocalSlotMotionMs provides if (arranging) Motion.panelSlide.durationMs else 0,
+        // Reflow is a view-time fit, so it is off while arranging: a widget capped to its slot cannot be resized past it.
+        LocalPlacementReflow provides !arranging,
         LocalSlotBoundsReporter provides slotBoundsReporter,
         LocalSlotBoundsWithdrawal provides slotBoundsWithdrawal,
         LocalRefusedMount provides refusedMount,
-        // A widget whose show condition does not hold is left out of its slot, except
-        // while arranging, on every surface, so it can be found where it stands. Preview
-        // shows the real look, which leaves it out.
-        LocalHiddenWidget provides if (state is EditModeState.On && !previewing) HiddenWidget else null,
-        // A press on empty map selects the slot while arranging; the middle button
-        // moves the map then.
-        LocalMapPanOnPrimary provides !(state is EditModeState.On && !previewing),
+        LocalHiddenWidget provides if (arranging) HiddenWidget else null,
+        LocalMapPanOnPrimary provides !arranging,
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .onGloballyPositioned { hostRect.value = it.boundsInWindow() }
-                // The way into edit mode for anyone who does not already know the
-                // chord. Right-clicking the background of the thing you want to
-                // rearrange is how every desktop offers this, so it is the gesture
-                // people try first -- and until now the only entrance was Ctrl+E,
-                // documented nowhere in the interface.
-                //
-                // Final pass, like the slot chrome: a press any widget claimed
-                // belongs to that widget. While editing this does nothing, because
-                // the slot chrome owns right-click there.
+                // The way in for anyone who does not know the chord: a right click on the background, in the final
+                // pass so a press a widget took stays the widget's. While arranging the slot chrome owns it.
                 .pointerInput(editing) {
                     awaitPointerEventScope {
                         while (true) {
@@ -703,316 +420,178 @@ fun EditorSurfaceHost(
                             }
                         }
                     }
+                }
+                // Which widget is meant: the innermost under the pointer, one for the whole window. Observed on the
+                // first pass and never consumed, so nothing underneath loses a move.
+                .pointerInput(arranging) {
+                    if (!arranging) return@pointerInput
+                    awaitPointerEventScope {
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Initial)
+                            val change = event.changes.firstOrNull() ?: continue
+                            when (event.type) {
+                                PointerEventType.Exit -> focus.hovered = null
+                                else -> if (change.type != PointerType.Touch) {
+                                    focus.hovered = registry.widgetForPoint(hostRect.value.topLeft + change.position)
+                                }
+                            }
+                        }
+                    }
                 },
         ) {
-            // While in edit mode the pane is framed in a thin line of the lead
-            // colour (EditModeVignette below) to communicate "this whole pane is
-            // being edited", without obscuring content.
             content()
 
             entryMenuAt?.let { at ->
-                NxContextMenu(
-                    anchorInWindow   = at,
-                    expanded         = true,
-                    onDismissRequest = { entryMenuAt = null },
-                ) {
-                    NxMenuItem(
-                        label = nexiraStrings().text("editorEnterLayout"),
-                        icon  = NxIcon.ViewQuilt,
-                        hint  = "Ctrl+E",
-                    ) {
+                NxContextMenu(anchorInWindow = at, expanded = true, onDismissRequest = { entryMenuAt = null }) {
+                    NxMenuItem(label = nexiraStrings().text("editorEnterLayout"), icon = NxIcon.ViewQuilt, hint = "Ctrl+E") {
                         entryMenuAt = null
                         editing = true
                     }
                 }
             }
 
-            // Center-anchored chrome layer: the vignette and the overlays belong
-            // over the content pane, so they take the rectangle the centre region
-            // reported rather than a guess at what the rails leave. Padding on an
-            // inner box, because a box that both measures and pads itself chases
-            // its own tail.
             ContentPaneBox(chromeBounds, hostRect) {
-            EditModeVignette(active = editing)
-
-            if (availableSurfaces.isNotEmpty()) {
-                val surfaceForReset = selectedSurface
-                if (editing && resetSurfaceConfirm && surfaceForReset != null) {
-                    NxAlertDialog(
-                        onDismissRequest = { resetSurfaceConfirm = false },
-                        paneTitle        = s.text("editorResetSurfaceTitle"),
-                        title            = { Text(s.text("editorResetSurfaceTitle")) },
-                        text             = {
-                            Text(
-                                text = s.text("editorResetSurfaceBody", humanSurfaceName(surfaceForReset, s, graphForSurfaces)),
-                                style = MaterialTheme.typography.bodyMedium,
-                            )
-                        },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                controller.resetSurface(surfaceForReset)
-                                resetSurfaceConfirm = false
-                            }) { Text(s.text("editorReset"), color = NxColor.status(Status.Error)) }
-                        },
-                        // Resetting everything is offered from here and asked about on
-                        // its own. It sat beside this surface's reset as a second red
-                        // button, under a body promising that the other surfaces are
-                        // left alone, which is true of one of the two.
-                        dismissButton = {
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                TextButton(modifier = Modifier.layerTrigger(), onClick = {
-                                    resetSurfaceConfirm = false
-                                    resetAllConfirm = true
-                                }) { Text(s.text("editorResetAll")) }
-                                TextButton(onClick = { resetSurfaceConfirm = false }) { Text(s.text("editorCancel")) }
-                            }
-                        },
-                    )
-                }
-                if (editing && resetAllConfirm) {
-                    NxAlertDialog(
-                        onDismissRequest = { resetAllConfirm = false },
-                        paneTitle        = s.text("editorResetAllTitle"),
-                        title            = { Text(s.text("editorResetAllTitle")) },
-                        text             = { Text(s.text("editorResetAllBody"), style = MaterialTheme.typography.bodyMedium) },
-                        confirmButton = {
-                            TextButton(onClick = {
-                                controller.resetAll()
-                                resetAllConfirm = false
-                            }) { Text(s.text("editorResetAll"), color = NxColor.status(Status.Error)) }
-                        },
-                        dismissButton = {
-                            TextButton(onClick = { resetAllConfirm = false }) { Text(s.text("editorCancel")) }
-                        },
-                    )
-                }
-
-                PresetManagerPanel(
-                    visible       = editing && presetPanelOpen,
-                    onDismiss     = { presetPanelOpen = false },
-                    onSaveCurrent = { name ->
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            presetRepo.save(name, currentGraph, customization)
-                        }
-                    },
-                    onLoad = { meta ->
-                        coroutineScope.launch {
-                            val env = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                presetRepo.load(meta.name)
-                            } ?: return@launch
-                            // Route the preset through the same migrate + merge +
-                            // uniqueness pipeline as a normal on-disk load, so a
-                            // preset from an older schema (retired kinds) or app
-                            // version (missing surfaces/slots) reconciles instead
-                            // of landing in live state verbatim. The structural
-                            // half already ran inside the repository, before the
-                            // graph was decoded; this is the half that reads one.
-                            val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                runCatching {
-                                    LayoutReconcile.reconcile(env.schemaVersion, env.graph, DefaultLayout.load())
-                                }
-                                    .onFailure { log.error("Preset '{}' failed to reconcile, not loading", meta.name, it) }
-                                    .getOrNull()
-                            } ?: return@launch
-                            when (result) {
-                                is LayoutReconcile.Result.Ok -> {
-                                    // And the registry-aware pass on top of it: the
-                                    // structural one seeds missing surfaces and slots
-                                    // but knows nothing of widget descriptors, so a
-                                    // preset saved before a container declared a child
-                                    // slot arrives without it -- the slot draws its
-                                    // placeholder, highlights on hover, and silently
-                                    // swallows every drop until the next start
-                                    // reconciles what this wrote to disk.
-                                    val seeded = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-                                        WidgetGraphReconciler.reconcile(
-                                            graph    = result.graph,
-                                            registry = widgetRegistry,
-                                        )
-                                    }
-                                    if (seeded.seededSlots > 0) {
-                                        log.info(
-                                            "Preset '{}': seeded {} declared container child slot(s)",
-                                            meta.name, seeded.seededSlots,
-                                        )
-                                    }
-                                    controller.loadArrangement(seeded.graph)
-                                    onCustomizationChanged(env.customization)
-                                    presetPanelOpen = false
-                                }
-                                is LayoutReconcile.Result.DuplicateId ->
-                                    log.error(
-                                        "Preset '{}' yields a duplicate instanceId '{}' after {}; not loading to protect the live layout.",
-                                        meta.name, result.id, result.stage,
-                                    )
-                            }
-                        }
-                    },
-                    onDelete = { meta ->
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            presetRepo.delete(meta.name)
-                        }
-                    },
-                    onExport = { meta ->
-                        // Open the parent dir in the OS file manager and
-                        // let the user copy from there. Avoids depending
-                        // on a save-file dialog API that the current
-                        // FileKit version does not expose.
-                        SystemActions.openFolder(meta.sourcePath.parent.toString())
-                    },
-                    listProvider = { presetRepo.list() },
-                    builtIns     = BundledPresets.IDS,
-                    onApplyBuiltIn = { id ->
-                        coroutineScope.launch {
-                            val preset = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                                runCatching { BundledPresets.load(id) }
-                                    .onFailure { log.error("Bundled preset '{}' failed to load", id, it) }
-                                    .getOrNull()
-                            } ?: return@launch
-                            // Only the surfaces the preset is about change. The look and
-                            // every other surface stay as the person left them, which is
-                            // what separates a shipped arrangement from a saved snapshot.
-                            controller.rearrange { graph ->
-                                WidgetGraphReconciler.reconcile(
-                                    graph    = graph.withSurfacesFrom(preset),
-                                    registry = widgetRegistry,
-                                ).graph
-                            }
-                            presetPanelOpen = false
-                        }
-                    },
-                )
+                EditModeVignette(active = editing)
 
                 WidgetModulesPanel(
-                    visible   = editing && !previewing && modulesPanelOpen,
+                    visible   = arranging && modulesPanelOpen,
                     modules   = widgetModules,
                     onDismiss = { modulesPanelOpen = false },
                     modifier  = Modifier.align(Alignment.TopStart).padding(start = 16.dp),
                 )
-
                 WidgetPalettePanel(
-                    visible        = editing && paletteOpen && !previewing && propTarget == null && !surfaceSettingsOpen,
-                    onDismiss      = { paletteOpen = false },
-                    controller     = dragController,
-                    registry       = registry,
-                    editController = controller,
-                    surface        = selectedSurface,
-                    modifier       = Modifier.align(Alignment.TopEnd),
+                    visible   = arranging && paletteOpen && dock == Dock.Palette,
+                    onDismiss = { paletteOpen = false },
+                    controller = dragController,
+                    registry  = registry,
+                    editor    = editor,
+                    modifier  = Modifier.align(Alignment.TopEnd),
                 )
-
+                val props = (dock as? Dock.Props)?.key
                 WidgetPropPanel(
-                    visible    = editing && !previewing && propTarget != null,
-                    path       = propTarget?.path,
-                    instanceId = propTarget?.instanceId,
-                    controller = controller,
-                    onDismiss  = { propTarget = null },
+                    visible    = arranging && props != null,
+                    path       = props?.path,
+                    instanceId = props?.instanceId,
+                    editor     = editor,
+                    onDismiss  = { dock = Dock.Palette },
                     modifier   = Modifier.align(Alignment.TopEnd),
                 )
-
-                // Surface-level settings (region's own settings, e.g. the left
-                // rail's selection style) -- shares the right edge with the
-                // widget prop panel; the two are mutually exclusive by flag.
+                ScreenPropertiesPanel(
+                    visible   = arranging && dock == Dock.Screen && screen != null,
+                    spec      = screen,
+                    editor    = editor,
+                    onDelete  = deleteScreen,
+                    onDismiss = { dock = Dock.Palette },
+                    modifier  = Modifier.align(Alignment.TopEnd),
+                )
                 SurfacePropertiesPanel(
-                    visible                = editing && !previewing && surfaceSettingsOpen &&
-                        selectedScreen == null && surfaceHasSettings(selectedSurface, graphForSurfaces),
-                    title                  = selectedSurface?.let { humanSurfaceName(it, s, graphForSurfaces) } ?: "",
+                    visible                = arranging && dock == Dock.RailStyle,
+                    title                  = s.text("editorSurfShortLeftRail"),
                     customization          = customization,
                     onCustomizationChanged = onCustomizationChanged,
-                    onDismiss              = { surfaceSettingsOpen = false },
+                    onDismiss              = { dock = Dock.Palette },
                     modifier               = Modifier.align(Alignment.TopEnd),
                 )
 
-                // A made screen's own settings, on the same chip and in the same place.
-                ScreenPropertiesPanel(
-                    visible    = editing && !previewing && surfaceSettingsOpen && selectedScreen != null,
-                    spec       = selectedScreen,
-                    controller = controller,
-                    onDelete   = deleteScreen,
-                    onDismiss  = { surfaceSettingsOpen = false },
-                    modifier   = Modifier.align(Alignment.TopEnd),
-                )
-
-                // No edit-mode FAB: Ctrl+E (window-level, see AppShell) toggles
-                // edit mode and Escape exits, so a dedicated button is redundant.
-            }
-            } // end center-anchored chrome layer
-
-            // Editor toolbar pill: centered over the WHOLE window, NOT the content
-            // pane. The rails collapse (Ctrl+N) and resize, so centring inside the
-            // pane drifts the pill across rail states. The full-window box keeps it
-            // put.
-            if (availableSurfaces.isNotEmpty()) {
-                EditModePill(
-                    active                = editing,
-                    surfaces              = availableSurfaces,
-                    selectedSurface       = selectedSurface,
-                    folded                = foldedSurfaces,
-                    onSurfacePicked       = { picked ->
-                        selectedSurface = picked
-                        followsScreen = !EditorSurfaces.isShell(picked)
-                        surfaceSettingsOpen = false
-                        clearSlotSelection()
-                        // Nothing can be arranged inside a folded rail, and the one
-                        // control that changes that is on its region. Opening it is
-                        // the answer to the press rather than a tab that shows a
-                        // hairline and explains nothing.
-                        // Null when the surface is nobody's inside, which leaves
-                        // the tab selected and nothing opened rather than opening
-                        // a panel about a region that does not exist.
-                        propTarget = (picked.takeIf { it in foldedSurfaces })
-                            ?.let { ownerRegion(it) }
-                            ?.let { (regionPath, id) -> PropTarget(regionPath, id) }
-                    },
-                    families              = availableFamilies,
-                    selectedFamily        = selectedFamily,
-                    onFamilyPicked        = { selectedFamily = it; clearSlotSelection() },
-                    surfaceHasSettings    = surfaceHasSettings(selectedSurface, graphForSurfaces),
-                    onOpenSurfaceSettings = { surfaceSettingsOpen = !surfaceSettingsOpen; if (surfaceSettingsOpen) propTarget = null },
-                    paletteOpen           = paletteOpen,
-                    onTogglePalette       = { paletteOpen = !paletteOpen },
-                    previewing            = previewing,
-                    onTogglePreview       = { previewing = !previewing },
-                    onOpenPresets         = { presetPanelOpen = true },
-                    onOpenModules         = { modulesPanelOpen = !modulesPanelOpen },
-                    onNewScreen           = {
-                        pendingSettings = true
-                        pendingScreen = controller.createScreen(s.text("screenDefaultTitle", graphForSurfaces.screens.size + 1))
-                    },
-                    onRequestReset        = { if (selectedSurface != null) resetSurfaceConfirm = true },
-                    hasRegionProps        = ownerRegion(selectedSurface) != null,
-                    onOpenRegionProps     = {
-                        ownerRegion(selectedSurface)?.let { (regionPath, id) ->
-                            surfaceSettingsOpen = false
-                            propTarget = if (propTarget?.instanceId == id) null else PropTarget(regionPath, id)
-                        }
-                    },
-                    canUndo               = controller.canUndo,
-                    canRedo               = controller.canRedo,
-                    onUndo                = { controller.undo() },
-                    onRedo                = { controller.redo() },
-                    modifier              = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBars).padding(top = 16.dp),
-                )
+                if (editing && resetScreenConfirm && screen != null) {
+                    ConfirmDialog(
+                        title   = s.text("editorResetSurfaceTitle"),
+                        body    = s.text("editorResetSurfaceBody", screen.title.ifBlank { s.text("screenUntitled") }),
+                        confirm = s.text("editorReset"),
+                        onConfirm = { editor.resetScreen(composition, config, standard, pagesOf) },
+                        onDismiss = { resetScreenConfirm = false },
+                    )
+                }
+                if (editing && resetAllConfirm) {
+                    ConfirmDialog(
+                        title   = s.text("editorResetAllTitle"),
+                        body    = s.text("editorResetAllBody"),
+                        confirm = s.text("editorResetAll"),
+                        onConfirm = { editor.resetAll(standard) },
+                        onDismiss = { resetAllConfirm = false },
+                    )
+                }
+                if (editing && standardConfirm) {
+                    ConfirmDialog(
+                        title   = s.text("editorBackToStandardTitle"),
+                        body    = s.text("editorBackToStandardBody"),
+                        confirm = s.text("editorBackToStandard"),
+                        onConfirm = { editor.backToStandard() },
+                        onDismiss = { standardConfirm = false },
+                    )
+                }
+                editor.consent.value?.let {
+                    ConfirmDialog(
+                        title     = s.text("editorExpertTitle"),
+                        body      = s.text("editorExpertBody"),
+                        confirm   = s.text("editorExpertConfirm"),
+                        danger    = false,
+                        onConfirm = { editor.answerConsent(yes = true) },
+                        onDismiss = { editor.answerConsent(yes = false) },
+                    )
+                }
             }
 
-            // Selected-slot chrome (Tier 2): handle + layout menu, full-window
-            // so it is never a layout child of the edited slot.
-            if (editing && !previewing) {
+            EditModePill(
+                active             = editing,
+                paletteOpen        = paletteOpen && dock == Dock.Palette,
+                onTogglePalette    = { if (dock == Dock.Palette) paletteOpen = !paletteOpen else { dock = Dock.Palette; paletteOpen = true } },
+                previewing         = previewing,
+                onTogglePreview    = { previewing = !previewing },
+                screenOpen         = dock == Dock.Screen,
+                onOpenScreen       = { dock = if (dock == Dock.Screen) Dock.Palette else Dock.Screen },
+                onOpenRailStyle    = { dock = if (dock == Dock.RailStyle) Dock.Palette else Dock.RailStyle },
+                onOpenModules      = { modulesPanelOpen = !modulesPanelOpen },
+                onNewScreen        = {
+                    val made = (document.compositions[composition]?.configs?.size ?: 0) + 1
+                    pendingScreen = editor.createScreen(composition, s.text("screenDefaultTitle", made), ScreenIcons.DEFAULT, pagesOf)
+                },
+                resetMenuOpen      = resetMenuOpen,
+                onResetMenu        = { resetMenuOpen = it },
+                onResetScreen      = { resetScreenConfirm = true },
+                onResetAll         = { resetAllConfirm = true },
+                ownDocument        = store.own.collectAsState().value,
+                onBackToStandard   = { standardConfirm = true },
+                canUndo            = editor.canUndo,
+                canRedo            = editor.canRedo,
+                onUndo             = { editor.undo() },
+                onRedo             = { editor.redo() },
+                modifier           = Modifier.align(Alignment.TopCenter).windowInsetsPadding(WindowInsets.statusBars).padding(top = 16.dp),
+            )
+
+            if (arranging) {
                 SlotSelectionOverlay(
                     selectedSlot     = selectedSlotState.value,
                     selectedSlotRect = selectedSlotRect,
                     handleMenuOpen   = handleMenuOpen,
                     cursorAnchor     = slotMenuCursor,
-                    controller       = controller,
+                    editor           = editor,
                     onOpenHandleMenu = { handleMenuOpen = true },
                     onDismiss        = { handleMenuOpen = false; slotMenuCursor = null },
                 )
             }
 
-            // The drag ghost follows the pointer across the WHOLE shell (rails
-            // included), so it stays full-window, above the inset chrome layer.
             DragGhostOverlay(dragController = dragController)
         }
     }
+}
+
+/** A question with one red answer, or one plain one where [danger] is false, and a way out. */
+@Composable
+private fun ConfirmDialog(title: String, body: String, confirm: String, onConfirm: () -> Unit, onDismiss: () -> Unit, danger: Boolean = true) {
+    val s = nexiraStrings()
+    NxAlertDialog(
+        onDismissRequest = onDismiss,
+        paneTitle        = title,
+        title            = { Text(title) },
+        text             = { Text(text = body, style = MaterialTheme.typography.bodyMedium) },
+        confirmButton    = {
+            TextButton(onClick = { onConfirm(); onDismiss() }) {
+                Text(confirm, color = if (danger) NxColor.status(Status.Error) else NxColor.lead())
+            }
+        },
+        dismissButton    = { TextButton(onClick = onDismiss) { Text(s.text("editorCancel")) } },
+    )
 }
 
 /**
@@ -1043,26 +622,22 @@ private fun ContentPaneBox(
 @Composable
 private fun EditModePill(
     active: Boolean,
-    surfaces: List<SurfaceId>,
-    selectedSurface: SurfaceId?,
-    /** Of [surfaces], the ones whose region is folded away right now. */
-    folded: Set<SurfaceId>,
-    onSurfacePicked: (SurfaceId) -> Unit,
-    families: List<FamilyId>,
-    selectedFamily: FamilyId?,
-    onFamilyPicked: (FamilyId?) -> Unit,
-    surfaceHasSettings: Boolean,
-    onOpenSurfaceSettings: () -> Unit,
-    hasRegionProps: Boolean,
-    onOpenRegionProps: () -> Unit,
     paletteOpen: Boolean,
     onTogglePalette: () -> Unit,
     previewing: Boolean,
     onTogglePreview: () -> Unit,
-    onOpenPresets: () -> Unit,
+    screenOpen: Boolean,
+    onOpenScreen: () -> Unit,
+    onOpenRailStyle: () -> Unit,
     onOpenModules: () -> Unit,
     onNewScreen: () -> Unit,
-    onRequestReset: () -> Unit,
+    resetMenuOpen: Boolean,
+    onResetMenu: (Boolean) -> Unit,
+    onResetScreen: () -> Unit,
+    onResetAll: () -> Unit,
+    /** Whether the person keeps a document of their own, the only case going back to the standard one means anything. */
+    ownDocument: Boolean,
+    onBackToStandard: () -> Unit,
     canUndo: Boolean,
     canRedo: Boolean,
     onUndo: () -> Unit,
@@ -1077,112 +652,31 @@ private fun EditModePill(
         exit     = fadeOut(tween(motionMs)) + slideOutVertically(tween(motionMs)) { -it },
         modifier = modifier,
     ) {
-        // The pill goes icon-only when the labelled one does not fit, measured rather
-        // than guessed. A width threshold was right for one set of chips and wrong
-        // the moment a chip or a surface tab was added: the labelled pill ran past
-        // the window and the "Esc -- exit" hint was squeezed into a vertical
-        // staircase that made the whole pill five rows tall.
+        // The pill goes icon-only when the labelled one does not fit, measured rather than guessed.
         FitOrCompact { compact ->
-            NxSurface(
-                kind  = SurfaceKind.Popup,
-                shape = RoundedCornerShape(20.dp),
-            ) {
+            NxSurface(kind = SurfaceKind.Popup, shape = RoundedCornerShape(20.dp)) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    // Only the compact form scrolls: the labelled one is measured with no width limit to
-                    // see whether it fits, and a scroller refuses an unlimited width.
+                    // Only the compact form scrolls: the labelled one is measured with no width limit to see whether
+                    // it fits, and a scroller refuses an unlimited width.
                     modifier = Modifier
                         .then(if (compact) Modifier.horizontalScroll(rememberScrollState()) else Modifier)
                         .padding(start = 12.dp, end = if (compact) 8.dp else 4.dp, top = 6.dp, bottom = 6.dp),
                 ) {
-                    Symbol(icon = NxIcon.Tune,
-                        contentDescription = null,
-                        tint               = NxColor.lead(),
-                        modifier           = Modifier.size(16.dp),
-                    )
+                    Symbol(icon = NxIcon.Tune, contentDescription = null, tint = NxColor.lead(), modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
-
-                    // Surface picker chips. One chip per available surface;
-                    // the active surface has a wash of the lead colour.
-                    surfaces.forEach { sid ->
-                        SurfaceChip(
-                            surface  = sid,
-                            active   = sid == selectedSurface,
-                            folded   = sid in folded,
-                            compact  = compact,
-                            onClick  = { onSurfacePicked(sid) },
-                        )
-                        Spacer(Modifier.width(4.dp))
-                    }
-
-                    // Family picker. Only for a surface that has more than one:
-                    // a single-family surface has nothing to choose, and a chip
-                    // that cannot change anything is noise in a pill already
-                    // tight enough to go icon-only.
-                    if (families.size > 1) {
-                        Spacer(Modifier.width(2.dp))
-                        families.forEach { fid ->
-                            FamilyChip(
-                                family  = fid,
-                                active  = fid == selectedFamily,
-                                compact = compact,
-                                // Picking the pinned one again hands the surface back
-                                // to the app, so the editor is never left holding a
-                                // family the reader has stopped looking at.
-                                onClick = { onFamilyPicked(if (fid == selectedFamily) null else fid) },
-                            )
-                            Spacer(Modifier.width(4.dp))
-                        }
-                    }
-
-                    Spacer(Modifier.width(6.dp))
-
-                    // Surface settings: opens the selected surface's own settings
-                    // panel (e.g. the left rail's selection style). Shown only for
-                    // surfaces that expose surface-level settings.
-                    if (surfaceHasSettings) {
-                        ToolChip(
-                            icon     = NxIcon.Settings,
-                            label    = s.text("editorSurfaceSettings"),
-                            selected = false,
-                            onClick  = onOpenSurfaceSettings,
-                            compact  = compact,
-                        )
-                        Spacer(Modifier.width(4.dp))
-                    }
-
-                    // The region this surface sits in, by its own settings.
-                    //
-                    // Its width, its plane and whether it is folded away are props on
-                    // a widget in the frame, and the frame is a surface of its own, so
-                    // reaching them meant knowing that the shell is a row, that the row
-                    // is editable, and which of the three widgets in it is the rail you
-                    // can see. They are one press from the rail's own tab now.
-                    if (hasRegionProps) {
-                        ToolChip(
-                            icon     = NxIcon.ViewSidebar,
-                            label    = s.text("editorRegionProps"),
-                            selected = false,
-                            onClick  = onOpenRegionProps,
-                            compact  = compact,
-                        )
-                        Spacer(Modifier.width(4.dp))
-                    }
-
-                    // Preview toggle -- hides chrome temporarily so the
-                    // user can see the real look without leaving edit
-                    // mode. Drag becomes impossible during preview (no
-                    // handles), which matches user intent.
+                    ToolChip(NxIcon.Settings, s.text("editorScreenSettings"), selected = screenOpen, onClick = onOpenScreen, compact = compact)
+                    Spacer(Modifier.width(4.dp))
+                    ToolChip(NxIcon.ViewSidebar, s.text("editorSurfShortLeftRail"), selected = false, onClick = onOpenRailStyle, compact = compact)
+                    Spacer(Modifier.width(4.dp))
                     ToolChip(
-                        icon       = if (previewing) NxIcon.VisibilityOff else NxIcon.Visibility,
-                        label      = if (previewing) s.text("editorPreviewHidden") else s.text("editorPreview"),
-                        selected   = previewing,
-                        onClick    = onTogglePreview,
-                        compact    = compact,
+                        icon     = if (previewing) NxIcon.VisibilityOff else NxIcon.Visibility,
+                        label    = if (previewing) s.text("editorPreviewHidden") else s.text("editorPreview"),
+                        selected = previewing,
+                        onClick  = onTogglePreview,
+                        compact  = compact,
                     )
                     Spacer(Modifier.width(4.dp))
-
-                    // Palette toggle.
                     ToolChip(
                         icon     = NxIcon.Widgets,
                         label    = if (paletteOpen) s.text("editorPaletteToggleHide") else s.text("editorWidgets"),
@@ -1191,82 +685,37 @@ private fun EditModePill(
                         compact  = compact,
                     )
                     Spacer(Modifier.width(4.dp))
-
-                    // Undo and redo. On the bar as well as on Ctrl+Z, because a
-                    // chord nobody is told about is a chord nobody has, and the
-                    // greyed pair is also the only place the editor says whether
-                    // there is anything to go back to.
-                    ToolChip(
-                        icon     = NxIcon.Undo,
-                        label    = s.text("editorUndo"),
-                        selected = false,
-                        onClick  = onUndo,
-                        enabled  = canUndo,
-                        compact  = compact,
-                    )
+                    // Undo and redo, on the bar as well as on Ctrl+Z, because a chord nobody is told about is a chord
+                    // nobody has, and the greyed pair is the only place that says whether there is anything to go back to.
+                    ToolChip(NxIcon.Undo, s.text("editorUndo"), selected = false, onClick = onUndo, enabled = canUndo, compact = compact)
                     Spacer(Modifier.width(4.dp))
-                    ToolChip(
-                        icon     = NxIcon.Redo,
-                        label    = s.text("editorRedo"),
-                        selected = false,
-                        onClick  = onRedo,
-                        enabled  = canRedo,
-                        compact  = compact,
-                    )
+                    ToolChip(NxIcon.Redo, s.text("editorRedo"), selected = false, onClick = onRedo, enabled = canRedo, compact = compact)
                     Spacer(Modifier.width(4.dp))
-
-                    // A new screen of one's own, opened and ready to be named.
-                    ToolChip(
-                        icon     = NxIcon.Add,
-                        label    = s.text("editorNewScreen"),
-                        selected = false,
-                        onClick  = onNewScreen,
-                        compact  = compact,
-                    )
+                    ToolChip(NxIcon.Add, s.text("editorNewScreen"), selected = false, onClick = onNewScreen, compact = compact)
                     Spacer(Modifier.width(4.dp))
-
-                    // The widget modules, switched on and off while the launcher runs.
-                    ToolChip(
-                        icon     = NxIcon.Folder,
-                        label    = s.text("modulesChip"),
-                        selected = false,
-                        onClick  = onOpenModules,
-                        compact  = compact,
-                    )
+                    ToolChip(NxIcon.Folder, s.text("modulesChip"), selected = false, onClick = onOpenModules, compact = compact)
                     Spacer(Modifier.width(4.dp))
-
-                    // Presets dialog.
-                    ToolChip(
-                        icon     = NxIcon.Inventory2,
-                        label    = s.text("editorPresetsTitle"),
-                        selected = false,
-                        onClick  = onOpenPresets,
-                        compact  = compact,
-                    )
-                    Spacer(Modifier.width(4.dp))
-
-                    // Escape hatch: reset the currently selected surface
-                    // to its bundled default. Destructive tint signals it
-                    // is a different class of action from the neutral
-                    // toggles next to it; confirmation dialog handled at
-                    // host level. Disabled when no surface is selected so
-                    // the chip cannot pretend to be live.
-                    ToolChip(
-                        icon        = NxIcon.RestartAlt,
-                        label       = s.text("editorReset"),
-                        selected    = false,
-                        onClick     = onRequestReset,
-                        destructive = true,
-                        enabled     = selectedSurface != null,
-                        compact     = compact,
-                    )
-
+                    Box {
+                        ToolChip(
+                            icon        = NxIcon.RestartAlt,
+                            label       = s.text("editorReset"),
+                            selected    = false,
+                            onClick     = { onResetMenu(true) },
+                            destructive = true,
+                            compact     = compact,
+                        )
+                        NxContextMenu(expanded = resetMenuOpen, onDismissRequest = { onResetMenu(false) }) {
+                            NxMenuItem(s.text("editorScreenSettings")) { onResetMenu(false); onResetScreen() }
+                            NxMenuItem(s.text("editorResetAll")) { onResetMenu(false); onResetAll() }
+                            if (ownDocument) NxMenuItem(s.text("editorBackToStandard")) { onResetMenu(false); onBackToStandard() }
+                        }
+                    }
                     if (!compact) {
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            text  = s.text("editorEscHint"),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = NxInk.quiet,
+                            text     = s.text("editorEscHint"),
+                            style    = MaterialTheme.typography.labelSmall,
+                            color    = NxInk.quiet,
                             modifier = Modifier.padding(end = 8.dp),
                         )
                     }
@@ -1290,84 +739,6 @@ private fun FitOrCompact(content: @Composable (compact: Boolean) -> Unit) {
         layout(chosen.maxOfOrNull { it.width } ?: 0, chosen.maxOfOrNull { it.height } ?: 0) {
             chosen.forEach { it.place(0, 0) }
         }
-    }
-}
-
-/**
- * One surface's tab.
- *
- * [folded] says the surface is a rail that is currently rolled up. It stays in the
- * row and stays pressable, because its region settings are the only place the fold
- * can be undone from and they hang off this tab. It says so with the crossed-out
- * eye and a dimmed label, so a tab that leads to settings rather than to a canvas
- * looks different from one that does not.
- */
-@Composable
-private fun SurfaceChip(
-    surface: SurfaceId,
-    active: Boolean,
-    folded: Boolean,
-    compact: Boolean,
-    onClick: () -> Unit,
-) {
-    val s = nexiraStrings()
-    val graph = LocalLayoutGraph.current
-    val bg = if (active) NxColor.wash(NxColor.lead(), 0.18f)
-             else Color.Transparent
-    val name = humanSurfaceShortName(surface, s, graph)
-    val label = if (folded) s.text("editorSurfaceFolded", name) else name
-    OnFill(bg) {
-        val base = if (active) NxColor.lead() else NxInk.quiet
-        val fg = if (folded) NxColor.wash(base, 0.45f) else base
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .clip(CHIP_SHAPE)
-                .background(bg)
-                .clickable { onClick() }
-                .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 5.dp),
-        ) {
-            Symbol(icon = if (folded) NxIcon.VisibilityOff else surfaceIcon(surface, graph),
-                // Named whenever the tab is folded, not only when the pill is too
-                // narrow for words: the wide pill writes the plain name and the
-                // only other cue is a dimmed tint, which a screen reader has no
-                // way to report.
-                contentDescription = if (compact || folded) label else null,
-                tint               = fg,
-                modifier           = Modifier.size(14.dp),
-            )
-            if (!compact) {
-                Spacer(Modifier.width(5.dp))
-                Text(
-                    text       = name,
-                    style      = MaterialTheme.typography.labelSmall,
-                    color      = fg,
-                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-                )
-            }
-        }
-    }
-}
-
-// A family of the selected surface. Text only: a family is named by what it is
-// for, and there is no icon vocabulary for "the rail while a project is open"
-// that would not be a worse label than the word.
-@Composable
-private fun FamilyChip(family: FamilyId, active: Boolean, compact: Boolean, onClick: () -> Unit) {
-    val bg = if (active) NxColor.wash(NxColor.lead(), 0.18f) else Color.Transparent
-    OnFill(bg) {
-        val fg = if (active) NxColor.lead() else NxInk.quiet
-        Text(
-            text       = family.value,
-            style      = MaterialTheme.typography.labelSmall,
-            color      = fg,
-            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
-            modifier   = Modifier
-                .clip(CHIP_SHAPE)
-                .background(bg)
-                .clickable { onClick() }
-                .padding(horizontal = if (compact) 7.dp else 10.dp, vertical = 6.dp),
-        )
     }
 }
 
@@ -1423,23 +794,6 @@ private fun ToolChip(
 }
 
 private val CHIP_SHAPE = RoundedCornerShape(12.dp)
-
-private fun surfaceIcon(surface: SurfaceId, graph: LayoutGraph): IconKey =
-    EditorSurfaces.specIn(surface, graph)?.icon ?: NxIcon.Home
-
-// Falls back to the raw id for a surface with no spec: better a visible
-// `home.experiment` in the picker than a blank chip, and the registry test
-// catches the omission before a build ships it.
-private fun humanSurfaceShortName(surface: SurfaceId, s: Strings, graph: LayoutGraph): String =
-    EditorSurfaces.specIn(surface, graph)?.shortName?.invoke(s) ?: surface.value
-
-private fun humanSurfaceName(surface: SurfaceId, s: Strings, graph: LayoutGraph): String =
-    EditorSurfaces.specIn(surface, graph)?.name?.invoke(s) ?: surface.value
-
-// Surfaces that expose surface-level settings (a SurfacePropertiesPanel, or a made
-// screen's own), distinct from per-widget props.
-private fun surfaceHasSettings(surface: SurfaceId?, graph: LayoutGraph): Boolean =
-    surface != null && EditorSurfaces.specIn(surface, graph)?.hasSettings == true
 
 /**
  * What a surface that refused to open inside itself draws while somebody is
@@ -1580,16 +934,3 @@ private val MIN_PANE = 200.dp
 
 /** Below this height the editor starts with its palette closed. */
 private val SHORT_WINDOW = 520.dp
-
-/**
- * Resolves a surface to the region widget that contains it, once per graph.
- *
- * A function returned rather than a value computed, because the caller asks
- * about whichever surface is selected and that changes without the graph doing
- * so.
- */
-@Composable
-private fun selectedSurfaceOwnerRegion(graph: LayoutGraph): (SurfaceId?) -> Pair<SlotPath, String>? =
-    remember(graph) {
-        { surface -> surface?.let { EditorSurfaces.ownerRegionOf(it, graph) } }
-    }

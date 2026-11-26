@@ -41,7 +41,6 @@ import hivens.ui.debug.DebugOverlayState
 import hivens.ui.diag.CrashDialog
 import hivens.ui.diag.ShellRecovery
 import hivens.ui.diag.UiRecoverySignal
-import hivens.ui.editor.EditModeController
 import hivens.ui.editor.presets.PresetRepository
 import hivens.ui.host.CompositionWindows
 import hivens.ui.identity.ClanRoleProvider

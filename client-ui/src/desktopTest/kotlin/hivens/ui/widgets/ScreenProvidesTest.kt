@@ -1,5 +1,9 @@
 package hivens.ui.widgets
 
+import hivens.ui.feature.catalogue.project.ProjectPageSource
+import hivens.ui.feature.catalogue.browse.CataloguePackPageSource
+import hivens.ui.widgets.about.OpenUpdateDialog
+import hivens.ui.widgets.about.AboutUpdateSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -13,7 +17,6 @@ import hivens.themes.Themes
 import hivens.themes.api.ThemesKeys
 import hivens.ui.Standing
 import hivens.ui.background.BackgroundSettings
-import hivens.ui.editor.EditorSurfaces
 import hivens.ui.feature.catalogue.browse.CataloguePackDetailScreen
 import hivens.ui.feature.catalogue.project.ModDetailScreen
 import hivens.ui.host.HostKoin
@@ -106,7 +109,7 @@ class ScreenProvidesTest {
         val koin = graph(services)
         val app: WidgetScope = koin.koin.get()
         val id = SurfaceId(surface)
-        val provides = EditorSurfaces.spec(id)?.provides.orEmpty().toList()
+        val provides = HANDED[surface].orEmpty()
         val drew = ArrayList<String>()
         val missed = HashSet<String>()
         val descriptor = Probe(provides, drew)
@@ -190,5 +193,14 @@ class ScreenProvidesTest {
         }
         assertEquals(emptySet(), missed)
         assertTrue(drew.isNotEmpty())
+    }
+
+    private companion object {
+        /** What each screen hands the widgets in its slots, as the screens are written today. */
+        val HANDED = mapOf(
+            "about" to listOf(AboutUpdateSource.id, OpenUpdateDialog.id),
+            "catalogue.pack" to listOf(CataloguePackPageSource.id),
+            "project" to listOf(ProjectPageSource.id),
+        )
     }
 }

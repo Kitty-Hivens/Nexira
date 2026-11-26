@@ -55,7 +55,8 @@ import hivens.ui.customization.CustomizationManager
 import hivens.ui.customization.LocalCustomization
 import hivens.ui.debug.IdentitySlotChromeModifier
 import hivens.ui.debug.IdentityWidgetDecorator
-import hivens.ui.editor.EditModeController
+import hivens.ui.editor.DocumentEditor
+import hivens.ui.editor.ShellSignals
 import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.host.CompositionWindows
 import hivens.ui.host.HostKoin
@@ -133,7 +134,8 @@ private fun AndroidShellContent() {
     val dataDirectory: Path = koinInject()
     val updateRecovery: ApplyRecovery = koinInject()
     val packAutoUpdates: PackAutoUpdateService = koinInject()
-    val editModeController: EditModeController = koinInject()
+    val documentEditor: DocumentEditor = koinInject()
+    val shellSignals: ShellSignals = koinInject()
     val windows: CompositionWindows = koinInject()
     val openWindows by windows.open.collectAsState()
 
@@ -263,15 +265,15 @@ private fun AndroidShellContent() {
                         val resolved = resolveShellChord(
                             event = ev,
                             debugOverlayAvailable = false,
-                            editing = editModeController.isEditing,
+                            editing = documentEditor.isEditing,
                             fieldFocused = layers.dismiss.fieldFocused,
                             modalOpen = layers.modalOpen,
                         )
                         when (resolved.chord) {
-                            ShellChord.ToggleEditMode -> editModeController.requestEditToggle()
-                            ShellChord.ToggleRightRail -> editModeController.requestRightRailToggle()
-                            ShellChord.UndoEdit -> editModeController.undo()
-                            ShellChord.RedoEdit -> editModeController.redo()
+                            ShellChord.ToggleEditMode -> shellSignals.requestEditToggle()
+                            ShellChord.ToggleRightRail -> shellSignals.requestRailToggle()
+                            ShellChord.UndoEdit -> documentEditor.undo()
+                            ShellChord.RedoEdit -> documentEditor.redo()
                             ShellChord.ToggleDebugOverlay, null -> Unit
                         }
                         resolved.consume

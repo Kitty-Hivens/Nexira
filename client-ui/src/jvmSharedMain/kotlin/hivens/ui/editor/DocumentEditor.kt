@@ -83,8 +83,14 @@ class DocumentEditor(
     /** An edit that waits for the document to be the person's own. */
     class PendingEdit internal constructor(internal val key: String?, internal val transform: (Document) -> Document)
 
+    private val _editing = mutableStateOf(false)
+
+    /** Whether somebody is arranging now, which is when the window's undo and redo are the editor's. */
+    val isEditing: Boolean get() = _editing.value
+
     /** Whether edits are being made in a session that can take them back. The history lives and dies with it. */
     fun reportEditing(on: Boolean) {
+        _editing.value = on
         scope.launch(writes) {
             recording = on
             if (!on) history.clear()

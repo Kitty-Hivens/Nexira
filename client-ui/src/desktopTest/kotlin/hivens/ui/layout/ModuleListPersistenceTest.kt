@@ -1,12 +1,8 @@
 package hivens.ui.layout
 
 import hivens.test.stopThenDelete
-import hivens.ui.customization.CustomizationSettings
-import hivens.ui.editor.EditModeController
-import hivens.ui.editor.presets.PresetRepository
 import hivens.ui.modulesNamedBy
 import hivens.widget.model.DefaultLayout
-import hivens.widget.model.LayoutGraph
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,7 +20,6 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 /**
  * The standard module list is read from the build at every start and never frozen
@@ -95,22 +90,5 @@ class ModuleListPersistenceTest {
         repo.flush()
         assertNull(repo.value().modules)
         assertNull(onDisk())
-    }
-
-    @Test
-    fun `a preset neither saves the module list nor brings one in when loaded`() = runBlocking {
-        val presets = PresetRepository(dir.resolve("presets"), json)
-        presets.save("mine", LayoutGraph(modules = emptyList()), CustomizationSettings())
-        val saved = presets.load("mine")!!.graph
-        assertNull(saved.modules, "a saved arrangement carried a module list")
-        val written = Files.list(dir.resolve("presets")).use { it.toList().single() }.readText()
-        assertTrue("\"modules\": []" !in written, "the list was written into the preset")
-
-        val repo = start()
-        repo.update { it.copy(modules = listOf("nexira.packs", "my.own")) }
-        val editor = EditModeController(repo, scope)
-        editor.loadArrangement(saved.copy(modules = emptyList()))
-        editor.awaitWrites()
-        assertEquals(listOf("nexira.packs", "my.own"), repo.value().modules, "loading an arrangement changed which modules come in")
     }
 }

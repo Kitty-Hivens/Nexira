@@ -70,7 +70,8 @@ import hivens.ui.diag.RenderBackend
 import hivens.ui.diag.SkinemaGate
 import hivens.ui.diag.UiRecoverySignal
 import hivens.ui.diag.probe
-import hivens.ui.editor.EditModeController
+import hivens.ui.editor.DocumentEditor
+import hivens.ui.editor.ShellSignals
 import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.generated.resources.Res
 import hivens.ui.host.CompositionWindows
@@ -214,7 +215,8 @@ private fun FrameWindowScope.ShellContent(
     // could not be made. A shell made again after a crash reload gives them another
     // try before anything in it reads them.
     remember(appLevel) { appLevel.retryFailed() }
-    val editModeController: EditModeController  = koinInject()
+    val documentEditor: DocumentEditor  = koinInject()
+    val shellSignals: ShellSignals      = koinInject()
     val sessions: hivens.ui.notifications.SessionRegistry = koinInject()
     // Shared process-lifetime scope (createdAtStart in appModule; canceled
     // by AppCoroutineScopeHook on JVM shutdown). Same instance backs
@@ -804,16 +806,16 @@ private fun FrameWindowScope.ShellContent(
             val resolved = resolveShellChord(
                 event                 = ev,
                 debugOverlayAvailable = debugOverlay.available,
-                editing               = editModeController.isEditing,
+                editing               = documentEditor.isEditing,
                 fieldFocused          = windowLayers.dismiss.fieldFocused,
                 modalOpen             = windowLayers.modalOpen,
             )
             when (resolved.chord) {
-                ShellChord.ToggleEditMode     -> editModeController.requestEditToggle()
-                ShellChord.ToggleRightRail    -> editModeController.requestRightRailToggle()
+                ShellChord.ToggleEditMode     -> shellSignals.requestEditToggle()
+                ShellChord.ToggleRightRail    -> shellSignals.requestRailToggle()
                 ShellChord.ToggleDebugOverlay -> debugOverlay.toggle()
-                ShellChord.UndoEdit           -> editModeController.undo()
-                ShellChord.RedoEdit           -> editModeController.redo()
+                ShellChord.UndoEdit           -> documentEditor.undo()
+                ShellChord.RedoEdit           -> documentEditor.redo()
                 null                          -> Unit
             }
             resolved.consume

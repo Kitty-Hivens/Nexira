@@ -1,5 +1,9 @@
 package hivens.ui.widgets
 
+import hivens.widget.model.CompositionName
+import hivens.widget.model.Document
+import hivens.ui.layout.DocumentStore
+import hivens.ui.editor.DocumentEditor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,11 +17,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.themes.Themes
-import hivens.ui.editor.EditModeController
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.theme.NxThemed
@@ -47,7 +49,6 @@ import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.serialization.json.Json
 import org.jetbrains.skia.Bitmap
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
@@ -99,8 +100,8 @@ class SampledWidgetTest {
     private fun editing(): EditModeState {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val dir = Files.createTempDirectory("sampled-widget-test")
-        val repo = LayoutGraphRepository(dir.resolve("layout-graph.json"), Json { ignoreUnknownKeys = true }, scope) { LayoutGraph.EMPTY }
-        return EditModeState.On(SurfaceId("s"), EditModeController(repo, scope))
+        val document = Document(start = CompositionName("test"))
+        return EditModeState.On(DocumentEditor(DocumentStore(dir.resolve("interface.json"), { document }), scope))
     }
 
     /** Draws the slot on a surface with no page above it, and hands back what the block read and the frame's pixels. */

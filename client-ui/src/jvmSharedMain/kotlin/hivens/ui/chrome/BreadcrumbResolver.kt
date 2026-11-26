@@ -14,11 +14,10 @@ import hivens.i18n.api.Strings
 import hivens.packs.api.PackPages
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.navigation.LauncherConfigs
-import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalDocument
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.HistoryEntry
-import hivens.widget.model.screen
 import org.koin.compose.koinInject
 
 /**
@@ -71,7 +70,8 @@ fun rememberCrumbLabel(entry: HistoryEntry): String {
         LauncherConfigs.Project -> CataloguePages.Project.read(entry.opened)?.let { modCrumb(it) }.orEmpty()
         // Read live, so a rename in the editor relabels the crumb at once. A screen
         // deleted while it was open says so rather than naming nothing.
-        else -> LocalLayoutGraph.current.screen(entry.config.value)?.title?.ifBlank { null } ?: s.text("screenMissing")
+        else -> LocalDocument.current?.compositions?.get(LauncherConfigs.Composition)?.configs?.get(entry.config)
+            ?.title?.ifBlank { null } ?: s.text("screenMissing")
     }
 }
 

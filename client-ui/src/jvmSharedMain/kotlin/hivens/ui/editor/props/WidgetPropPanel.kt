@@ -39,7 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.editor.EditModeController
+import hivens.ui.editor.DocumentEditor
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
@@ -48,7 +48,7 @@ import hivens.ui.surface.SurfaceKind
 import hivens.ui.surface.defaultOpacity
 import hivens.ui.widgets.kind
 import hivens.ui.widgets.customization.LabeledSlider
-import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalDocument
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.resolveSurface
 import hivens.widget.api.resolveEntrance
@@ -61,14 +61,14 @@ import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.PropHidden
 import hivens.widget.model.FillSource
 import hivens.widget.model.PropLabel
-import hivens.widget.model.SlotPath
+import hivens.widget.model.NodePath
 import hivens.widget.model.SurfaceCorners
 import hivens.widget.model.SurfaceInsets
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.propsWith
 import hivens.widget.model.parseFill
 import hivens.widget.model.WidgetInstance
-import hivens.widget.model.traverse
+import hivens.widget.model.contentAt
 import kotlin.math.roundToInt
 import kotlinx.serialization.KSerializer
 import kotlinx.serialization.json.JsonObject
@@ -80,20 +80,20 @@ import hivens.ui.theme.plateSurface
 
 // Right-edge prop editor. Opened by a widget's "tune" chrome affordance,
 // which sets the host's prop target (path + instanceId). Resolves the
-// live instance from the layout graph each recomposition so external
+// live instance from the document each recomposition so external
 // edits (or a reset) reflect immediately. Mounted at the same edge as
 // the palette; the host hides the palette while this is open so they do
 // not overlap.
 @Composable
 fun WidgetPropPanel(
     visible: Boolean,
-    path: SlotPath?,
+    path: NodePath?,
     instanceId: String?,
-    controller: EditModeController,
+    editor: DocumentEditor,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val graph = LocalLayoutGraph.current
+    val document = LocalDocument.current
     val registry = LocalWidgetRegistry.current
 
     // Latch the last real target so the slide-out animation still has
@@ -101,7 +101,7 @@ fun WidgetPropPanel(
     // same frame `visible` goes false, which would otherwise blank the
     // panel mid-animation. The conditional write converges (same value on
     // re-composition) and only updates while a target is set.
-    var lastPath by remember { mutableStateOf<SlotPath?>(null) }
+    var lastPath by remember { mutableStateOf<NodePath?>(null) }
     var lastId   by remember { mutableStateOf<String?>(null) }
     if (path != null && instanceId != null) {
         lastPath = path
@@ -111,7 +111,7 @@ fun WidgetPropPanel(
     val resolveId   = instanceId ?: lastId
 
     val instance: WidgetInstance? = if (resolvePath != null && resolveId != null) {
-        graph.traverse(resolvePath)?.widgets?.firstOrNull { it.instanceId == resolveId }
+        document?.contentAt(resolvePath)?.widgets?.firstOrNull { it.instanceId == resolveId }
     } else {
         null
     }
@@ -139,7 +139,7 @@ fun WidgetPropPanel(
                 instance   = instance,
                 path       = resolvePath,
                 instanceId = resolveId,
-                controller = controller,
+                editor     = editor,
                 onDismiss  = onDismiss,
             )
         }
@@ -151,9 +151,9 @@ private fun PropPanelBody(
     descriptor: WidgetDescriptor,
     serializer: KSerializer<*>?,
     instance: WidgetInstance,
-    path: SlotPath,
+    path: NodePath,
     instanceId: String,
-    controller: EditModeController,
+    editor: DocumentEditor,
     onDismiss: () -> Unit,
 ) {
     val s = nexiraStrings()
@@ -251,7 +251,7 @@ private fun PropPanelBody(
                             // out of the record again and follows the
                             // declaration, which is the same rule read by
                             // [effective] one screen up.
-                            controller.updatePropsFrom(path, instanceId, historyKey = name) { stored ->
+                            editor.props(path, instanceId, name) { stored ->
                                 propsWith(descriptor.defaultPropsJson, stored, name, newValue)
                             }
                         },
@@ -265,19 +265,18 @@ private fun PropPanelBody(
             // Above Backing because it frames the widget rather than describing its plane.
             PaddingSection(
                 padding = instance.placement?.padding ?: SurfaceInsets(),
-                write   = { controller.setWidgetPadding(path, instanceId, it) },
+                write   = { key, change -> editor.padding(path, instanceId, key, change) },
             )
             Spacer(Modifier.size(8.dp))
 
             // How it arrives, on every widget: the character it declares or one of
             // its own, and the delay its place in the slot gives it or one pinned.
-            val order = LocalLayoutGraph.current.traverse(path)?.widgets
+            val order = LocalDocument.current?.contentAt(path)?.widgets
                 ?.indexOfFirst { it.instanceId == instanceId }?.coerceAtLeast(0) ?: 0
             MotionSection(
                 entrance = descriptor.resolveEntrance(instance),
                 delayMs  = instance.motion?.delayMs ?: Motion.stagger(order),
-                motion   = instance.motion ?: WidgetMotion(),
-                write    = { controller.updateMotion(path, instanceId, it) },
+                write    = { key, change -> editor.motion(path, instanceId, key, change) },
             )
             Spacer(Modifier.size(8.dp))
 
@@ -296,7 +295,8 @@ private fun PropPanelBody(
             // edit into "give this widget a plane", at whatever the renderer fills the
             // unnamed fields with. Giving one is its own act now.
             val resolved = descriptor.resolveSurface(instance)
-            fun write(next: SurfaceSpec) = controller.updateSurface(path, instanceId, next)
+            fun write(key: String, change: (SurfaceSpec) -> SurfaceSpec) =
+                editor.surface(path, instanceId, key, descriptor.defaultSurface, change)
             if (descriptor.drawsOwnSurface) {
                 Text(
                     text  = s.text("editorSurfaceOwn"),
@@ -309,7 +309,7 @@ private fun PropPanelBody(
                     style = MaterialTheme.typography.bodySmall,
                     color = NxInk.quiet.copy(alpha = 0.7f),
                 )
-                TextButton(onClick = { write(SurfaceSpec(fill = "panel", opacity = 0.5f)) }) {
+                TextButton(onClick = { write("add") { SurfaceSpec(fill = "panel", opacity = 0.5f) } }) {
                     Symbol(NxIcon.Add, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(6.dp))
                     Text(s.text("editorSurfaceAdd"), style = MaterialTheme.typography.labelMedium)
@@ -320,11 +320,7 @@ private fun PropPanelBody(
         }
 
         TextButton(
-            onClick  = {
-                if (sd != null) controller.updateProps(path, instanceId, JsonObject(emptyMap()))
-                controller.updateSurface(path, instanceId, null)
-                controller.updateMotion(path, instanceId, null)
-            },
+            onClick  = { editor.reset(path, instanceId) },
             modifier = Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
         ) {
             Symbol(NxIcon.RestartAlt, contentDescription = null, modifier = Modifier.size(16.dp))
@@ -359,7 +355,7 @@ private fun defaultOpacityOf(spec: SurfaceSpec): Float = plateSurface.opacity ?:
  * plane being reset with it.
  */
 @Composable
-private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
+private fun SurfaceRows(surface: SurfaceSpec, write: (key: String, change: (SurfaceSpec) -> SurfaceSpec) -> Unit) {
     val s = nexiraStrings()
     // What the plate draws where the record names nothing, so each row opens on it.
     val plate = plateOutline
@@ -370,7 +366,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
     // follows it relative to what holds the widget, a literal does not. A typo
     // falls back to the theme rather than to black, so a mistake never looks
     // deliberate.
-    StringRow(s.text("editorSurfaceFill"), surface.fill) { write(surface.copy(fill = it)) }
+    StringRow(s.text("editorSurfaceFill"), surface.fill) { write("fill") { cur -> cur.copy(fill = it) } }
     Text(
         text  = s.text("editorSurfaceFillHint"),
         style = MaterialTheme.typography.bodySmall,
@@ -387,8 +383,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
         format        = "%.0f%%",
         keyStep       = 1f,
         isSet         = surface.opacity != null,
-        onReset       = { write(surface.copy(opacity = null)) },
-        onValueChange = { write(surface.copy(opacity = it / 100f)) },
+        onReset       = { write("opacity") { cur -> cur.copy(opacity = null) } },
+        onValueChange = { write("opacity") { cur -> cur.copy(opacity = it / 100f) } },
     )
     LabeledSlider(
         label         = s.text("editorSurfaceBlur"),
@@ -399,8 +395,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
         format        = "%.0f",
         keyStep       = 1f,
         isSet         = surface.blurDp != null,
-        onReset       = { write(surface.copy(blurDp = null)) },
-        onValueChange = { write(surface.copy(blurDp = it)) },
+        onReset       = { write("blurDp") { cur -> cur.copy(blurDp = null) } },
+        onValueChange = { write("blurDp") { cur -> cur.copy(blurDp = it) } },
     )
     // Opens on the plate's corner rather than on a sentinel, and writes
     // the baseline WITHOUT clearing the per-corner overrides beside it: it
@@ -413,9 +409,9 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
         format        = "%.0f",
         keyStep       = 1f,
         isSet         = surface.shape.corners.all != null,
-        onReset       = { write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(all = null)))) },
+        onReset       = { write("shape.corners.all") { cur -> cur.copy(shape = cur.shape.copy(corners = cur.shape.corners.copy(all = null))) } },
         onValueChange = {
-            write(surface.copy(shape = surface.shape.copy(corners = surface.shape.corners.copy(all = it))))
+            write("shape.corners.all") { cur -> cur.copy(shape = cur.shape.copy(corners = cur.shape.corners.copy(all = it))) }
         },
     )
 
@@ -435,7 +431,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
     ) {
       Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
           StringRow(s.text("editorSurfaceShapeKind"), surface.shape.kind) {
-              write(surface.copy(shape = surface.shape.copy(kind = it)))
+              write("shape.kind") { cur -> cur.copy(shape = cur.shape.copy(kind = it)) }
           }
           Text(
               text  = s.text("editorSurfaceShapeKindHint"),
@@ -449,8 +445,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               format        = "%.0f%%",
               keyStep       = 1f,
               isSet         = surface.shape.smoothing != null,
-              onReset       = { write(surface.copy(shape = surface.shape.copy(smoothing = null))) },
-              onValueChange = { write(surface.copy(shape = surface.shape.copy(smoothing = it / 100f))) },
+              onReset       = { write("shape.smoothing") { cur -> cur.copy(shape = cur.shape.copy(smoothing = null)) } },
+              onValueChange = { write("shape.smoothing") { cur -> cur.copy(shape = cur.shape.copy(smoothing = it / 100f)) } },
           )
           // A star's three values, and only where they mean something. Offering
           // them under a rounded rectangle would put back the thing this panel
@@ -464,8 +460,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
                   format        = "%.0f",
                   keyStep       = 1f,
                   isSet         = surface.shape.points != null,
-                  onReset       = { write(surface.copy(shape = surface.shape.copy(points = null))) },
-                  onValueChange = { write(surface.copy(shape = surface.shape.copy(points = it.roundToInt()))) },
+                  onReset       = { write("shape.points") { cur -> cur.copy(shape = cur.shape.copy(points = null)) } },
+                  onValueChange = { write("shape.points") { cur -> cur.copy(shape = cur.shape.copy(points = it.roundToInt())) } },
               )
               if (kind == "star") {
                   LabeledSlider(
@@ -475,8 +471,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
                       format        = "%.0f%%",
                       keyStep       = 1f,
                       isSet         = surface.shape.innerRadius != null,
-                      onReset       = { write(surface.copy(shape = surface.shape.copy(innerRadius = null))) },
-                      onValueChange = { write(surface.copy(shape = surface.shape.copy(innerRadius = it / 100f))) },
+                      onReset       = { write("shape.innerRadius") { cur -> cur.copy(shape = cur.shape.copy(innerRadius = null)) } },
+                      onValueChange = { write("shape.innerRadius") { cur -> cur.copy(shape = cur.shape.copy(innerRadius = it / 100f)) } },
                   )
               }
               LabeledSlider(
@@ -486,26 +482,27 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
                   format        = "%.0f%%",
                   keyStep       = 1f,
                   isSet         = surface.shape.pointRounding != null,
-                  onReset       = { write(surface.copy(shape = surface.shape.copy(pointRounding = null))) },
-                  onValueChange = { write(surface.copy(shape = surface.shape.copy(pointRounding = it / 100f))) },
+                  onReset       = { write("shape.pointRounding") { cur -> cur.copy(shape = cur.shape.copy(pointRounding = null)) } },
+                  onValueChange = { write("shape.pointRounding") { cur -> cur.copy(shape = cur.shape.copy(pointRounding = it / 100f)) } },
               )
           }
           // Each corner opens at whatever the baseline resolves to and, once
           // moved, pins that corner independently -- which is what makes a plane
           // square on one side and round on the other.
           val corners = surface.shape.corners
-          fun withCorners(next: SurfaceCorners) = write(surface.copy(shape = surface.shape.copy(corners = next)))
-          CornerRow(s.text("editorSurfaceCornerTopStart"), corners.topStart(corner), corners.topStart != null, { withCorners(corners.copy(topStart = null)) }) {
-              withCorners(corners.copy(topStart = it))
+          fun withCorners(key: String, change: (SurfaceCorners) -> SurfaceCorners) =
+              write("corners.$key") { it.copy(shape = it.shape.copy(corners = change(it.shape.corners))) }
+          CornerRow(s.text("editorSurfaceCornerTopStart"), corners.topStart(corner), corners.topStart != null, { withCorners("topStart") { c -> c.copy(topStart = null) } }) { v ->
+              withCorners("topStart") { c -> c.copy(topStart = v) }
           }
-          CornerRow(s.text("editorSurfaceCornerTopEnd"), corners.topEnd(corner), corners.topEnd != null, { withCorners(corners.copy(topEnd = null)) }) {
-              withCorners(corners.copy(topEnd = it))
+          CornerRow(s.text("editorSurfaceCornerTopEnd"), corners.topEnd(corner), corners.topEnd != null, { withCorners("topEnd") { c -> c.copy(topEnd = null) } }) { v ->
+              withCorners("topEnd") { c -> c.copy(topEnd = v) }
           }
-          CornerRow(s.text("editorSurfaceCornerBottomEnd"), corners.bottomEnd(corner), corners.bottomEnd != null, { withCorners(corners.copy(bottomEnd = null)) }) {
-              withCorners(corners.copy(bottomEnd = it))
+          CornerRow(s.text("editorSurfaceCornerBottomEnd"), corners.bottomEnd(corner), corners.bottomEnd != null, { withCorners("bottomEnd") { c -> c.copy(bottomEnd = null) } }) { v ->
+              withCorners("bottomEnd") { c -> c.copy(bottomEnd = v) }
           }
-          CornerRow(s.text("editorSurfaceCornerBottomStart"), corners.bottomStart(corner), corners.bottomStart != null, { withCorners(corners.copy(bottomStart = null)) }) {
-              withCorners(corners.copy(bottomStart = it))
+          CornerRow(s.text("editorSurfaceCornerBottomStart"), corners.bottomStart(corner), corners.bottomStart != null, { withCorners("bottomStart") { c -> c.copy(bottomStart = null) } }) { v ->
+              withCorners("bottomStart") { c -> c.copy(bottomStart = v) }
           }
           LabeledSlider(
               label         = s.text("editorSurfaceBorder"),
@@ -514,11 +511,11 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               format        = "%.1f",
               keyStep       = 0.5f,
               isSet         = surface.border.widthDp != null,
-              onReset       = { write(surface.copy(border = surface.border.copy(widthDp = null))) },
-              onValueChange = { write(surface.copy(border = surface.border.copy(widthDp = it))) },
+              onReset       = { write("border.widthDp") { cur -> cur.copy(border = cur.border.copy(widthDp = null)) } },
+              onValueChange = { write("border.widthDp") { cur -> cur.copy(border = cur.border.copy(widthDp = it)) } },
           )
           StringRow(s.text("editorSurfaceBorderColor"), surface.border.color) {
-              write(surface.copy(border = surface.border.copy(color = it)))
+              write("border.color") { cur -> cur.copy(border = cur.border.copy(color = it)) }
           }
           LabeledSlider(
               label         = s.text("editorSurfaceBorderOpacity"),
@@ -527,8 +524,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               format        = "%.0f%%",
               keyStep       = 1f,
               isSet         = surface.border.opacity != null,
-              onReset       = { write(surface.copy(border = surface.border.copy(opacity = null))) },
-              onValueChange = { write(surface.copy(border = surface.border.copy(opacity = it / 100f))) },
+              onReset       = { write("border.opacity") { cur -> cur.copy(border = cur.border.copy(opacity = null)) } },
+              onValueChange = { write("border.opacity") { cur -> cur.copy(border = cur.border.copy(opacity = it / 100f)) } },
           )
           LabeledSlider(
               label         = s.text("editorSurfaceShadow"),
@@ -537,8 +534,8 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
               format        = "%.0f",
               keyStep       = 1f,
               isSet         = surface.shadowDp != null,
-              onReset       = { write(surface.copy(shadowDp = null)) },
-              onValueChange = { write(surface.copy(shadowDp = it)) },
+              onReset       = { write("shadowDp") { cur -> cur.copy(shadowDp = null) } },
+              onValueChange = { write("shadowDp") { cur -> cur.copy(shadowDp = it) } },
           )
       }
     }
@@ -553,7 +550,7 @@ private fun SurfaceRows(surface: SurfaceSpec, write: (SurfaceSpec) -> Unit) {
  * it pins that number.
  */
 @Composable
-private fun MotionSection(entrance: Entrance, delayMs: Int, motion: WidgetMotion, write: (WidgetMotion) -> Unit) {
+private fun MotionSection(entrance: Entrance, delayMs: Int, write: (key: String, change: (WidgetMotion) -> WidgetMotion) -> Unit) {
     val s = nexiraStrings()
     Text(
         text       = s.text("editorMotionTitle"),
@@ -565,7 +562,7 @@ private fun MotionSection(entrance: Entrance, delayMs: Int, motion: WidgetMotion
         NxSelect(
             options  = Entrance.entries,
             selected = entrance,
-            onSelect = { write(motion.copy(enter = it.id)) },
+            onSelect = { write("enter") { cur -> cur.copy(enter = it.id) } },
             label    = { it.label(s) },
             modifier = Modifier.fillMaxWidth(),
         )
@@ -576,7 +573,7 @@ private fun MotionSection(entrance: Entrance, delayMs: Int, motion: WidgetMotion
         range         = 0f..MAX_DELAY_MS.toFloat(),
         format        = "%.0f",
         keyStep       = 10f,
-        onValueChange = { write(motion.copy(delayMs = it.roundToInt())) },
+        onValueChange = { write("delayMs") { cur -> cur.copy(delayMs = it.roundToInt()) } },
     )
 }
 
@@ -597,7 +594,7 @@ private fun Entrance.label(s: Strings): String = when (this) {
  * section uses.
  */
 @Composable
-private fun PaddingSection(padding: SurfaceInsets, write: (SurfaceInsets) -> Unit) {
+private fun PaddingSection(padding: SurfaceInsets, write: (key: String, change: (SurfaceInsets) -> SurfaceInsets) -> Unit) {
     val s = nexiraStrings()
     Text(
         text       = s.text("editorPaddingTitle"),
@@ -611,7 +608,7 @@ private fun PaddingSection(padding: SurfaceInsets, write: (SurfaceInsets) -> Uni
         range         = 0f..64f,
         format        = "%.0f",
         keyStep       = 1f,
-        onValueChange = { write(padding.copy(all = it)) },
+        onValueChange = { write("all") { cur -> cur.copy(all = it) } },
     )
     var showMore by remember { mutableStateOf(false) }
     DisclosureRow(s.text("editorSurfaceMore"), showMore) { showMore = !showMore }
@@ -623,10 +620,10 @@ private fun PaddingSection(padding: SurfaceInsets, write: (SurfaceInsets) -> Uni
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
             // Each side opens at the uniform value and, once moved, pins that side
             // independently of it.
-            CornerRow(s.text("editorBackingPaddingTop"), padding.top(0f)) { write(padding.copy(top = it)) }
-            CornerRow(s.text("editorBackingPaddingEnd"), padding.end(0f)) { write(padding.copy(end = it)) }
-            CornerRow(s.text("editorBackingPaddingBottom"), padding.bottom(0f)) { write(padding.copy(bottom = it)) }
-            CornerRow(s.text("editorBackingPaddingStart"), padding.start(0f)) { write(padding.copy(start = it)) }
+            CornerRow(s.text("editorBackingPaddingTop"), padding.top(0f)) { write("top") { cur -> cur.copy(top = it) } }
+            CornerRow(s.text("editorBackingPaddingEnd"), padding.end(0f)) { write("end") { cur -> cur.copy(end = it) } }
+            CornerRow(s.text("editorBackingPaddingBottom"), padding.bottom(0f)) { write("bottom") { cur -> cur.copy(bottom = it) } }
+            CornerRow(s.text("editorBackingPaddingStart"), padding.start(0f)) { write("start") { cur -> cur.copy(start = it) } }
         }
     }
 }

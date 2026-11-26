@@ -51,7 +51,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import hivens.ui.editor.EditModeController
+import hivens.ui.editor.DocumentEditor
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.i18n.api.LocalTranslator
@@ -66,7 +66,6 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.editor.props.PANEL_SHADOW_DP
 import hivens.widget.api.LocalWidgetRegistry
-import hivens.widget.model.SurfaceId
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 
@@ -79,9 +78,7 @@ fun WidgetPalettePanel(
     onDismiss: () -> Unit,
     controller: DragController,
     registry: DropTargetRegistry,
-    editController: EditModeController,
-    /** The surface being arranged. The palette offers only what can stand on it. */
-    surface: SurfaceId?,
+    editor: DocumentEditor,
     modifier: Modifier = Modifier,
 ) {
     val s = nexiraStrings()
@@ -104,12 +101,11 @@ fun WidgetPalettePanel(
     val labels = LocalWidgetLabels.current
     val words = LocalTranslator.current
     val nameOf = { d: WidgetDescriptor -> labels.of(d.kind, d.displayName, words) }
-    // And only what the surface being arranged can hold: a widget reading what that
-    // surface does not have would only draw the placeholder for a misplaced one.
-    val descriptors = remember(registry0, labels, words, surface) {
+    // Whether one can stand where it is dropped is asked of the place it is dropped on, not of the palette: the whole
+    // window is arranged at once, so there is no one place to filter by.
+    val descriptors = remember(registry0, labels, words) {
         registry0.all().values
             .filter { it.removable }
-            .filter { surface == null || editController.admits(it.kind, surface) }
             .sortedBy { nameOf(it).lowercase() }
     }
     // Above the search branch: remembered inside it, a query matching nothing
@@ -287,7 +283,7 @@ fun WidgetPalettePanel(
                                     descriptor     = descriptor,
                                     controller     = controller,
                                     registry       = registry,
-                                    editController = editController,
+                                    editor         = editor,
                                     previews       = previews,
                                 )
                             }

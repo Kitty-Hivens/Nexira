@@ -34,7 +34,7 @@ import hivens.ui.widgets.Commands
 import hivens.ui.widgets.MisplacedWidget
 import hivens.ui.widgets.Sources
 import hivens.widget.api.CompositionKeys
-import hivens.widget.api.LocalLayoutGraph
+import hivens.widget.api.LocalDocument
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.ProvideScoped
 import hivens.widget.api.ProvideScopedCommand
@@ -47,7 +47,6 @@ import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
 import hivens.widget.model.History
-import hivens.widget.model.screen
 import hivens.widget.model.Show
 import hivens.widget.model.SlotId
 import hivens.widget.model.WidgetInstance
@@ -91,6 +90,7 @@ fun AppLayout(
     // reach rail widgets; it puts its own chrome back over the content pane from
     // what the centre region reports. The shell itself is the config's layout.
     EditorSurfaceHost(
+        composition            = LauncherConfigs.Composition,
         config                 = now.current.config,
         customization          = customization,
         onCustomizationChanged = onCustomizationChanged,
@@ -189,8 +189,11 @@ fun AppSidebar(
         PuppetClick("nav.logout") { onLogout() }
     }
     // A made screen has no fixed entry above, so it is driven by its id.
-    LocalLayoutGraph.current.screens.forEach { spec ->
-        key(spec.id) { PuppetClick("nav.screen.${spec.id}") { onSection(ConfigId(spec.id)) } }
+    val standard: Document = koinInject()
+    val configs = LocalDocument.current?.compositions?.get(LauncherConfigs.Composition)?.configs?.keys.orEmpty()
+    val shipped = standard.compositions[LauncherConfigs.Composition]?.configs?.keys.orEmpty()
+    (configs - shipped).forEach { id ->
+        key(id) { PuppetClick("nav.screen.${id.value}") { onSection(id) } }
     }
 
     NavigationRail(
