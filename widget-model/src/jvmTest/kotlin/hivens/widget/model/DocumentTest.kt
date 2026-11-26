@@ -4,6 +4,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -135,6 +136,89 @@ class DocumentTest {
         assertEquals(props("kept"), kept.at(root(home)).widgets.first { it.kind == news }.props)
         assertNull(kept.launcher().singles.getValue(news).placement)
         assertSame(document, document.keepSingle(CompositionName("gone"), node("news")))
+    }
+
+    // A slot held as a config's own
+
+    private val top = SlotId("top")
+    private fun inRail(config: ConfigId) = root(config).child("rail", top)
+    private val mint = { name: String -> "$name-own" }
+
+    @Test
+    fun `a slot a config holds as its own shows what that config holds, and the record's everywhere else`() {
+        val held = document.holdOwn(inRail(home), mint)
+        assertTrue(held.holdsOwn(inRail(home)))
+        assertFalse(held.holdsOwn(inRail(library)))
+        assertEquals(listOf("link1-own"), held.ids(inRail(home)), "a copy under a name of its own")
+        assertEquals(listOf("link1"), held.ids(inRail(library)))
+        val edited = held.edit(inRail(home)) { it.withWidget(node("filter"), 1) }
+        assertEquals(listOf("link1-own", "filter"), edited.ids(inRail(home)))
+        assertEquals(listOf("link1"), edited.ids(inRail(library)))
+        assertEquals(document.launcher().singles, edited.launcher().singles, "the record is untouched")
+    }
+
+    @Test
+    fun `the other slots of a single stay one record while one of them is a config's own`() {
+        val two = document.edit(root(home)) { c -> c.withWidgetUpdated("rail") { it.copy(children = it.children + (SlotId("bottom") to SlotContent(listOf(node("bell"))))) } }
+        val held = two.holdOwn(inRail(home), mint)
+        val edited = held.edit(root(home).child("rail", SlotId("bottom"))) { it.withWidget(node("clock", "clock2"), 1) }
+        assertEquals(listOf("bell", "clock2"), edited.ids(root(library).child("rail", SlotId("bottom"))))
+        assertEquals(listOf("link1-own"), edited.ids(inRail(home)))
+    }
+
+    @Test
+    fun `changing the single where it stands keeps the slot the config holds as its own out of the record`() {
+        val held = document.holdOwn(inRail(home), mint).edit(inRail(home)) { it.withWidget(node("filter"), 0) }
+        val named = held.edit(root(home)) { c -> c.withWidgetUpdated("rail") { it.copy(props = props("new")) } }
+        assertEquals(props("new"), named.at(root(library)).widgets.first().props)
+        assertEquals(document.launcher().singles.getValue(rail).children, named.launcher().singles.getValue(rail).children)
+        assertEquals(listOf("filter", "link1-own"), named.ids(inRail(home)))
+        val raw = named.launcher().configs.getValue(home).layouts.single().root.widgets.first()
+        assertEquals(setOf(top), raw.children.keys, "the config holds the slot and nothing else of the single")
+    }
+
+    @Test
+    fun `a slot given back shows the record's again`() {
+        val back = document.holdOwn(inRail(home), mint).edit(inRail(home)) { it.withWidget(node("filter"), 0) }.shareOwn(inRail(home))
+        assertFalse(back.holdsOwn(inRail(home)))
+        assertEquals(listOf("link1"), back.ids(inRail(home)))
+        assertEquals(document.launcher().configs, back.launcher().configs)
+    }
+
+    @Test
+    fun `only a single's slot can be held as one's own, and only once`() {
+        val held = document.holdOwn(inRail(home), mint)
+        assertSame(held, held.holdOwn(inRail(home)) { error("held already") })
+        assertSame(document, document.holdOwn(root(home).child("box", SlotId("body")), mint))
+        assertSame(document, document.holdOwn(root(home).child("rail", SlotId("nothing")), mint))
+        assertSame(document, document.holdOwn(root(home), mint))
+        assertSame(document, document.shareOwn(inRail(home)))
+        assertFalse(document.holdsOwn(root(home).child("box", SlotId("body"))))
+    }
+
+    @Test
+    fun `a single moved takes the slots it holds as its own along`() {
+        val held = document.holdOwn(inRail(home), mint)
+        val inBox = held.moveWidget(root(home), root(home).child("box", SlotId("body")), "rail", 0)
+        assertEquals(listOf("link1-own"), inBox.ids(root(home).child("box", SlotId("body")).child("rail", top)))
+        assertEquals(document.launcher().singles, inBox.launcher().singles)
+        val fromLibrary = document.edit(root(library)) { it.withoutWidget("rail") }.holdOwn(inRail(home), mint)
+        val there = fromLibrary.moveWidget(root(home), root(library), "rail", 0)
+        assertEquals(listOf("link1-own"), there.ids(inRail(library)))
+    }
+
+    @Test
+    fun `what a config holds as its own is listed and named like anything else`() {
+        val held = document.holdOwn(inRail(home), mint)
+        assertEquals(listOf("rail", "link1", "link1-own", "news", "box", "clock", "packs"), held.launcher().widgets().map { it.instanceId }.toList())
+        val twice = held.edit(inRail(home)) { it.withWidget(node("link", "link1"), 1) }
+        var n = 0
+        val named = twice.withOwnNames { "$it-${++n}" }
+        val ids = named.launcher().widgets().map { it.instanceId }.toList()
+        assertEquals(ids.size, ids.toSet().size, "$ids")
+        assertEquals(listOf("link1-own", "link1-1"), named.ids(inRail(home)))
+        val read = assertIs<DocumentRead.Whole>(DocumentCodec.read(DocumentCodec.write(held)))
+        assertEquals(held, read.document)
     }
 
     // Edits

@@ -47,7 +47,8 @@ data class Document(
  *
  * [singles] are the widgets this composition has once. Every config that has one has the same one, so its record is
  * kept here and a config only says where it stands ([standing]). Moving to another config neither makes it anew nor
- * changes it.
+ * changes it. A config may hold a slot of one as its own: what stands there is then that config's, and the record's
+ * content of that slot is what the other configs show.
  *
  * [residents] are drawn on the window's top layer over whichever config is shown. [transition] is the widget that is
  * handed the config going and the config coming, null for a plain swap.
@@ -66,11 +67,11 @@ data class Composition(
         get() = configs[start] ?: configs.values.firstOrNull()
 
     /**
-     * [widget] as it stands: where it is one of [singles], the record kept for it, placed where [widget] is placed.
-     * Any other widget is itself.
+     * [widget] as it stands: where it is one of [singles], the record kept for it, placed where [widget] is placed and
+     * holding in each slot [widget] holds what [widget] holds there. Any other widget is itself.
      */
     fun standing(widget: WidgetInstance): WidgetInstance =
-        singles[widget.kind]?.copy(placement = widget.placement) ?: widget
+        singles[widget.kind]?.let { it.copy(placement = widget.placement, children = it.children + widget.children) } ?: widget
 }
 
 /**
