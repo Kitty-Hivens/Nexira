@@ -14,6 +14,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,9 +79,19 @@ internal fun ScreenPropertiesPanel(
         val current = spec ?: return@EditorSidePanel
         // Held here and not read back from the record on every keystroke: the write
         // lands on another thread a frame later, and a field fed from it would put
-        // the caret back at the end under somebody typing in the middle.
+        // the caret back at the end under somebody typing in the middle. A title that
+        // is none of the field's own writes landing was changed under it, by an undo
+        // say, and the field takes it.
         var draft by remember(current.id) { mutableStateOf(current.title) }
-        val rename: (String) -> Unit = { draft = it; editor.updateScreen(current.composition, current.id, title = it) }
+        val pending = remember(current.id) { ArrayDeque<String>() }
+        val rename: (String) -> Unit = {
+            draft = it
+            pending.addLast(it)
+            editor.updateScreen(current.composition, current.id, title = it)
+        }
+        LaunchedEffect(current.id, current.title) {
+            titleLanded(pending, current.title, draft)?.let { draft = it }
+        }
 
         SectionLabel(s.text("screenTitleLabel"))
         NxField(
@@ -170,6 +181,21 @@ internal fun ScreenPropertiesPanel(
             )
         }
     }
+}
+
+/**
+ * What a title field shows once [landed] is the title on record, given the writes it has made that had not landed yet
+ * ([pending], oldest first, drained here as they land) and what it shows now. Null where it keeps what it shows: the
+ * title is one of its own writes arriving. Anything else was changed under the field and is shown.
+ */
+internal fun titleLanded(pending: ArrayDeque<String>, landed: String, shown: String): String? {
+    val own = pending.indexOf(landed)
+    if (own >= 0) {
+        repeat(own + 1) { pending.removeFirst() }
+        return null
+    }
+    pending.clear()
+    return landed.takeIf { it != shown }
 }
 
 @Composable
