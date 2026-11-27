@@ -58,9 +58,10 @@ package hivens.widget.api
  *    requires is brought in with it, where [MANIFEST_REQUIRES] named only what had to be carried.
  * 4: pages and their history are not the kernel's. What is shown, the values a page reads and the
  *    history's keys moved to the pages and history APIs (`hivens.pages.api`, `hivens.history.api`),
- *    and a composition answers the config it draws ([CompositionKeys.Config]) and the windows it
- *    owns. A level made per key answers a key with the value it was asked for with
- *    ([PageLevels.levelFor]).
+ *    and a composition answers its name, the config it starts on, its configs and the config it
+ *    draws ([CompositionKeys]) and the windows it owns. The host answers how often the interface
+ *    started over after a crash ([InterfaceKeys.Restarts]). A level made per key answers a key with
+ *    the value it was asked for with ([PageLevels.levelFor]).
  */
 object WidgetApi {
     const val VERSION: Int = 4

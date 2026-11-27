@@ -37,6 +37,7 @@ import hivens.ui.feature.catalogue.project.sampleProjectPage
 import hivens.ui.host.CompositionWindows
 import hivens.ui.host.HostWindowState
 import hivens.ui.host.HostWords
+import hivens.ui.host.InterfaceRestartLog
 import hivens.ui.host.LauncherFiles
 import hivens.ui.host.LauncherHostAccess
 import hivens.ui.host.WindowPolicy
@@ -48,7 +49,6 @@ import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
 import hivens.ui.layout.DocumentStore
-import hivens.ui.navigation.CompositionHistories
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.navigation.NavRequests
@@ -83,6 +83,7 @@ import hivens.ui.widgets.about.OpenUpdateDialog
 import hivens.ui.widgets.about.sampleUpdateCheck
 import hivens.ui.widgets.about.systemFactsReadOff
 import hivens.ui.widgets.levelServices
+import hivens.ui.widgets.modules.BuiltInWidgetsRequire
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.ui.widgets.modules.WidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
@@ -99,6 +100,8 @@ import hivens.ui.widgets.state.instanceIdsIn
 import hivens.widget.api.BringIn
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.CompositionKeys
+import hivens.widget.api.InterfaceKeys
+import hivens.widget.api.InterfaceRestarts
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.FactoryFailures
 import hivens.widget.api.HostFiles
@@ -191,8 +194,8 @@ fun uiCoreModule(
     // The windows the launcher has open. One for the process: it outlives a shell
     // restarted after a crash, and each window leaves it as its shell goes.
     single { WindowRegistry(windowPolicy) }
-    // Where each composition stands, for an interface that starts over to go on from.
-    single { CompositionHistories() }
+    // The interface's starts over after a crash, which modules that keep what was shown read.
+    single { InterfaceRestartLog() }
     // The document the windows are opened from, and the compositions shown in a window
     // of their own. Kept for the process, so a window stays open while the interface
     // starts over.
@@ -334,7 +337,7 @@ fun uiCoreModule(
     // and the jars switched on require, and the ones brought in since.
     single {
         val named = get<DocumentStore>().document.value.modules.toSet()
-        ModulesIn(broughtIn(named, compiled, jarsRequire = get<WidgetModules>().state.value.requires))
+        ModulesIn(broughtIn(named, compiled, jarsRequire = get<WidgetModules>().state.value.requires, builtInRequire = BuiltInWidgetsRequire))
     }
 
     // What the modules brought in contribute of the kinds the compiled modules take: the
@@ -413,6 +416,7 @@ fun uiCoreModule(
                 doNotDisturb     = center.doNotDisturb,
                 sslBypass        = sslBypassSource(get(), get<ServerProtocolConfig>().sslBypassHost, appScope),
                 background       = backgrounds.settings,
+                restarts         = get<InterfaceRestartLog>().restarts,
             ),
             // Reactive write side: commands widgets fire via rememberCommand /
             // rememberAction without injecting the backing service. What only some
@@ -681,6 +685,7 @@ internal fun uiDataRegistry(
     doNotDisturb: StateFlow<Boolean>,
     sslBypass: WidgetDataSource<Boolean>,
     background: StateFlow<BackgroundSettings>,
+    restarts: StateFlow<InterfaceRestarts> = MutableStateFlow(InterfaceRestarts()),
 ): WidgetDataRegistry = WidgetDataRegistry().apply {
     register(Sources.Activity, flowSource(activity))
     register(Sources.Notifications, flowSource(notifications))
@@ -689,6 +694,7 @@ internal fun uiDataRegistry(
     declare(Sources.Window) { HostWindowState.Sample }
     register(Sources.SslBypass, sslBypass)
     register(Sources.Background, flowSource(background))
+    register(InterfaceKeys.Restarts, flowSource(restarts))
     // Read the first time a card asks rather than at startup: asking the OS is slow,
     // and most runs never open the page that shows it. The card asks while the page
     // is laid out, so the files are read off that thread.
@@ -707,8 +713,10 @@ internal fun uiDataRegistry(
     registerFactory(WindowKeys.Open, sample = { emptySet() }) { app -> flowSource(app.hostServices.get<CompositionWindows>().open) }
     // What the composition's owner provides around every surface it draws, with the
     // sample in the sense above.
+    declare(CompositionKeys.Name) { LauncherConfigs.Composition }
+    declare(CompositionKeys.Start) { LauncherConfigs.Home }
+    declare(CompositionKeys.Configs) { emptySet() }
     declare(CompositionKeys.Config) { LauncherConfigs.Home }
-    declare(HistoryKeys.History) { History(LauncherConfigs.Home) }
     // What the router provides for the entry each page is drawn for, and the launcher's own value of one.
     declare(PageKeys.Entry) { HistoryEntry(LauncherConfigs.Home) }
     registerFactory(PackSettingsPage.key) { page -> page.read(PackSettingsPage) }
@@ -737,12 +745,6 @@ internal fun uiCommandRegistry(
     }
     registerFactory(WindowKeys.Show) { app -> command(app.hostServices.get<CompositionWindows>()::show) }
     registerFactory(WindowKeys.Close) { app -> command(app.hostServices.get<CompositionWindows>()::close) }
-    // What the composition's owner provides: its history.
-    declare(PagesKeys.Show)
-    declare(HistoryKeys.Back)
-    declare(HistoryKeys.Forward)
-    declare(HistoryKeys.BackTo)
-    declare(HistoryKeys.Rewrite)
     // What the About page provides for its update panel.
     declare(OpenUpdateDialog)
     // What each window provides of the commands it takes.

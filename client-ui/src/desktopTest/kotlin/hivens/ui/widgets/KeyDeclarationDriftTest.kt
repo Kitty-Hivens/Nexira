@@ -39,6 +39,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import hivens.history.api.HistoryApi
 
 /**
  * The ids widgets name in their needs, the keys the launcher declares, and the
@@ -92,9 +93,9 @@ class KeyDeclarationDriftTest {
     }
 
     @Test
-    fun `the standard document names the language, themes, look, packs, accounts and catalogue modules and the two sources, so a fresh install has their keys`() {
+    fun `the standard document names the language, themes, look, packs, accounts and catalogue modules, the two sources and the history, so a fresh install has their keys`() {
         assertEquals(
-            listOf(I18nApi.ID, ThemesApi.ID, LookApi.ID, ColourNxControls.ID, MotionNxControls.ID, PacksApi.ID, AccountsApi.ID, CatalogueApi.ID, MirrorSourceModule.ID, ModrinthSourceModule.ID),
+            listOf(I18nApi.ID, ThemesApi.ID, LookApi.ID, ColourNxControls.ID, MotionNxControls.ID, PacksApi.ID, AccountsApi.ID, CatalogueApi.ID, MirrorSourceModule.ID, ModrinthSourceModule.ID, HistoryApi.ID),
             StandardDocument.load().modules,
         )
         assertTrue(CompiledModules.any { it.id == PacksApi.ID }, "and the build carries the packs module")
@@ -107,6 +108,7 @@ class KeyDeclarationDriftTest {
         assertTrue(CompiledModules.any { it.id == MotionNxControls.ID }, "and the motion provider's controls")
         assertTrue(CompiledModules.any { it.id == MirrorSourceModule.ID }, "and the mirror source")
         assertTrue(CompiledModules.any { it.id == ModrinthSourceModule.ID }, "and the Modrinth source")
+        assertTrue(CompiledModules.any { it.id == HistoryApi.ID }, "and the history module")
     }
 
     @Test

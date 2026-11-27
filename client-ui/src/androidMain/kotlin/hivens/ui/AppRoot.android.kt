@@ -15,21 +15,20 @@ import hivens.ui.background.rememberDeviceTilt
 import hivens.themes.api.WallpaperTone
 import hivens.ui.host.CompositionWindows
 import hivens.ui.layers.Layer
-import hivens.ui.navigation.CompositionHistory
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.widget.model.Document
 
 /**
- * The system's back, for as long as the composition draws: one step back in the
+ * The system's back, for as long as the composition draws: one step [back] in the
  * history, or at the root a back counted for the composition to answer. Always
- * enabled, so a back at the root reaches the composition instead of falling through
- * to the system, which would take the person out of the launcher. The shell's
+ * enabled, so a back at the root, or one with no history to answer it, never falls
+ * through to the system, which would take the person out of the launcher. The shell's
  * dismiss stack registers after this one and is asked first.
  */
 @Composable
-internal actual fun NavigationInputs(history: CompositionHistory) {
-    BackHandler(enabled = true) { history.back() }
+internal actual fun NavigationInputs(back: () -> Unit, forward: () -> Unit) {
+    BackHandler(enabled = true) { back() }
 }
 
 @Composable

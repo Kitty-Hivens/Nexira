@@ -23,6 +23,7 @@ import kotlin.io.path.readBytes
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import hivens.history.api.HistoryApi
 
 /**
  * What the modules compiled into the build say of each other is what their classes do: every API of
@@ -77,6 +78,13 @@ class ModuleRequirementsTest {
     fun `what the jars require is brought in, by the API or the id they ask for it by, and what no module here offers is left to the jars`() {
         val brought = broughtIn(setOf(I18nApi.ID), CompiledModules, jarsRequire = setOf(AccountsApi.ID, "wobble"))
         assertEquals(setOf(I18nApi.ID, AccountsApi.ID), brought)
+    }
+
+    // A document of a person's own keeps the modules it was written with, so one written before the history was a
+    // module names none, and the rail, the breadcrumb and the home page would draw nothing in it.
+    @Test
+    fun `what the built-in widgets require is brought in whatever the document names`() {
+        assertEquals(setOf(HistoryApi.ID), broughtIn(emptySet(), CompiledModules, builtInRequire = BuiltInWidgetsRequire))
     }
 
     @Test

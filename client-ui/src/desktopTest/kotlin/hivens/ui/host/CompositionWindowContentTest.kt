@@ -10,7 +10,6 @@ import hivens.ui.CompositionContent
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.layout.DocumentStore
 import hivens.ui.levelServicesModule
-import hivens.ui.navigation.CompositionHistories
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.onEventThread
 import hivens.ui.settle
@@ -77,7 +76,6 @@ class CompositionWindowContentTest {
             module {
                 single { console }
                 single { ConsoleSettingsStore(dir.resolve("console.json"), json, scope) }
-                single { CompositionHistories() }
                 single<Document> { StandardDocument.load() }
                 single { DocumentStore(dir.resolve("interface.json"), { get<Document>() }) }
                 single { WidgetModules(dir.resolve("widgets"), dir.resolve("widget-modules.json"), json, GeneratedWidgetRegistry, scope, NoWidgetModuleHost) }

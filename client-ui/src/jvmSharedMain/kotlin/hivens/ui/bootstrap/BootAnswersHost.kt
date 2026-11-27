@@ -30,6 +30,7 @@ import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
 import kotlin.reflect.KClass
+import hivens.ui.widgets.modules.BuiltInWidgetsRequire
 
 private val log = LoggerFactory.getLogger("BootAnswers")
 
@@ -51,7 +52,7 @@ fun bootValues(
     named: Set<String> = documentModules(dataDir),
 ): BootValues {
     val words = fixedTakenWords(launcherWords(compiled))
-    val brought = broughtIn(named, compiled)
+    val brought = broughtIn(named, compiled, builtInRequire = BuiltInWidgetsRequire)
     val taken = bootTakenContributions(brought, compiled)
     return compiled.fold(BootValues.NONE) { gathered, module ->
         val answered = try {

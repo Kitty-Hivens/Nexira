@@ -10,7 +10,6 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import hivens.ui.ProvideComposition
 import hivens.ui.layout.DocumentStore
-import hivens.ui.navigation.CompositionHistory
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.onEventThread
 import hivens.ui.settle
@@ -78,7 +77,7 @@ class OwnedWindowsTest {
                         listOf(first, second).forEach { seen ->
                             if (seen === second || drawn) {
                                 ChildLevel(ScopeLevel.Composition) {
-                                    ProvideComposition(CompositionHistory(LauncherConfigs.Home), {}) {
+                                    ProvideComposition(LauncherConfigs.Home) {
                                         seen.open = rememberScopedSource(CompositionKeys.Windows).valueOrNull()
                                         seen.show = rememberScopedCommand(CompositionKeys.ShowWindow)
                                         seen.close = rememberScopedCommand(CompositionKeys.CloseWindow)

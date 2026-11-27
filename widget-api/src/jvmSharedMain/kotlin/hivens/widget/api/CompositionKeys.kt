@@ -12,6 +12,15 @@ import hivens.widget.model.SourceKey
  * they name configs and compositions by id, so no widget needs a type of the host's to reach one.
  */
 object CompositionKeys {
+    /** The composition's name in the document. Provided to the composition's level by whoever draws it. */
+    val Name = SourceKey<CompositionName>("composition.name", ScopeLevel.Composition)
+
+    /** The config the document starts the composition on. Provided with [Name]. */
+    val Start = SourceKey<ConfigId>("composition.start", ScopeLevel.Composition)
+
+    /** The configs the document gives the composition, as the document changes. Provided with [Name]. */
+    val Configs = SourceKey<Set<ConfigId>>("composition.configs", ScopeLevel.Composition)
+
     /** The config the composition draws now, which a widget's condition of where it is shown is read against. */
     val Config = SourceKey<ConfigId>("composition.config", ScopeLevel.Composition)
 

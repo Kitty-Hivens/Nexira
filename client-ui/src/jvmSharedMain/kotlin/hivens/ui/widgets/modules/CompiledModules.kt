@@ -2,6 +2,8 @@ package hivens.ui.widgets.modules
 
 import hivens.accounts.AccountsModule
 import hivens.catalogue.CatalogueModule
+import hivens.history.HistoryModule
+import hivens.history.api.HistoryApi
 import hivens.i18n.I18nModule
 import hivens.look.colour.api.ColourModule
 import hivens.look.colour.nx.controls.ColourNxControls
@@ -54,6 +56,7 @@ val CompiledModules: List<CompiledModule> =
         IconModule, IconGoogleRoundedModule,
         CursorModule, CursorSystemModule, CursorNxModule,
         PacksModule, AccountsModule, CatalogueModule, MirrorSourceModule, ModrinthSourceModule,
+        HistoryModule,
     )
 
 /**
@@ -75,12 +78,26 @@ private fun offersOf(module: CompiledModule): Map<String, ApiVersion> =
     module.version?.let { mapOf(module.id to it) }.orEmpty() + module.provides
 
 /**
- * The modules the host brings in where the document names [named] and the jars switched on do not run
- * without [jarsRequire]: those named, and of [compiled] what either requires, and what that requires.
+ * What the widgets compiled into the launcher outside any module do not run without, by the APIs they name: the rail,
+ * the breadcrumb and the home page read and move the history of the pages shown. Brought in whatever the document
+ * names, the way what a jar requires is, so a document of a person's own written before the history was a module
+ * keeps them. Theirs to declare once those widgets are a module of their own.
  */
-internal fun broughtIn(named: Set<String>, compiled: List<CompiledModule>, jarsRequire: Set<String> = emptySet()): Set<String> {
+val BuiltInWidgetsRequire: Set<String> = setOf(HistoryApi.ID)
+
+/**
+ * The modules the host brings in where the document names [named], the jars switched on do not run
+ * without [jarsRequire] and the widgets compiled in outside any module without [builtInRequire]: those named,
+ * and of [compiled] what any of them requires, and what that requires.
+ */
+internal fun broughtIn(
+    named: Set<String>,
+    compiled: List<CompiledModule>,
+    jarsRequire: Set<String> = emptySet(),
+    builtInRequire: Set<String> = emptySet(),
+): Set<String> {
     val graph = moduleGraph(compiled)
-    val asked = named + jarsRequire.mapNotNull(graph::providerOf)
+    val asked = named + (jarsRequire + builtInRequire).mapNotNull(graph::providerOf)
     return asked + graph.requiredBy(asked)
 }
 

@@ -43,12 +43,12 @@ import hivens.ui.diag.ShellRecovery
 import hivens.ui.diag.UiRecoverySignal
 import hivens.ui.editor.presets.PresetRepository
 import hivens.ui.host.CompositionWindows
+import hivens.ui.host.InterfaceRestartLog
 import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
 import hivens.ui.legacy.RetiredClientsGate
-import hivens.ui.navigation.CompositionHistories
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.NotificationArchiveStore
@@ -473,8 +473,8 @@ private fun runShellWithRecovery(
                 modules?.culpritOf(crash)?.let { modules.switchOffAfterCrash(it, crash) }
             }.onFailure { log.warn("Could not trace the crash to a widget module", it) }
             val again = UiRecoverySignal.crashesSinceHealthy() > 0
-            runCatching { koin?.getOrNull<CompositionHistories>()?.afterCrash(again) }
-                .onFailure { log.warn("Could not step back from the page shown", it) }
+            runCatching { koin?.getOrNull<InterfaceRestartLog>()?.record(again) }
+                .onFailure { log.warn("Could not tell the modules the interface starts over after a crash", it) }
             runCatching { koin?.getOrNull<CompositionWindows>()?.closeAfterCrash() }
                 .onFailure { log.warn("Could not close the windows opened beside the main one", it) }
         }

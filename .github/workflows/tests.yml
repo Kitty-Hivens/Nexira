@@ -116,7 +116,7 @@ jobs:
           :nx-ui:desktopTest :ui-layers:test :ui-puppet:test
           :widget-api:test :widget-model:test :widget-processor:test :widget-loader:test
           :packs-api:test :packs:test :accounts-api:test :accounts:test
-          :pages-api:test :history-api:test
+          :pages-api:test :history-api:test :history:test
           :catalogue-api:test :catalogue:test :source-mirror:test :source-modrinth:test :i18n-api:test :i18n:test
           :look:allTests
           :authlib-agent:test :profiler-agent:test

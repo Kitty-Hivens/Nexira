@@ -41,6 +41,7 @@ import hivens.widget.api.get
 import hivens.widget.api.hostServices
 import hivens.pages.api.pageValue
 import hivens.widget.api.service
+import hivens.pages.api.PagesApi
 import hivens.widget.model.ApiVersion
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.WidgetDataSource
@@ -67,7 +68,7 @@ object PacksModule : CompiledModule {
 
     // The API's own object lives in the API artifact's package, so the package is read off it.
     override val apiPackages: Map<String, Set<String>> = mapOf(PacksApi.ID to setOf(PacksApi::class.java.name.substringBeforeLast('.')))
-    override val uses: Map<String, ApiVersion> = mapOf(CatalogueApi.ID to CatalogueApi.VERSION)
+    override val uses: Map<String, ApiVersion> = mapOf(CatalogueApi.ID to CatalogueApi.VERSION, PagesApi.ID to PagesApi.VERSION)
     override val contributions: List<ModuleContribution> = listOf(PackKeysContribution)
 
     private const val NAME = "packs.name"

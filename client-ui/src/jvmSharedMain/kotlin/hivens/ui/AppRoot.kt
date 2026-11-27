@@ -21,8 +21,6 @@ import hivens.ui.components.SignOutPrompt
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.host.CompositionWindows
 import hivens.ui.layout.DocumentStore
-import hivens.ui.navigation.CompositionHistories
-import hivens.ui.navigation.CompositionHistory
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.render.NotificationStack
@@ -34,11 +32,11 @@ import hivens.themes.api.WallpaperTone
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.host.launcherServices
 import hivens.widget.api.LocalScope
-import hivens.widget.model.ConfigId
+import hivens.widget.api.rememberScopedCommand
+import hivens.history.api.HistoryKeys
 import hivens.widget.model.Document
 import hivens.history.api.History
 import hivens.widget.model.ScopeLevel
-import hivens.pages.api.Show
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -56,11 +54,12 @@ import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Whatever the host feeds into the history besides the screens: thumb buttons on a
- * desktop, the system back gesture on a phone. A back with nowhere to go stays in
- * the history as [History.backsAtRoot] and never reaches the host as a way out.
+ * desktop, the system back gesture on a phone, as [back] and [forward]. A back with
+ * nowhere to go stays in the history as [History.backsAtRoot] and never reaches the
+ * host as a way out, and where no history answers, a back goes nowhere.
  */
 @Composable
-internal expect fun NavigationInputs(history: CompositionHistory)
+internal expect fun NavigationInputs(back: () -> Unit, forward: () -> Unit)
 
 /** The wallpaper behind the layout, which reports its tone upward. A host with no wallpaper draws nothing and reports none. */
 @Composable
@@ -127,30 +126,9 @@ fun AppRoot(
 
     WarmLibrary()
 
-    // Where the composition has been, from Home. At Home back goes nowhere. Kept for the
-    // run, so an interface that starts over goes on from where it was.
-    val histories: CompositionHistories = koinInject()
-    val history = remember(histories) { histories.of(LauncherConfigs.Composition, LauncherConfigs.Home) }
-
-    NavigationInputs(history)
-
-    // What the composition can show: the configs the document gives it. One gone while it
-    // sits in the history leaves it, back and forward both, so neither arrow can open a page
-    // about nothing.
     val store: DocumentStore = koinInject()
     val document by store.document.collectAsState()
-    val configs = document.compositions[LauncherConfigs.Composition]?.configs?.keys.orEmpty()
-    val known by rememberUpdatedState(configs)
-    val has: (ConfigId) -> Boolean = remember { { it in known } }
-    LaunchedEffect(configs) { history.retain { has(it.config) } }
-    val show: (Show) -> Unit = remember(history, has) { { if (has(it.config)) history.show(it) } }
-
-    // Out-of-composition navigation requests (notification actions, drivers)
-    // land in the same history the buttons above drive.
     val navRequests: NavRequests = koinInject()
-    LaunchedEffect(navRequests, show) {
-        navRequests.requests.collect { show(it) }
-    }
 
     // ── Background settings ───────────────────────────────────────────────
     val backgroundManager: BackgroundManager = koinInject()
@@ -185,6 +163,20 @@ fun AppRoot(
     val widgetLabels = remember(widgetModules) { WidgetLabels { widgetModules[it] } }
     // The composition's level, around everything it draws, the editor included.
     ChildLevel(ScopeLevel.Composition) {
+    // Where the composition has been, from where the document starts it, as the history
+    // module keeps it for the run: an interface that starts over goes on from where it was.
+    ProvideCompositionFacts(LauncherConfigs.Composition, document)
+    val start = document.compositions[LauncherConfigs.Composition]?.start ?: LauncherConfigs.Home
+    val (history, show) = rememberCompositionHistory(start)
+    val back = rememberScopedCommand(HistoryKeys.Back)
+    val forward = rememberScopedCommand(HistoryKeys.Forward)
+    NavigationInputs(back = { back?.invoke(Unit) }, forward = { forward?.invoke(Unit) })
+    // Out-of-composition navigation requests (notification actions, drivers) land in the
+    // same history the buttons above drive.
+    val latestShow by rememberUpdatedState(show)
+    LaunchedEffect(navRequests) {
+        navRequests.requests.collect { latestShow(it) }
+    }
     CompositionLocalProvider(LocalWidgetLabels provides widgetLabels) {
     ScreenEffectHost(
         effects  = effects,

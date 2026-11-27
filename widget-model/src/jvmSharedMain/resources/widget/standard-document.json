@@ -10,7 +10,8 @@
         "nexira.accounts",
         "nexira.catalogue",
         "nexira.source.mirror",
-        "nexira.source.modrinth"
+        "nexira.source.modrinth",
+        "nexira.history"
     ],
     "start": "launcher",
     "compositions": {

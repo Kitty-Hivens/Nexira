@@ -62,6 +62,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
+import hivens.pages.api.PagesApi
 
 /**
  * The catalogue module as the application carries it: compiled in, and brought in by
@@ -77,6 +78,8 @@ object CatalogueModule : CompiledModule {
     override val apiPackages: Map<String, Set<String>> = mapOf(CatalogueApi.ID to setOf(CatalogueApi::class.java.name.substringBeforeLast('.')))
 
     // The sources: every module, compiled in or a jar, brings its own as one of these.
+    // A project, a build or a pack page reads what it was opened with through the pages API, and nothing without it.
+    override val uses: Map<String, ApiVersion> = mapOf(PagesApi.ID to PagesApi.VERSION)
     override val contributionKinds: List<Class<out ModuleContribution>> = listOf(PackSourceContribution::class.java, ProjectSearchContribution::class.java)
     override val contributions: List<ModuleContribution> = listOf(CatalogueKeysContribution)
 

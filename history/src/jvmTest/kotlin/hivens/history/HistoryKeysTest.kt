@@ -1,0 +1,120 @@
+package hivens.history
+
+import hivens.history.api.HistoryKeys
+import hivens.pages.api.PagesKeys
+import hivens.pages.api.Show
+import hivens.widget.api.CompositionKeys
+import hivens.widget.api.ContributedServices
+import hivens.widget.api.HostApi
+import hivens.widget.api.InterfaceKeys
+import hivens.widget.api.InterfaceRestarts
+import hivens.widget.api.LevelServices
+import hivens.widget.api.LevelServicesHost
+import hivens.widget.api.ModuleKeysResult
+import hivens.widget.api.WidgetCommandRegistry
+import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.WidgetScope
+import hivens.widget.api.current
+import hivens.widget.api.flowSource
+import hivens.widget.api.registerModuleKeys
+import hivens.widget.model.CompositionName
+import hivens.widget.model.ConfigId
+import hivens.widget.model.ScopeLevel
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlin.reflect.KClass
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+
+/**
+ * The history module's keys as a composition reads them: kept by the composition's name across its levels, moved by
+ * its commands, holding to the configs the document gives it, and stepped back after the interface crashed.
+ */
+@OptIn(HostApi::class)
+class HistoryKeysTest {
+
+    private val home = ConfigId("home")
+    private val library = ConfigId("library")
+    private val pack = ConfigId("pack")
+
+    private val restarts = MutableStateFlow(InterfaceRestarts())
+    private val configs = MutableStateFlow(setOf(home, library, pack))
+
+    private val app: WidgetScope = run {
+        val sources = WidgetDataRegistry().apply { register(InterfaceKeys.Restarts, flowSource(restarts)) }
+        val commands = WidgetCommandRegistry()
+        val services = ContributedServices()
+        assertIs<ModuleKeysResult.Registered>(registerModuleKeys(HistoryModule.id, HistoryKeysContribution, sources, commands, services, trusted = true))
+        WidgetScope.app(sources, services.host(NoServices, Dispatchers.Unconfined), Dispatchers.Unconfined, commands)
+    }
+
+    /** A level of the composition "main", as whoever draws it hands it what the document says of it. */
+    private fun composition(): WidgetScope = app.child(ScopeLevel.Window).child(ScopeLevel.Composition).apply {
+        provide(CompositionKeys.Name, CompositionName("main"))
+        provide(CompositionKeys.Start, home)
+        provideSource(CompositionKeys.Configs, flowSource(configs))
+    }
+
+    private fun WidgetScope.shown(): ConfigId? = current(HistoryKeys.History)?.current?.config
+
+    @Test
+    fun `a page shown moves the history, and back and forward walk it`() {
+        val main = composition()
+        assertEquals(home, main.shown())
+        main.findCommand(PagesKeys.Show)!!.run(Show(library))
+        assertEquals(library, main.shown())
+        main.findCommand(HistoryKeys.Back)!!.run(Unit)
+        assertEquals(home, main.shown())
+        main.findCommand(HistoryKeys.Forward)!!.run(Unit)
+        assertEquals(library, main.shown())
+    }
+
+    @Test
+    fun `a config the composition does not have is not shown`() {
+        val main = composition()
+        main.findCommand(PagesKeys.Show)!!.run(Show(ConfigId("nowhere")))
+        assertEquals(home, main.shown())
+    }
+
+    @Test
+    fun `the composition drawn again on a new level goes on from where it stood`() {
+        val first = composition()
+        first.findCommand(PagesKeys.Show)!!.run(Show(pack))
+        first.close()
+        assertEquals(pack, composition().shown())
+    }
+
+    @Test
+    fun `a config gone from the document leaves the history`() {
+        val main = composition()
+        main.findCommand(PagesKeys.Show)!!.run(Show(library))
+        main.findCommand(PagesKeys.Show)!!.run(Show(pack))
+        configs.value = setOf(home, library)
+        assertEquals(library, main.shown())
+        main.findCommand(HistoryKeys.Forward)!!.run(Unit)
+        assertEquals(library, main.shown(), "nor is it ahead")
+    }
+
+    @Test
+    fun `after the interface crashed the composition drawn again stands one step back`() {
+        val first = composition()
+        first.findCommand(PagesKeys.Show)!!.run(Show(library))
+        first.findCommand(PagesKeys.Show)!!.run(Show(pack))
+        first.close()
+        restarts.value = InterfaceRestarts(count = 1, again = false)
+        assertEquals(library, composition().shown())
+    }
+}
+
+/** A host with no services of its own, under the module's. */
+private object NoServices : LevelServicesHost {
+    override val services: LevelServices = object : LevelServices {
+        override fun <T : Any> find(type: KClass<T>): T? = null
+        override fun <T : Any> get(type: KClass<T>): T = throw NoSuchElementException("no ${type.qualifiedName} here")
+    }
+
+    override fun child(level: ScopeLevel): LevelServicesHost = this
+
+    override fun close() = Unit
+}
