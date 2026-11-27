@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -23,6 +24,7 @@ import hivens.widget.model.FlowSpec
 import hivens.widget.model.NodePath
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
+import kotlinx.coroutines.CancellationException
 
 // ── Drag payload + active state ─────────────────────────────────────────────
 
@@ -76,6 +78,41 @@ class DragController {
         _active.value = null
         return payload
     }
+
+    // Gestures under way, and how many cuts were asked for. A gesture remembers the count it began at and stops at its
+    // first frame after a cut, which runs everything it does when it is cut off: nothing is committed, and what it wrote
+    // as it went is put back.
+    private val underWay = mutableIntStateOf(0)
+    @Volatile private var cuts = 0
+
+    /** Whether a drag, a move or a resize is under way, which is when Escape cuts it short rather than leave the editor. */
+    val gestureUnderWay: Boolean get() = underWay.intValue > 0
+
+    /** Cuts short every gesture under way. */
+    fun cutGesture() {
+        cuts++
+    }
+
+    /** Runs a gesture, handing it the check it calls on every frame: past a cut, it throws and the gesture ends there. */
+    inline fun <T> gesture(block: (stopIfCut: () -> Unit) -> T): T {
+        val at = beginGesture()
+        try {
+            return block { if (wasCut(at)) throw CancellationException("The gesture was cut short") }
+        } finally {
+            endGesture()
+        }
+    }
+
+    @PublishedApi internal fun beginGesture(): Int {
+        underWay.intValue++
+        return cuts
+    }
+
+    @PublishedApi internal fun endGesture() {
+        underWay.intValue--
+    }
+
+    @PublishedApi internal fun wasCut(at: Int): Boolean = cuts != at
 }
 
 // ── Which widget is meant ───────────────────────────────────────────────────
@@ -330,15 +367,18 @@ fun Modifier.dragSource(
         // finally: a drag cut off with the palette closing under it, Esc or Ctrl+E
         // mid-gesture, ran nothing after this, and the ghost and the hidden cursor
         // it draws stayed up over the whole window. A cut-off drag drops nothing.
-        try {
-            val released = drag(drag.id) { change: PointerInputChange ->
-                lastPointer += change.positionChange()
-                controller.update(lastPointer)
-                change.consume()
+        controller.gesture { stopIfCut ->
+            try {
+                val released = drag(drag.id) { change: PointerInputChange ->
+                    stopIfCut()
+                    lastPointer += change.positionChange()
+                    controller.update(lastPointer)
+                    change.consume()
+                }
+                if (released) onDragEnd(lastPointer)
+            } finally {
+                controller.end()
             }
-            if (released) onDragEnd(lastPointer)
-        } finally {
-            controller.end()
         }
     }
 }

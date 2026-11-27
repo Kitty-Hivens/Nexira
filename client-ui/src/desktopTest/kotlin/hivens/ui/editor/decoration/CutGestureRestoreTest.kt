@@ -88,11 +88,12 @@ class CutGestureRestoreTest {
     private fun DocumentStore.placement(): Placement? =
         document.value.contentAt(path)?.widgets?.single()?.placement
 
-    /** Presses the widget, drags it, and then lets go or takes the chrome away mid-drag. */
+    private enum class End { LetGo, ChromeGone, Escape }
+
+    /** Presses the widget, drags it, and then lets go, takes the chrome away mid-drag, or cuts it short as Escape does. */
     @OptIn(ExperimentalComposeUiApi::class)
-    private fun drag(store: DocumentStore, edit: DocumentEditor, letGo: Boolean) {
+    private fun drag(store: DocumentStore, edit: DocumentEditor, end: End, drag: DragController = DragController()) {
         var shown by mutableStateOf(true)
-        val drag = DragController()
         val registry = DropTargetRegistry()
         val scene = ImageComposeScene(width = 300, height = 300, density = Density(1f)) {
             NxThemed(Themes.default, dark = true) {
@@ -123,11 +124,22 @@ class CutGestureRestoreTest {
             runBlocking { edit.awaitWrites() }
             assertNotEquals(start, store.placement(), "the drag never moved the widget, so the test proved nothing")
 
-            if (letGo) {
-                scene.sendPointerEvent(PointerEventType.Release, Offset(100f, 90f))
-            } else {
-                shown = false
-                Snapshot.sendApplyNotifications()
+            assertTrue(drag.gestureUnderWay, "a drag under way is what Escape asks about")
+            when (end) {
+                End.LetGo -> scene.sendPointerEvent(PointerEventType.Release, Offset(100f, 90f))
+                End.ChromeGone -> {
+                    shown = false
+                    Snapshot.sendApplyNotifications()
+                }
+                End.Escape -> {
+                    drag.cutGesture()
+                    // The next frame of the drag is where it stops, and the pointer still held moves nothing after it.
+                    scene.sendPointerEvent(PointerEventType.Move, Offset(120f, 100f))
+                    frame()
+                    scene.sendPointerEvent(PointerEventType.Move, Offset(140f, 110f))
+                    frame()
+                    scene.sendPointerEvent(PointerEventType.Release, Offset(140f, 110f))
+                }
             }
             frame()
             frame()
@@ -143,10 +155,24 @@ class CutGestureRestoreTest {
         val edit = DocumentEditor(store, scope)
         edit.reportEditing(true)
 
-        drag(store, edit, letGo = false)
+        drag(store, edit, End.ChromeGone)
 
         assertEquals(start, store.placement())
         assertFalse(edit.canUndo, "undo would only lead back into the move that was abandoned")
+    }
+
+    @Test
+    fun `Escape mid-drag puts the widget back, ends the gesture and leaves nothing to undo`() {
+        val store = store()
+        val edit = DocumentEditor(store, scope)
+        edit.reportEditing(true)
+        val controller = DragController()
+
+        drag(store, edit, End.Escape, controller)
+
+        assertEquals(start, store.placement())
+        assertFalse(edit.canUndo)
+        assertFalse(controller.gestureUnderWay, "Escape goes back to leaving the editor")
     }
 
     @Test
@@ -155,7 +181,7 @@ class CutGestureRestoreTest {
         val edit = DocumentEditor(store, scope)
         edit.reportEditing(true)
 
-        drag(store, edit, letGo = true)
+        drag(store, edit, End.LetGo)
 
         assertEquals(Placement(x = 60f, y = 50f), store.placement())
         assertTrue(edit.canUndo)

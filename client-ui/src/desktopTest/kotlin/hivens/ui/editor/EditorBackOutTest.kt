@@ -31,6 +31,7 @@ class EditorBackOutTest {
     private var previewing by mutableStateOf(false)
     private var resetSurface by mutableStateOf(false)
     private var resetAll by mutableStateOf(false)
+    private var gesture by mutableStateOf(false)
 
     private val layers = WindowLayers()
     private val scene = ImageComposeScene(width = 200, height = 200, density = Density(1f)) {
@@ -44,6 +45,8 @@ class EditorBackOutTest {
                 onCloseSlotMenu     = { slotMenu = false },
                 previewing          = previewing,
                 onEndPreview        = { previewing = false },
+                gesture             = gesture,
+                onCutGesture        = { gesture = false },
             )
             // As the host gates them: only while editing.
             if (editing && resetSurface) NxDialog(onDismissRequest = { resetSurface = false }) {}
@@ -151,6 +154,20 @@ class EditorBackOutTest {
         assertFalse(layers.dismiss.handlesBack, "no dialog is left holding the window either")
         assertFalse(escape())
         assertTrue(resetAll, "nothing was closed on a session that is gone")
+    }
+
+    @Test
+    fun `Escape during a drag cuts the drag and nothing else`() {
+        settle()
+        selection = true
+        settle()
+        gesture = true
+        settle()
+
+        escape()
+        assertFalse(gesture, "the drag first")
+        assertTrue(selection)
+        assertTrue(editing, "and the editor stays open")
     }
 
     @Test

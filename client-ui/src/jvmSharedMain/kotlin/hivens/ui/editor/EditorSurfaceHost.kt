@@ -231,6 +231,8 @@ fun EditorSurfaceHost(
         onCloseSlotMenu  = { handleMenuOpen = false; slotMenuCursor = null },
         previewing       = previewing,
         onEndPreview     = { previewing = false },
+        gesture          = dragController.gestureUnderWay,
+        onCutGesture     = dragController::cutGesture,
     )
     // Every way out of edit mode ends here, so the next entry starts clean.
     LaunchedEffect(editing) {

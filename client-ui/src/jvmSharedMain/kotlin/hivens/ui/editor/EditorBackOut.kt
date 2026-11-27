@@ -5,8 +5,8 @@ import hivens.ui.layers.DismissOnBack
 
 /**
  * The editor's way back out, one Escape or back per step, as entries of the
- * window's dismiss stack: preview, the slot menu, the slot selection, and editing
- * itself.
+ * window's dismiss stack: a gesture under way, preview, the slot menu, the slot
+ * selection, and editing itself.
  *
  * Each step is an entry while it is open, so the stack closes whichever was opened
  * last: preview closes before the slot steps it hides, so no press is spent on
@@ -28,9 +28,13 @@ internal fun EditorBackOut(
     onCloseSlotMenu: () -> Unit,
     previewing: Boolean,
     onEndPreview: () -> Unit,
+    /** A drag, a move or a resize under way, which Escape cuts short before anything else. */
+    gesture: Boolean,
+    onCutGesture: () -> Unit,
 ) {
     DismissOnBack(enabled = editing, onDismiss = onLeave)
     DismissOnBack(enabled = editing && selection, onDismiss = onClearSelection)
     DismissOnBack(enabled = editing && slotMenu, onDismiss = onCloseSlotMenu)
     DismissOnBack(enabled = editing && previewing, onDismiss = onEndPreview)
+    DismissOnBack(enabled = editing && gesture, onDismiss = onCutGesture)
 }

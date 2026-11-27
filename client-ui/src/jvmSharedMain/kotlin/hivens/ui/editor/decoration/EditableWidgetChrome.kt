@@ -494,6 +494,8 @@ fun EditableWidgetChrome(
                                     return@awaitEachGesture
                                 }
                             }
+                            // Escape cuts it short, a frame later, through the same path as a gesture cut off by anything.
+                            controller.gesture { stopIfCut ->
                             when {
                                 // The lattice branch goes first, because a lattice
                                 // slot is also a placement slot and the finer answer
@@ -532,6 +534,7 @@ fun EditableWidgetChrome(
                                     try {
                                         moving = true
                                         val released = drag(down.id) { change ->
+                                            stopIfCut()
                                             acc += change.positionChange()
                                             pointer += change.positionChange()
                                             autoScroll.move(pointer)
@@ -594,6 +597,7 @@ fun EditableWidgetChrome(
                                     try {
                                         moving = true
                                         released = drag(down.id) { change ->
+                                            stopIfCut()
                                             pointer += change.positionChange()
                                             autoScroll.move(pointer)
                                             val slot = liveSlotSize.value
@@ -655,6 +659,7 @@ fun EditableWidgetChrome(
                                     autoScroll.start(last) { }
                                     try {
                                         val released = drag(slop.id) { change ->
+                                            stopIfCut()
                                             last += change.positionChange()
                                             autoScroll.move(last)
                                             controller.update(last)
@@ -667,6 +672,7 @@ fun EditableWidgetChrome(
                                         controller.end()
                                     }
                                 }
+                            }
                             }
                         }
                     },
@@ -825,8 +831,10 @@ fun EditableWidgetChrome(
                                         accY += moved.y
                                         apply()
                                     }
+                                    controller.gesture { stopIfCut ->
                                     try {
                                         released = drag(down.id) { change ->
+                                            stopIfCut()
                                             accX += change.positionChange().x
                                             accY += change.positionChange().y
                                             pointer += change.positionChange()
@@ -840,6 +848,7 @@ fun EditableWidgetChrome(
                                         registry.publishOverlap(emptySet())
                                         if (wrote && !released) editor.restorePlacement(path, instance.instanceId, p)
                                         editor.closeStep()
+                                    }
                                     }
                                 }
                             },
