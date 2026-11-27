@@ -88,10 +88,13 @@ object RecoveryIo {
 
     // -- resets -----------------------------------------------------------
 
-    /** Delete the widget layout graph so it re-seeds the bundled default next boot. */
+    /**
+     * Delete the person's own interface, so the next boot draws the standard one and updates replace it again. The
+     * interface of a launcher from before it was a document is not read any more and is left where it is.
+     */
     fun resetLayout(dataDir: Path) {
         stateWasReset = true
-        deleteQuietly(dataDir.resolve(Storage.LAYOUT_GRAPH_FILE))
+        deleteQuietly(dataDir.resolve(Storage.INTERFACE_FILE))
     }
 
     /** Delete theme / background / console / the look's choice so each re-seeds its default. */

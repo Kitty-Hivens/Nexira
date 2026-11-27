@@ -647,23 +647,6 @@ class LayoutGraphRepositoryTest {
     private fun touchJob(): Job? = null
 
     @Test
-    fun `a reset from the recovery surface is not undone by the shutdown flush`() = runBlocking {
-        // The reported shape: the recovery surface deletes the layout, the user
-        // relaunches, and the dying process writes its in-memory copy straight
-        // back -- so the reset survived only until the next boot loaded the same
-        // broken graph, and the button appeared to do nothing.
-        val repo = repo()
-        repo.update { it.copy(surfaces = it.surfaces + (SurfaceId("scratch") to SurfaceLayout())) }
-        assertTrue(Files.exists(file), "precondition: an edit reaches disk")
-
-        RecoveryIo.resetLayout(tmpDir)
-        assertFalse(Files.exists(file), "precondition: the reset deleted the file")
-
-        repo.flush()
-        assertFalse(Files.exists(file), "the shutdown flush resurrected the layout the user just reset")
-    }
-
-    @Test
     fun `flush does not rewrite a file that already matches memory`() = runBlocking {
         // pendingWrite was nulled only by flush, so a long-completed debounce job
         // left flush believing a write was still owed. Every quit rewrote the file

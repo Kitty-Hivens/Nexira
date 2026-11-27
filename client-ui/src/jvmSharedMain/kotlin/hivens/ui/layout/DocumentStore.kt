@@ -5,6 +5,7 @@ import hivens.core.data.ReadOnlyReason
 import hivens.core.data.ReadOnlyStore
 import hivens.core.io.AtomicFiles
 import hivens.core.io.readUtf8
+import hivens.ui.bootstrap.RecoveryIo
 import hivens.widget.model.Document
 import hivens.widget.model.DocumentCodec
 import hivens.widget.model.DocumentRead
@@ -105,6 +106,9 @@ class DocumentStore(
         if (!queued.compareAndSet(false, true)) return
         save("the interface") {
             queued.set(false)
+            // The recovery surface deleted the file under the running launcher: a write queued before that would bring
+            // back the interface the person just reset.
+            if (RecoveryIo.stateWasReset) return@save
             synchronized(this) {
                 if (ownState.value) AtomicFiles.writeString(file, DocumentCodec.write(state.value)) else Files.deleteIfExists(file)
             }
@@ -137,5 +141,17 @@ class DocumentStore(
     private fun leftAsItIs(reason: ReadOnlyReason): Loaded {
         NewerBuildData.record(ReadOnlyStore.Layout, reason)
         return Loaded(standard(), own = true, reason = reason)
+    }
+
+    companion object {
+        /**
+         * The document a store over [file] would draw, read with nothing written, recorded or logged: for what has to
+         * know it before the store exists, the modules the boot window asks before the shell is up.
+         */
+        fun peek(file: Path, standard: () -> Document): Document {
+            if (!Files.isRegularFile(file)) return standard()
+            val text = runCatching { readUtf8(file) }.getOrNull() ?: return standard()
+            return (DocumentCodec.read(text) as? DocumentRead.Whole)?.document ?: standard()
+        }
     }
 }

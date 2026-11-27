@@ -336,7 +336,7 @@ fun uiCoreModule(
     // The compiled modules that are in: the ones the document names, read once, the ones those
     // and the jars switched on require, and the ones brought in since.
     single {
-        val named = modulesNamedBy(get<LayoutGraphRepository>().value()) { DefaultLayout.modules(get()) }
+        val named = get<DocumentStore>().document.value.modules.toSet()
         ModulesIn(broughtIn(named, compiled, jarsRequire = get<WidgetModules>().state.value.requires))
     }
 
@@ -833,13 +833,6 @@ internal fun jarKeysOf(modules: WidgetModules): List<JarKeys> =
         }
     }
 
-/**
- * The ids of the modules [graph] names, or, where it names none at all, the standard
- * list. A graph the launcher wrote itself never names the standard list, so it is
- * read here as whatever the standard list is in this build.
- */
-internal fun modulesNamedBy(graph: LayoutGraph, standard: () -> List<String>): Set<String> =
-    (graph.modules ?: standard()).toSet()
 
 /**
  * Registers into [keys] the keys of the modules the launcher brings in:

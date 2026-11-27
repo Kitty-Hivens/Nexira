@@ -18,7 +18,7 @@ import hivens.ui.i18n.NexiraStrings
 import hivens.ui.prepareLook
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.widget.api.current
-import hivens.widget.model.DefaultLayout
+import hivens.widget.model.StandardDocument
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -46,15 +46,15 @@ class DocumentModulesTest {
 
     @Test
     fun `with no document of the person's the standard list is named, and nothing is written`() {
-        assertEquals(DefaultLayout.modules().toSet(), documentModules(dir))
-        assertFalse(dir.resolve(Storage.LAYOUT_GRAPH_FILE).exists(), "the first start's own document is the shell's to write")
+        assertEquals(StandardDocument.load().modules.toSet(), documentModules(dir))
+        assertFalse(dir.resolve(Storage.INTERFACE_FILE).exists(), "the first start's own document is the shell's to write")
     }
 
     @Test
     fun `the standard document names the look manager and no axis, provider or pack of the look`() {
         // The providers' controls are named beside it: a controller is none of the three, the manager
         // never brings one in, and its keys are in only where a document names it.
-        val look = DefaultLayout.modules().filter { it.startsWith("nexira.look") }
+        val look = StandardDocument.load().modules.filter { it.startsWith("nexira.look") }
         assertEquals(listOf(LookApi.ID, ColourNxControls.ID, MotionNxControls.ID), look)
     }
 
@@ -63,8 +63,8 @@ class DocumentModulesTest {
         ModuleAppLevel.writeDocument(dir, listOf(ThemesApi.ID, "someone.else"))
         assertEquals(setOf(ThemesApi.ID, "someone.else"), documentModules(dir))
 
-        dir.resolve(Storage.LAYOUT_GRAPH_FILE).writeText("{ damaged")
-        assertEquals(DefaultLayout.modules().toSet(), documentModules(dir))
+        dir.resolve(Storage.INTERFACE_FILE).writeText("{ damaged")
+        assertEquals(StandardDocument.load().modules.toSet(), documentModules(dir))
     }
 
     @Test

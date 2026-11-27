@@ -1,8 +1,7 @@
 package hivens.ui.bootstrap
 
 import hivens.config.Storage
-import hivens.ui.layout.LayoutGraphRepository
-import hivens.ui.modulesNamedBy
+import hivens.ui.layout.DocumentStore
 import hivens.ui.settings.SettingsDomainFiles
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.ui.widgets.modules.bootTakenContributions
@@ -24,10 +23,9 @@ import hivens.widget.api.SourceFactory
 import hivens.widget.api.TakenContributions
 import hivens.widget.api.TakenWords
 import hivens.widget.model.CommandKey
-import hivens.widget.model.DefaultLayout
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
-import kotlinx.serialization.json.Json
+import hivens.widget.model.StandardDocument
 import org.slf4j.LoggerFactory
 import java.nio.file.Path
 import java.util.concurrent.CompletableFuture
@@ -78,28 +76,11 @@ fun answeredLater(answer: () -> BootValues): CompletableFuture<BootValues> =
     }
 
 /**
- * The modules the document names, decided the way the shell decides it once it is up: the person's
- * document, read the way every start reads it, and the standard list where it names none or there is
- * none. Nothing is written.
+ * The modules the document names, decided the way the shell decides it once it is up: the person's own
+ * document where it is one this build reads, the standard document otherwise. Nothing is written.
  */
-internal fun documentModules(dataDir: Path): Set<String> {
-    val read = LayoutGraphRepository.read(
-        file            = dataDir.resolve(Storage.LAYOUT_GRAPH_FILE),
-        json            = LayoutJson,
-        standardModules = { DefaultLayout.modules(LayoutJson) },
-        defaultGraph    = { DefaultLayout.load(LayoutJson) },
-    )
-    return modulesNamedBy(read.graph) { DefaultLayout.modules(LayoutJson) }
-}
-
-/** The document read as the launcher's own Json reads it, which the shell's repository is handed. */
-private val LayoutJson: Json = Json {
-    ignoreUnknownKeys = true
-    prettyPrint = true
-    isLenient = true
-    encodeDefaults = true
-    coerceInputValues = true
-}
+internal fun documentModules(dataDir: Path): Set<String> =
+    DocumentStore.peek(dataDir.resolve(Storage.INTERFACE_FILE)) { StandardDocument.load() }.modules.toSet()
 
 /**
  * What [module] answers, held to what it declares, or nothing where it is not in [brought] or it answers

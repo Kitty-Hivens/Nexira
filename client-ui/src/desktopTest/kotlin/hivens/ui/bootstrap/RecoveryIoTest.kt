@@ -67,11 +67,14 @@ class RecoveryIoTest {
     }
 
     @Test
-    fun `resetLayout deletes the layout graph`() {
-        val layout = dataDir / Storage.LAYOUT_GRAPH_FILE
-        Files.writeString(layout, "{}")
+    fun `resetLayout deletes the person's own interface and leaves an old layout file where it is`() {
+        val own = dataDir / Storage.INTERFACE_FILE
+        val old = dataDir / Storage.LAYOUT_GRAPH_FILE
+        Files.writeString(own, "{}")
+        Files.writeString(old, "{}")
         RecoveryIo.resetLayout(dataDir)
-        assertFalse(Files.exists(layout))
+        assertFalse(Files.exists(own))
+        assertTrue(Files.exists(old), "the old file is nobody's to touch")
     }
 
     @Test

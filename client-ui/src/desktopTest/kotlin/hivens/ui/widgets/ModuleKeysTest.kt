@@ -14,7 +14,6 @@ import hivens.ui.HostKeys
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.host.LauncherHostAccess
 import hivens.ui.moduleKeys
-import hivens.ui.modulesNamedBy
 import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.uiCommandRegistry
@@ -148,13 +147,5 @@ class ModuleKeysTest {
     fun `with the packs and accounts modules named, only the history the page provides is wanting`() {
         val missing = assertNotNull(placed(Host(named = setOf(PacksApi.ID, AccountsApi.ID))))
         assertEquals(listOf(CompositionKeys.Show.id), missing, "the pack and session keys answer, and nothing put the history over the composition")
-    }
-
-    @Test
-    fun `a document that says nothing takes the bundled default's modules, and one that names none takes none`() {
-        val standard = listOf(PacksApi.ID)
-        assertEquals(setOf(PacksApi.ID), modulesNamedBy(LayoutGraph()) { standard })
-        assertEquals(emptySet(), modulesNamedBy(LayoutGraph(modules = emptyList())) { standard })
-        assertEquals(setOf("someone.else"), modulesNamedBy(LayoutGraph(modules = listOf("someone.else"))) { standard })
     }
 }

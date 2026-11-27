@@ -1,9 +1,10 @@
 package hivens.ui
 
+import hivens.widget.model.StandardDocument
+import hivens.widget.model.DocumentCodec
 import hivens.config.Storage
 import hivens.ui.host.LauncherFiles
 import hivens.ui.host.LauncherHostAccess
-import hivens.ui.layout.LayoutReconcile
 import hivens.ui.settings.SettingsDomainFiles
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.modules.broughtIn
@@ -25,16 +26,11 @@ import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.current
 import hivens.widget.model.CommandKey
-import hivens.widget.model.DefaultLayout
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import java.nio.file.Path
 import kotlin.io.path.writeText
 import kotlin.reflect.KClass
@@ -124,11 +120,9 @@ internal class ModuleAppLevel(
         /** A module list with no jar loaded. */
         fun noJars(): WidgetModules.Snapshot = WidgetModules.Snapshot(NoWidgets, emptyList())
 
-        /** Writes the person's document under [dataDir]: the bundled arrangement, naming [modules]. */
+        /** Writes the person's document under [dataDir]: the standard interface, naming [modules]. */
         fun writeDocument(dataDir: Path, modules: List<String>) {
-            val graph = Json.encodeToJsonElement(LayoutGraph.serializer(), DefaultLayout.load().copy(modules = modules))
-            val envelope = JsonObject(mapOf("schema_version" to JsonPrimitive(LayoutReconcile.CURRENT_SCHEMA), "graph" to graph))
-            dataDir.resolve(Storage.LAYOUT_GRAPH_FILE).writeText(envelope.toString())
+            dataDir.resolve(Storage.INTERFACE_FILE).writeText(DocumentCodec.write(StandardDocument.load().copy(modules = modules)))
         }
     }
 

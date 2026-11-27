@@ -3,6 +3,8 @@ package hivens.ui.layout
 import hivens.core.data.NewerBuildData
 import hivens.core.data.ReadOnlyReason
 import hivens.core.data.ReadOnlyStore
+import hivens.config.Storage
+import hivens.ui.bootstrap.RecoveryIo
 import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
 import hivens.widget.model.Composition
@@ -34,11 +36,15 @@ class DocumentStoreTest {
     )
 
     @BeforeTest
-    fun clean() = NewerBuildData.reset()
+    fun clean() {
+        NewerBuildData.reset()
+        RecoveryIo.resetForTests()
+    }
 
     @AfterTest
     fun tearDown() {
         NewerBuildData.reset()
+        RecoveryIo.resetForTests()
         dir.toFile().deleteRecursively()
     }
 
@@ -66,6 +72,19 @@ class DocumentStoreTest {
         assertEquals(DocumentRead.Whole(moved), DocumentCodec.read(file.readText()))
         assertEquals(moved, store().document.value, "the next start reads it back")
         assertTrue(store().own.value)
+    }
+
+    @Test
+    fun `a reset from the recovery surface is not undone by a write queued before it`() {
+        val queued = ArrayList<() -> Unit>()
+        val store = DocumentStore(dir.resolve(Storage.INTERFACE_FILE), { standard }) { _, block -> queued += block }
+        assertTrue(store.takeOwn())
+        queued.removeFirst()()
+        assertTrue(store.update { it.copy(start = CompositionName("elsewhere")) })
+
+        RecoveryIo.resetLayout(dir)
+        queued.forEach { it() }
+        assertFalse(Files.exists(dir.resolve(Storage.INTERFACE_FILE)), "the write waiting in the queue brought back the interface the person reset")
     }
 
     @Test

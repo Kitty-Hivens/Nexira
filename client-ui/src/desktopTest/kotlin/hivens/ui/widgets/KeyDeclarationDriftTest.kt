@@ -15,7 +15,6 @@ import androidx.compose.runtime.Composable
 import hivens.ui.background.BackgroundSettings
 import hivens.ui.editor.DocumentAdmission
 import hivens.ui.moduleKeys
-import hivens.ui.modulesNamedBy
 import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.ui.widgets.modules.CompiledModules
@@ -28,7 +27,6 @@ import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.flowSource
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.CommandKey
-import hivens.widget.model.DefaultLayout
 import hivens.widget.model.Document
 import hivens.widget.model.NodePath
 import hivens.widget.model.NodeRoot
@@ -65,7 +63,7 @@ class KeyDeclarationDriftTest {
     init {
         moduleKeys(
             keys     = HostKeys(data, commands, ContributedServices()),
-            named    = modulesNamedBy(DefaultLayout.load()) { DefaultLayout.modules() },
+            named    = StandardDocument.load().modules.toSet(),
             compiled = CompiledModules,
             jars     = emptyList(),
         )
@@ -94,12 +92,11 @@ class KeyDeclarationDriftTest {
     }
 
     @Test
-    fun `the bundled document names the language, themes, look, packs, accounts and catalogue modules and the two sources, so a fresh install has their keys`() {
+    fun `the standard document names the language, themes, look, packs, accounts and catalogue modules and the two sources, so a fresh install has their keys`() {
         assertEquals(
             listOf(I18nApi.ID, ThemesApi.ID, LookApi.ID, ColourNxControls.ID, MotionNxControls.ID, PacksApi.ID, AccountsApi.ID, CatalogueApi.ID, MirrorSourceModule.ID, ModrinthSourceModule.ID),
-            DefaultLayout.modules(),
+            StandardDocument.load().modules,
         )
-        assertEquals(null, DefaultLayout.load().modules, "the bundled graph itself names none, so nothing written from it freezes the list")
         assertTrue(CompiledModules.any { it.id == PacksApi.ID }, "and the build carries the packs module")
         assertTrue(CompiledModules.any { it.id == AccountsApi.ID }, "and the accounts module")
         assertTrue(CompiledModules.any { it.id == CatalogueApi.ID }, "and the catalogue module")
