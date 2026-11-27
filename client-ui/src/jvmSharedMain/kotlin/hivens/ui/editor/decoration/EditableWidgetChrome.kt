@@ -496,7 +496,7 @@ fun EditableWidgetChrome(
                                 }
                             }
                             // Escape cuts it short, a frame later, through the same path as a gesture cut off by anything.
-                            controller.gesture { stopIfCut ->
+                            controller.gesture { gesture ->
                             when {
                                 // The lattice branch goes first, because a lattice
                                 // slot is also a placement slot and the finer answer
@@ -521,6 +521,7 @@ fun EditableWidgetChrome(
                                     // widget travels across the lattice, so it is added to
                                     // the drag rather than left behind with the content.
                                     autoScroll.start(pointer) { moved ->
+                                        if (gesture.isCut) return@start
                                         acc += moved
                                         latticeDrag = acc
                                     }
@@ -535,13 +536,14 @@ fun EditableWidgetChrome(
                                     try {
                                         moving = true
                                         val released = drag(down.id) { change ->
-                                            stopIfCut()
+                                            gesture.stopIfCut()
                                             acc += change.positionChange()
                                             pointer += change.positionChange()
                                             autoScroll.move(pointer)
                                             latticeDrag = acc
                                             change.consume()
                                         }
+                                        gesture.stopIfCut()
                                         autoScroll.stop()
                                         if (released) {
                                             gridGeo.value?.let { geo ->
@@ -590,6 +592,7 @@ fun EditableWidgetChrome(
                                     // The page moved under the held widget: the widget keeps
                                     // to the pointer, which on the page is that much further on.
                                     autoScroll.start(pointer) { moved ->
+                                        if (gesture.isCut) return@start
                                         curX += moved.x / density * signX
                                         curY += moved.y / density * signY
                                         editor.offset(path, instance.instanceId, curX, curY)
@@ -597,8 +600,8 @@ fun EditableWidgetChrome(
                                     }
                                     try {
                                         moving = true
-                                        released = drag(down.id) { change ->
-                                            stopIfCut()
+                                        val letGo = drag(down.id) { change ->
+                                            gesture.stopIfCut()
                                             pointer += change.positionChange()
                                             autoScroll.move(pointer)
                                             val slot = liveSlotSize.value
@@ -627,6 +630,8 @@ fun EditableWidgetChrome(
                                             )
                                             change.consume()
                                         }
+                                        gesture.stopIfCut()
+                                        released = letGo
                                     } finally {
                                         moving = false
                                         autoScroll.stop()
@@ -660,12 +665,13 @@ fun EditableWidgetChrome(
                                     autoScroll.start(last) { }
                                     try {
                                         val released = drag(slop.id) { change ->
-                                            stopIfCut()
+                                            gesture.stopIfCut()
                                             last += change.positionChange()
                                             autoScroll.move(last)
                                             controller.update(last)
                                             change.consume()
                                         }
+                                        gesture.stopIfCut()
                                         autoScroll.stop()
                                         if (released) liveCommitDrop.value(last)
                                     } finally {
@@ -825,17 +831,18 @@ fun EditableWidgetChrome(
                                         }
                                     }
                                     var pointer = handleOrigin + down.position
+                                    controller.gesture { gesture ->
                                     // A handle pulled to the edge of a page grows the widget
                                     // on past it, by as far as the page moved under it.
                                     autoScroll.start(pointer) { moved ->
+                                        if (gesture.isCut) return@start
                                         accX += moved.x
                                         accY += moved.y
                                         apply()
                                     }
-                                    controller.gesture { stopIfCut ->
                                     try {
-                                        released = drag(down.id) { change ->
-                                            stopIfCut()
+                                        val letGo = drag(down.id) { change ->
+                                            gesture.stopIfCut()
                                             accX += change.positionChange().x
                                             accY += change.positionChange().y
                                             pointer += change.positionChange()
@@ -843,6 +850,8 @@ fun EditableWidgetChrome(
                                             apply()
                                             change.consume()
                                         }
+                                        gesture.stopIfCut()
+                                        released = letGo
                                     } finally {
                                         autoScroll.stop()
                                         resizing = false

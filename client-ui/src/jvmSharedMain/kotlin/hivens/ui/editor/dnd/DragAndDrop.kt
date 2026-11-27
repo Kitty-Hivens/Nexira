@@ -79,40 +79,57 @@ class DragController {
         return payload
     }
 
-    // Gestures under way, and how many cuts were asked for. A gesture remembers the count it began at and stops at its
-    // first frame after a cut, which runs everything it does when it is cut off: nothing is committed, and what it wrote
-    // as it went is put back.
-    private val underWay = mutableIntStateOf(0)
+    // Gestures under way that no cut has reached, and how many cuts were asked for. A gesture remembers the count it
+    // began at and stops at its first frame after a cut, which runs everything it does when it is cut off: nothing is
+    // committed, and what it wrote as it went is put back. A cut gesture is no longer under way, though it only stops
+    // when its pointer next moves or lets go, so a second Escape leaves the editor rather than cut it again.
+    private val live = mutableIntStateOf(0)
     @Volatile private var cuts = 0
 
     /** Whether a drag, a move or a resize is under way, which is when Escape cuts it short rather than leave the editor. */
-    val gestureUnderWay: Boolean get() = underWay.intValue > 0
+    val gestureUnderWay: Boolean get() = live.intValue > 0
 
     /** Cuts short every gesture under way. */
     fun cutGesture() {
         cuts++
+        live.intValue = 0
     }
 
-    /** Runs a gesture, handing it the check it calls on every frame: past a cut, it throws and the gesture ends there. */
-    inline fun <T> gesture(block: (stopIfCut: () -> Unit) -> T): T {
-        val at = beginGesture()
+    /** Runs a gesture, handing it the [Gesture] it checks on every frame and before it commits. */
+    inline fun <T> gesture(block: (Gesture) -> T): T {
+        val gesture = beginGesture()
         try {
-            return block { if (wasCut(at)) throw CancellationException("The gesture was cut short") }
+            return block(gesture)
         } finally {
-            endGesture()
+            endGesture(gesture)
         }
     }
 
-    @PublishedApi internal fun beginGesture(): Int {
-        underWay.intValue++
-        return cuts
+    @PublishedApi internal fun beginGesture(): Gesture {
+        live.intValue++
+        return Gesture(this, cuts)
     }
 
-    @PublishedApi internal fun endGesture() {
-        underWay.intValue--
+    @PublishedApi internal fun endGesture(gesture: Gesture) {
+        if (!gesture.isCut) live.intValue--
     }
 
-    @PublishedApi internal fun wasCut(at: Int): Boolean = cuts != at
+    internal fun cutSince(at: Int): Boolean = cuts != at
+}
+
+/**
+ * One gesture under way. A pointer let go is reported without a frame of its own, so the check runs on every frame and
+ * once more before the gesture commits. Whatever moves the gesture on without the pointer, a page scrolled under it,
+ * asks [isCut] first.
+ */
+class Gesture internal constructor(private val controller: DragController, private val at: Int) {
+    /** Whether a cut has reached this gesture. */
+    val isCut: Boolean get() = controller.cutSince(at)
+
+    /** Past a cut, throws, and the gesture ends there with nothing committed. */
+    fun stopIfCut() {
+        if (isCut) throw CancellationException("The gesture was cut short")
+    }
 }
 
 // ── Which widget is meant ───────────────────────────────────────────────────
@@ -367,14 +384,15 @@ fun Modifier.dragSource(
         // finally: a drag cut off with the palette closing under it, Esc or Ctrl+E
         // mid-gesture, ran nothing after this, and the ghost and the hidden cursor
         // it draws stayed up over the whole window. A cut-off drag drops nothing.
-        controller.gesture { stopIfCut ->
+        controller.gesture { gesture ->
             try {
                 val released = drag(drag.id) { change: PointerInputChange ->
-                    stopIfCut()
+                    gesture.stopIfCut()
                     lastPointer += change.positionChange()
                     controller.update(lastPointer)
                     change.consume()
                 }
+                gesture.stopIfCut()
                 if (released) onDragEnd(lastPointer)
             } finally {
                 controller.end()

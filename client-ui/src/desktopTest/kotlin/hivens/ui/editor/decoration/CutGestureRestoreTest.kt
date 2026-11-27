@@ -88,9 +88,12 @@ class CutGestureRestoreTest {
     private fun DocumentStore.placement(): Placement? =
         document.value.contentAt(path)?.widgets?.single()?.placement
 
-    private enum class End { LetGo, ChromeGone, Escape }
+    private enum class End { LetGo, ChromeGone, Escape, EscapeThenLetGoStill }
 
-    /** Presses the widget, drags it, and then lets go, takes the chrome away mid-drag, or cuts it short as Escape does. */
+    /**
+     * Presses the widget, drags it, and then lets go, takes the chrome away mid-drag, or cuts it short as Escape does,
+     * with the pointer moving on after or let go where it stands.
+     */
     @OptIn(ExperimentalComposeUiApi::class)
     private fun drag(store: DocumentStore, edit: DocumentEditor, end: End, drag: DragController = DragController()) {
         var shown by mutableStateOf(true)
@@ -140,6 +143,12 @@ class CutGestureRestoreTest {
                     frame()
                     scene.sendPointerEvent(PointerEventType.Release, Offset(140f, 110f))
                 }
+                End.EscapeThenLetGoStill -> {
+                    drag.cutGesture()
+                    assertFalse(drag.gestureUnderWay, "a second Escape leaves the editor rather than cut the drag again")
+                    // Let go where it stands: no frame of the drag runs before the release.
+                    scene.sendPointerEvent(PointerEventType.Release, Offset(100f, 90f))
+                }
             }
             frame()
             frame()
@@ -173,6 +182,18 @@ class CutGestureRestoreTest {
         assertEquals(start, store.placement())
         assertFalse(edit.canUndo)
         assertFalse(controller.gestureUnderWay, "Escape goes back to leaving the editor")
+    }
+
+    @Test
+    fun `Escape and a pointer let go without moving put the widget back and leave nothing to undo`() {
+        val store = store()
+        val edit = DocumentEditor(store, scope)
+        edit.reportEditing(true)
+
+        drag(store, edit, End.EscapeThenLetGoStill)
+
+        assertEquals(start, store.placement())
+        assertFalse(edit.canUndo)
     }
 
     @Test
