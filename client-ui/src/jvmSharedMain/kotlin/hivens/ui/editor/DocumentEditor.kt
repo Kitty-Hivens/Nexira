@@ -117,9 +117,13 @@ class DocumentEditor(
     /**
      * The names of the widgets something here can still bring back: the documents undo and redo reach and the screens
      * deleted this session. Their state is kept although the document drawn does not hold them.
+     *
+     * The document as it is now too, read in the same step as the history. A collector holding a document it sampled
+     * a moment ago would otherwise miss a widget an undo brought back in between: no longer in the history, not yet
+     * in what it sampled.
      */
     suspend fun heldIds(): Set<String> = withContext(writes) {
-        val ids = HashSet<String>()
+        val ids = HashSet(store.document.value.instanceIds())
         history.snapshots().forEach { ids += it.instanceIds() }
         deleted.values.forEach { config -> config.layouts.forEach { layout -> ids += layout.root.instanceIds() } }
         ids
@@ -407,8 +411,18 @@ class DocumentEditor(
 
     // ── Presets ──────────────────────────────────────────────────────
 
-    /** Puts [preset] in place of the whole interface, keeping the modules the launcher has. One step, like any other. */
-    fun applyPreset(preset: Document) = edit { current -> preset.copy(modules = current.modules) }
+    /**
+     * Puts [preset] in place of the whole interface, keeping the modules the launcher has. One step, like any other.
+     * [landed] hears once the interface is the preset's, already or by this edit, and never where the edit was dropped:
+     * the person said no to making the document theirs, or a newer build's file is not written over.
+     */
+    fun applyPreset(preset: Document, landed: () -> Unit = {}) {
+        scope.launch(writes) {
+            val transform = { current: Document -> preset.copy(modules = current.modules) }
+            if (transform(store.document.value) == store.document.value) landed()
+            else apply(null, transform) { _, _ -> landed() }
+        }
+    }
 
     // ── Resets ───────────────────────────────────────────────────────
 

@@ -227,7 +227,8 @@ fun PresetManagerPanel(
                             }
                         }
                     } else {
-                        items(items = presets, key = { it.name }) { meta ->
+                        // By file: two files can carry one name, see PresetRepository.load.
+                        items(items = presets, key = { it.sourcePath.toString() }) { meta ->
                             PresetRow(
                                 meta     = meta,
                                 onLoad   = { onLoad(meta) },

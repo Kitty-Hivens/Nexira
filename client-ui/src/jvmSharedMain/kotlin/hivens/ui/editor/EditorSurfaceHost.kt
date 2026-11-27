@@ -560,13 +560,13 @@ fun EditorSurfaceHost(
                     onSaveCurrent = { name -> withContext(Dispatchers.IO) { presetRepo.save(name, store.document.value, customization) } },
                     onLoad        = { meta ->
                         presetScope.launch {
-                            val preset = withContext(Dispatchers.IO) { presetRepo.load(meta.name) } ?: return@launch
-                            editor.applyPreset(preset.document)
-                            onCustomizationChanged(preset.customization)
+                            val preset = withContext(Dispatchers.IO) { presetRepo.load(meta) } ?: return@launch
+                            // The look comes with the arrangement, so only once the arrangement has landed.
+                            editor.applyPreset(preset.document) { presetScope.launch { onCustomizationChanged(preset.customization) } }
                             presetsOpen = false
                         }
                     },
-                    onDelete      = { meta -> withContext(Dispatchers.IO) { presetRepo.delete(meta.name) } },
+                    onDelete      = { meta -> withContext(Dispatchers.IO) { presetRepo.delete(meta) } },
                     // The folder it is in, in the file manager, to copy from: there is no save dialog to hand it to.
                     onExport      = { meta -> SystemActions.openFolder(meta.sourcePath.parent.toString()) },
                     listProvider  = { presetRepo.list() },

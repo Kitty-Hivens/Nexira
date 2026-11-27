@@ -88,6 +88,26 @@ class PresetRepositoryTest {
     }
 
     @Test
+    fun `a name saved before the digest and saved again since is two rows, each read and deleted from its own file`() {
+        Files.createDirectories(tmp.resolve("presets"))
+        val before = interfaceWith(WidgetInstance(WidgetKind("notes"), "notes-before"))
+        Files.writeString(tmp.resolve("presets/____.json"), json.encodeToString(PresetEnvelope.serializer(), envelope("Ночь", before)))
+        val repo = newRepo()
+        val since = interfaceWith(WidgetInstance(WidgetKind("notes"), "notes-since"))
+        repo.save("Ночь", since, CustomizationSettings())
+
+        val rows = repo.list()
+        assertEquals(listOf("Ночь", "Ночь"), rows.map { it.name })
+        assertEquals(2, rows.map { it.sourcePath }.toSet().size, "the panel keys its rows by file, so they must differ")
+        val legacy = rows.single { it.sourcePath.name == "____.json" }
+        assertEquals(before, repo.load(legacy)?.document, "Apply on the older row applies the older file")
+        assertEquals(since, repo.load(rows.single { it != legacy })?.document)
+
+        assertTrue(repo.delete(legacy))
+        assertEquals(listOf(since), repo.list().map { repo.load(it)?.document })
+    }
+
+    @Test
     fun `two names that sanitise alike stay two presets`() {
         val repo = newRepo()
         // Every character outside [A-Za-z0-9_-] maps to an underscore, so any two

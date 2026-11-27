@@ -132,6 +132,40 @@ class DocumentEditorStateTest {
     }
 
     @Test
+    fun `what is held includes the document as it is when asked, so a widget an undo just brought back is kept`() {
+        val (editor, _) = editor()
+        editor.remove(root, "clock-1")
+        editor.undo()
+        editor.settle()
+        // The history's past is empty again and the collector may still hold the document from before the undo.
+        assertTrue("clock-1" in runBlocking { editor.heldIds() })
+    }
+
+    @Test
+    fun `a preset says it landed only once the interface is the preset's`() {
+        val preset = document.copy(compositions = document.compositions.mapValues { (_, c) -> c.copy(configs = c.configs - ConfigId("made")) })
+
+        val (refused, _) = editor(own = false)
+        var heard = 0
+        refused.applyPreset(preset) { heard++ }
+        refused.settle()
+        refused.answerConsent(yes = false)
+        refused.settle()
+        assertEquals(0, heard, "the person said no, so the look the preset carries does not come either")
+
+        val (taken, _) = editor(own = false)
+        taken.applyPreset(preset) { heard++ }
+        taken.settle()
+        taken.answerConsent(yes = true)
+        taken.settle()
+        assertEquals(1, heard)
+
+        taken.applyPreset(preset) { heard++ }
+        taken.settle()
+        assertEquals(2, heard, "an interface that is the preset's already has it landed")
+    }
+
+    @Test
     fun `on the standard document the state is copied once the person says yes`() {
         val (editor, _) = editor(own = false)
         editor.holdOwn(railTop)

@@ -59,8 +59,15 @@ class PresetRepository(
      * Reads a preset, or null where there is none to apply: none by that name, one made before the interface was a
      * document, one a newer build wrote, or a file that is not a preset. Each is logged, and the file is left as it is.
      */
-    fun load(name: String): LoadedPreset? {
-        val path = resolveExisting(name)
+    fun load(name: String): LoadedPreset? = loadFrom(resolveExisting(name), name)
+
+    /**
+     * Reads the preset of one row of [list], from the file that row was read from. Two files can carry one name, a
+     * preset saved before names had their digest and the same name saved since, and each row is its own file.
+     */
+    fun load(meta: PresetMeta): LoadedPreset? = loadFrom(meta.sourcePath, meta.name)
+
+    private fun loadFrom(path: Path, name: String): LoadedPreset? {
         if (!Files.exists(path)) return null
         return try {
             val envelope = json.decodeFromString<PresetEnvelope>(readUtf8(path))
@@ -131,6 +138,9 @@ class PresetRepository(
     fun delete(name: String): Boolean {
         return Files.deleteIfExists(resolveExisting(name))
     }
+
+    /** Deletes the file one row of [list] was read from, see [load]. */
+    fun delete(meta: PresetMeta): Boolean = Files.deleteIfExists(meta.sourcePath)
 
     fun export(name: String, destination: Path): Boolean {
         val source = resolveExisting(name)
