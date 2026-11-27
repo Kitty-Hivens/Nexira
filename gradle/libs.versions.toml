@@ -10,7 +10,7 @@
 # and the build targets Java 27 bytecode. Every 2.4.x stops at JVM_26. Move to
 # 2.5.0 when it ships stable.
 kotlin            = "2.5.0-RC"
-compose           = "1.13.0-beta02"
+compose           = "1.13.0-rc01"
 buildconfigPlugin = "6.1.2"
 versionsPlugin    = "0.67.0"
 # ksp tracks its own release line, decoupled from the Kotlin version. KSP2 runs
@@ -42,7 +42,7 @@ coroutines        = "1.11.0"
 # which has no stable release on any line the desktop target has used. The
 # version here is the alpha paired with the compose core above; the two move
 # together, and the pairing is the only thing that makes an alpha acceptable.
-composeMaterial3  = "1.13.0-beta02"
+composeMaterial3  = "1.13.0-rc01"
 # androidx graphics-shapes -- rounded polygons with corner SMOOTHING (squircles)
 # and star/polygon outlines, which RoundedCornerShape cannot express. Already on
 # the classpath transitively; declared so the source depends on it deliberately.
@@ -79,7 +79,7 @@ filekit           = "0.17.1"
 
 # ── Logging ──────────────────────────────────────────────────────────────────
 slf4j             = "2.0.20"
-logback           = "1.6.6"
+logback           = "1.6.8"
 
 # ── Misc runtime ─────────────────────────────────────────────────────────────
 commonsCompress   = "1.28.0"
