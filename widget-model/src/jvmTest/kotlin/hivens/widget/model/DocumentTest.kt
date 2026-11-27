@@ -291,7 +291,17 @@ class DocumentTest {
         assertSame(document, document.edit(NodePath(CompositionName("gone"), NodeRoot.Residents)) { SlotContent() })
         assertSame(document, document.edit(root(home).child("nobody", SlotId("body"))) { SlotContent() })
         assertSame(document, document.edit(root(home).child("box", SlotId("nothing"))) { SlotContent() })
-        assertNull(document.contentAt(root(home).child("news", SlotId("body"))))
+    }
+
+    @Test
+    fun `a slot its container holds nothing under yet reads as empty and takes what is put in it`() {
+        val fresh = root(home).child("news", SlotId("body"))
+        assertEquals(SlotContent(), document.contentAt(fresh), "a slot the widget came to declare after the file was written")
+        val edited = document.edit(fresh) { it.withWidget(node("weather"), 0) }
+        assertEquals(listOf("weather"), edited.ids(fresh))
+        val inRecord = root(home).child("rail", SlotId("bottom"))
+        assertEquals(listOf("weather"), document.edit(inRecord) { it.withWidget(node("weather"), 0) }.launcher().singles.getValue(rail).children[SlotId("bottom")]?.widgets?.map { it.instanceId })
+        assertNull(document.contentAt(root(home).child("nobody", SlotId("body"))), "a container that is not there still leads nowhere")
     }
 
     @Test

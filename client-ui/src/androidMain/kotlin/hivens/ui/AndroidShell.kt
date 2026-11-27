@@ -57,7 +57,6 @@ import hivens.ui.debug.IdentitySlotChromeModifier
 import hivens.ui.debug.IdentityWidgetDecorator
 import hivens.ui.editor.DocumentEditor
 import hivens.ui.editor.ShellSignals
-import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.host.CompositionWindows
 import hivens.ui.host.HostKoin
 import hivens.ui.host.HostedWindow
@@ -70,7 +69,6 @@ import hivens.ui.i18n.nexiraStrings
 import hivens.ui.layers.Layer
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
-import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.logic.LaunchLogCollector
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
@@ -85,16 +83,13 @@ import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.WidgetScope
-import hivens.widget.model.DefaultLayout
 import hivens.widget.model.Document
-import hivens.widget.model.walkInstances
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import org.koin.compose.koinInject
 import org.koin.core.KoinApplication
-import org.slf4j.LoggerFactory
 import java.nio.file.Path
 
 /**
@@ -119,7 +114,6 @@ private fun AndroidShellContent() {
     val settingsService: ISettingsService = koinInject()
     val controller: LauncherController = koinInject()
     val gameConsole: GameConsoleService = koinInject()
-    val layoutGraphRepo: LayoutGraphRepository = koinInject()
     val widgetModules: WidgetModules = koinInject()
     val appLevel: WidgetScope = koinInject()
     // The app level outlives the Activity, and with it the record of which of its
@@ -168,23 +162,6 @@ private fun AndroidShellContent() {
         if (!lookReady) {
             appLevel.awaitLook()
             lookReady = true
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        val before = layoutGraphRepo.value()
-        val defaultKinds = DefaultLayout.load().walkInstances().map { it.kind }.toSet() + widgetModules.knownKinds()
-        val result = WidgetGraphReconciler.reconcile(
-            graph = before,
-            registry = widgetModules.registry,
-            defaultKinds = defaultKinds,
-            prune = layoutGraphRepo.migratedFromSchema != null,
-        )
-        if (result.graph != before) {
-            LoggerFactory.getLogger("AndroidShell").info(
-                "Layout reconcile: seeded {} slot(s), pruned {} widget(s)", result.seededSlots, result.prunedWidgets,
-            )
-            layoutGraphRepo.update { result.graph }
         }
     }
 

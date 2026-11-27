@@ -72,7 +72,6 @@ import hivens.ui.diag.UiRecoverySignal
 import hivens.ui.diag.probe
 import hivens.ui.editor.DocumentEditor
 import hivens.ui.editor.ShellSignals
-import hivens.ui.editor.WidgetGraphReconciler
 import hivens.ui.generated.resources.Res
 import hivens.ui.host.CompositionWindows
 import hivens.ui.host.DesktopWindowBackend
@@ -87,7 +86,6 @@ import hivens.ui.host.WindowRegistry
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.rememberWindowLayers
-import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.legacy.RetiredClientsGate
 import hivens.ui.logic.PostLaunchGate
 import hivens.ui.logic.PostLaunchMove
@@ -110,9 +108,7 @@ import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
-import hivens.widget.model.DefaultLayout
 import hivens.widget.model.Frame
-import hivens.widget.model.walkInstances
 import hivens.window.OpeningFrame
 import hivens.window.WindowHost
 import hivens.window.WindowManagerProbe
@@ -207,7 +203,6 @@ private fun FrameWindowScope.ShellContent(
     val controller: LauncherController         = koinInject()
     val gameConsole: GameConsoleService        = koinInject()
     val debugOverlay: DebugOverlayState        = koinInject()
-    val layoutGraphRepo: LayoutGraphRepository = koinInject()
     val widgetRegistry: WidgetRegistry         = koinInject()
     val widgetModules: WidgetModules           = koinInject()
     val appLevel: WidgetScope = koinInject()
@@ -344,42 +339,6 @@ private fun FrameWindowScope.ShellContent(
     // fallbacks where the document brings no such module (see ShellLookValues). What decides the
     // look, the system's colour scheme among it, the modules read themselves.
     val words = appLevel.read(ShellLookValues.Words)
-
-    // One-time registry-aware reconcile of the loaded layout graph. The
-    // launcher seeds missing bundled-default surfaces/slots but has no
-    // WidgetRegistry, so descriptor-declared container child slots are seeded
-    // here -- otherwise a container persisted before child-slot seeding (or one
-    // whose descriptor gained a slot) silently refuses nested drops. Idempotent:
-    // a healthy graph reconciles to itself and writes nothing.
-    LaunchedEffect(Unit) {
-        val before = layoutGraphRepo.value()
-        // A module that is off, broken or gone still owns its kinds until somebody
-        // forgets it, so its widgets are not pruned as if they had been renamed away.
-        val defaultKinds = DefaultLayout.load().walkInstances().map { it.kind }.toSet() + widgetModules.knownKinds()
-        val result = WidgetGraphReconciler.reconcile(
-            graph        = before,
-            registry     = widgetRegistry,
-            defaultKinds = defaultKinds,
-            // Prune removed kinds only when a schema bump actually happened --
-            // a deliberate app update is the safe moment to reap orphans.
-            //
-            // A kind vanishes here either because it was renamed away, or because
-            // the module that carried it is off, broken or gone. The reconciler
-            // cannot tell those apart, which is why every kind a remembered module
-            // ever brought is counted as known above: only a kind no module claims
-            // is reaped, and a module's kinds are let go only when somebody forgets
-            // the module.
-            prune        = layoutGraphRepo.migratedFromSchema != null,
-        )
-        if (result.graph != before) {
-            val reconcileLog = LoggerFactory.getLogger("Main")
-            if (result.seededSlots > 0)
-                reconcileLog.info("Layout reconcile: seeded {} declared container child slot(s)", result.seededSlots)
-            if (result.prunedWidgets > 0)
-                reconcileLog.info("Layout reconcile: pruned {} widget(s) of removed kinds after a schema bump", result.prunedWidgets)
-            layoutGraphRepo.update { result.graph }
-        }
-    }
 
     // Collapsed to the changes this shell acts on. Preparing and downloading emit
     // per chunk and per verified file, and the shell reads neither the stage nor the

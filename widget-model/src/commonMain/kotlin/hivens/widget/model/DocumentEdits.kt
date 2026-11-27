@@ -32,7 +32,10 @@ data class NodePath(
     fun child(parentInstanceId: String, slot: SlotId): NodePath = copy(nested = nested + NestedSegment(parentInstanceId, slot))
 }
 
-/** The content at [path], every single in it as it stands, or null where the path leads nowhere. */
+/**
+ * The content at [path], every single in it as it stands, or null where the path leads nowhere. A slot its container
+ * holds nothing under yet, one its widget came to declare after the file was written say, is an empty slot.
+ */
 fun Document.contentAt(path: NodePath): SlotContent? {
     val composition = compositions[path.composition] ?: return null
     return composition.rawContentAt(path)?.let { composition.stand(it) }
@@ -43,7 +46,7 @@ private fun Composition.rawContentAt(path: NodePath): SlotContent? {
     var content = rootContent(path.root) ?: return null
     for (segment in path.nested) {
         val container = content.widgets.firstOrNull { it.instanceId == segment.parentInstanceId } ?: return null
-        content = standing(container).children[segment.slot] ?: return null
+        content = standing(container).children[segment.slot] ?: SlotContent()
     }
     return content
 }
@@ -91,9 +94,11 @@ private fun changeContent(
     // A slot of a single goes to its record, unless this config holds the slot as its own.
     val toRecord = container.kind in singles && segment.slot !in container.children
     val holder = if (toRecord) singles.getValue(container.kind) else container
-    val child = holder.children[segment.slot] ?: return content
+    // A slot held nothing under yet is empty, and an edit that leaves it empty adds nothing to the file.
+    val held = holder.children[segment.slot]
+    val child = held ?: SlotContent()
     val nextChild = changeContent(child, nested.drop(1), singles, change)
-    if (nextChild === child) return content
+    if (nextChild === child || (held == null && nextChild == child)) return content
     if (toRecord) {
         // Read again: a change further down may have changed this very record, a single inside a single of its own kind say.
         val latest = singles.getValue(container.kind)
