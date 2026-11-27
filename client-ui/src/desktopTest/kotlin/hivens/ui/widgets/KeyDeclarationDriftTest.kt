@@ -11,7 +11,9 @@ import hivens.source.mirror.MirrorSourceModule
 import hivens.source.modrinth.ModrinthSourceModule
 import hivens.themes.api.ThemesApi
 import hivens.ui.HostKeys
+import androidx.compose.runtime.Composable
 import hivens.ui.background.BackgroundSettings
+import hivens.ui.editor.DocumentAdmission
 import hivens.ui.moduleKeys
 import hivens.ui.modulesNamedBy
 import hivens.ui.uiCommandRegistry
@@ -20,11 +22,21 @@ import hivens.ui.widgets.modules.CompiledModules
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.KeyDeclaration
 import hivens.widget.api.KeyKind
+import hivens.widget.api.KeyOrigin
+import hivens.widget.api.PageKeys
+import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.flowSource
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.CommandKey
 import hivens.widget.model.DefaultLayout
+import hivens.widget.model.Document
+import hivens.widget.model.NodePath
+import hivens.widget.model.NodeRoot
 import hivens.widget.model.ScopeLevel
+import hivens.widget.model.StandardDocument
+import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetKind
+import hivens.widget.model.contentAt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -32,7 +44,7 @@ import kotlin.test.assertTrue
 
 /**
  * The ids widgets name in their needs, the keys the launcher declares, and the
- * surfaces the editor says provide them, held together. Each is a string in a
+ * screens that say they hand them, held together. Each is a string in a
  * different file, and a typo in any of them does not fail anything at runtime: the
  * widget silently leaves the palette, or draws the placeholder on its own page.
  */
@@ -123,6 +135,49 @@ class KeyDeclarationDriftTest {
         val unanswered = catalog.filter { it.level == ScopeLevel.App && it.id !in commands.keys() }.map { it.id }
         assertEquals(listOf(Commands.CheckUpdate.id), unanswered)
         assertEquals(null, commands.declarationOf(Commands.CheckUpdate.id), "absent, not answered by something that does nothing")
+        val needy = GeneratedWidgetRegistry.all().keys.first()
+        val admission = DocumentAdmission(::declarationOf, { kind -> if (kind == needy) Needs(listOf(Commands.CheckUpdate.id)) else GeneratedWidgetRegistry[kind] })
+        val standard = StandardDocument.load()
+        val anywhere = NodePath(standard.start, NodeRoot.Layout(standard.compositions.getValue(standard.start).start, standard.compositions.getValue(standard.start).startConfig!!.layouts.first().id))
+        assertEquals(listOf(Commands.CheckUpdate.id), admission.missing(needy, anywhere, standard), "a widget that needs it is kept off where no host answers it")
     }
 
+    @Test
+    fun `every key a page's owner hands is declared by the screen that hands it, and only by one`() {
+        val handedOver = declared.filter { it.level == ScopeLevel.Page && it.origin == KeyOrigin.Owner }.map { it.id }.toSet()
+        val listed = GeneratedWidgetRegistry.all().values.flatMap { it.hands }
+        assertEquals(handedOver, listed.toSet() + PageKeys.Entry.id, "a key a page hands that no screen declares keeps its widgets off that page too")
+        assertEquals(listed.size, listed.toSet().size, "a key is handed by one screen")
+    }
+
+    @Test
+    fun `the standard document puts no widget where something it needs has no answer`() {
+        val standard = StandardDocument.load()
+        val admission = DocumentAdmission(::declarationOf, GeneratedWidgetRegistry::get, everyPage = setOf(PageKeys.Entry.id))
+        val misplaced = standard.compositions.flatMap { (name, composition) ->
+            composition.configs.flatMap { (id, config) ->
+                config.layouts.flatMap { layout -> standing(standard, NodePath(name, NodeRoot.Layout(id, layout.id))).toList() }
+            }
+        }.mapNotNull { (path, widget) ->
+            admission.missing(widget.kind, path, standard).takeIf { it.isNotEmpty() }?.let { "${widget.kind.value} at $path: $it" }
+        }
+        assertTrue(misplaced.isEmpty(), "a fresh install would draw these as misplaced: $misplaced")
+    }
+
+    /** Every widget drawn under [path], with the slot it stands in, as the document resolves each slot. */
+    private fun standing(document: Document, path: NodePath): Sequence<Pair<NodePath, WidgetInstance>> = sequence {
+        document.contentAt(path)?.widgets.orEmpty().forEach { widget ->
+            yield(path to widget)
+            GeneratedWidgetRegistry[widget.kind]?.slots.orEmpty().forEach { slot -> yieldAll(standing(document, path.child(widget.instanceId, slot))) }
+        }
+    }
+
+    private class Needs(override val needs: List<String>) : WidgetDescriptor {
+        override val kind = WidgetKind("test.needy")
+        override val displayName = "needy"
+        override val removable = true
+
+        @Composable
+        override fun Render(instance: WidgetInstance) = Unit
+    }
 }

@@ -39,6 +39,7 @@ import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
+import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.DefaultLayout
 import hivens.widget.model.FamilyId
 import hivens.widget.model.FlowSpec
@@ -58,10 +59,10 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * What a surface says its page hands its widgets ([hivens.ui.editor.EditorSurfaceSpec.provides])
- * is what the screen drawing that surface actually hands them: a probe widget needing
- * every listed key is put in each of the surface's slots, the screen is drawn in a
- * page of its own, and the probe has to draw rather than be found misplaced.
+ * What a screen declares it hands the widgets in its slots (@Widget(hands = ...)) is what
+ * it actually hands them: a probe widget needing every declared key is put in each of the
+ * screen's slots, the screen is drawn in a page of its own, and the probe has to draw
+ * rather than be found misplaced.
  *
  * The catalogue's pages are drawn with no catalogue module behind them: what they
  * hand their widgets is the screen's own, so it is there whether or not the module
@@ -109,7 +110,7 @@ class ScreenProvidesTest {
         val koin = graph(services)
         val app: WidgetScope = koin.koin.get()
         val id = SurfaceId(surface)
-        val provides = HANDED[surface].orEmpty()
+        val provides = GeneratedWidgetRegistry[WidgetKind(kind)]?.hands.orEmpty()
         val drew = ArrayList<String>()
         val missed = HashSet<String>()
         val descriptor = Probe(provides, drew)
@@ -158,7 +159,7 @@ class ScreenProvidesTest {
     }
 
     @Test
-    fun `the theme picker hands its widgets what its surface lists`() {
+    fun `the theme picker hands its widgets what it declares`() {
         // The themes on offer and the one in use are the app's values here rather than the
         // themes module's answers, since this probe's Koin holds no manager to answer them.
         data.register(ThemesKeys.Offered, flowSource(MutableStateFlow(Themes.all)))
@@ -169,7 +170,7 @@ class ScreenProvidesTest {
     }
 
     @Test
-    fun `the about page hands its widgets what its surface lists`() {
+    fun `the about page hands its widgets what it declares`() {
         // The page asks the application's Koin for the host's actions, which this
         // probe's answers with none: no update check runs.
         val (drew, missed) = probe("about", "screen.about") { AboutSurface(it, onBack = {}) }
@@ -178,7 +179,7 @@ class ScreenProvidesTest {
     }
 
     @Test
-    fun `a catalogue pack's page hands its widgets what its surface lists`() {
+    fun `a catalogue pack's page hands its widgets what it declares`() {
         val (drew, missed) = probe("catalogue.pack", "screen.catalogue.pack") {
             CataloguePackDetailScreen(it, origin = "Mirror", packId = "probe", onBack = {}, onInstalled = {})
         }
@@ -187,7 +188,7 @@ class ScreenProvidesTest {
     }
 
     @Test
-    fun `a project's page hands its widgets what its surface lists`() {
+    fun `a project's page hands its widgets what it declares`() {
         val (drew, missed) = probe("project", "screen.project") {
             ModDetailScreen(it, target = ProjectTarget.Catalogue("probe"), onOpenVersion = { _, _ -> })
         }
@@ -195,12 +196,12 @@ class ScreenProvidesTest {
         assertTrue(drew.isNotEmpty())
     }
 
-    private companion object {
-        /** What each screen hands the widgets in its slots, as the screens are written today. */
-        val HANDED = mapOf(
-            "about" to listOf(AboutUpdateSource.id, OpenUpdateDialog.id),
-            "catalogue.pack" to listOf(CataloguePackPageSource.id),
-            "project" to listOf(ProjectPageSource.id),
-        )
+    @Test
+    fun `each screen declares the keys it hands, under the ids its keys have`() {
+        fun hands(kind: String) = GeneratedWidgetRegistry[WidgetKind(kind)]?.hands.orEmpty()
+        assertEquals(listOf(AboutUpdateSource.id, OpenUpdateDialog.id), hands("screen.about"))
+        assertEquals(listOf(CataloguePackPageSource.id), hands("screen.catalogue.pack"))
+        assertEquals(listOf(ProjectPageSource.id), hands("screen.project"))
+        assertEquals(emptyList(), hands("screen.theme.picker"))
     }
 }

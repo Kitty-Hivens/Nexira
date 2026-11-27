@@ -67,6 +67,7 @@ import hivens.ui.editor.decoration.EditableWidgetChrome
 import hivens.ui.editor.decoration.EmptySlotPlaceholder
 import hivens.ui.editor.decoration.UnsupportedWidgetPlaceholder
 import hivens.ui.editor.dnd.DragController
+import hivens.ui.editor.dnd.DragPayload
 import hivens.ui.editor.dnd.DropTargetRegistry
 import hivens.ui.editor.dnd.EditFocus
 import hivens.ui.editor.dnd.LocalDragController
@@ -150,11 +151,15 @@ private sealed interface Dock {
     data object Palette : Dock
     data class Props(val key: WidgetKey) : Dock
     data object Screen : Dock
-    data object RailStyle : Dock
+    /** The left rail's selection style, a setting of the person's, opened from the rail's own panel and going back to it. */
+    data class RailStyle(val back: Dock) : Dock
     data object Nothing : Dock
 }
 
 private val log = LoggerFactory.getLogger("EditorSurfaceHost")
+
+/** The left rail region, whose panel opens the rail's selection style. */
+private val LEFT_RAIL = WidgetKind("appshell.region.left")
 
 @Composable
 fun EditorSurfaceHost(
@@ -291,10 +296,29 @@ fun EditorSurfaceHost(
 
     // The one drop target for the drag under way, worked out once per frame for every widget.
     val liveDocument by rememberUpdatedState(document)
+    val dropSlot by remember {
+        derivedStateOf {
+            val active = dragController.active ?: return@derivedStateOf null
+            registry.slotForPoint(active.pointerInWindow)
+        }
+    }
+    // Whether the slot under the drag would refuse what is dragged, which the ghost says while it is over it. Asked
+    // when the slot changes, not on every frame of the drag.
+    val dropRefused by remember {
+        derivedStateOf {
+            val path = dropSlot ?: return@derivedStateOf false
+            when (val payload = dragController.active?.payload) {
+                is DragPayload.PaletteWidget -> editor.missingAt(path, payload.kind).isNotEmpty()
+                is DragPayload.ExistingWidget -> payload.source != path && editor.missingAt(path, payload.instance).isNotEmpty()
+                null -> false
+            }
+        }
+    }
     val dropTarget by remember {
         derivedStateOf {
             val active = dragController.active ?: return@derivedStateOf null
-            val path = registry.slotForPoint(active.pointerInWindow) ?: return@derivedStateOf null
+            val path = dropSlot ?: return@derivedStateOf null
+            if (dropRefused) return@derivedStateOf null
             val flow = liveDocument.contentAt(path)?.flow
             path to registry.insertionIndexInSlot(path, active.pointerInWindow, flow)
         }
@@ -468,12 +492,16 @@ fun EditorSurfaceHost(
                     modifier  = Modifier.align(Alignment.TopEnd),
                 )
                 val props = (dock as? Dock.Props)?.key
+                // The left rail's selection style is the person's setting, not the document's, and it belongs to the rail,
+                // so the rail's own panel is where it opens from.
+                val propsKind = props?.let { key -> document.contentAt(key.path)?.widgets?.firstOrNull { it.instanceId == key.instanceId }?.kind }
                 WidgetPropPanel(
                     visible    = arranging && props != null,
                     path       = props?.path,
                     instanceId = props?.instanceId,
                     editor     = editor,
                     onDismiss  = { dock = Dock.Palette },
+                    action     = if (propsKind == LEFT_RAIL) s.text("navSelectionTitle") to { dock = Dock.RailStyle(back = dock) } else null,
                     modifier   = Modifier.align(Alignment.TopEnd),
                 )
                 ScreenPropertiesPanel(
@@ -485,11 +513,11 @@ fun EditorSurfaceHost(
                     modifier  = Modifier.align(Alignment.TopEnd),
                 )
                 SurfacePropertiesPanel(
-                    visible                = arranging && dock == Dock.RailStyle,
+                    visible                = arranging && dock is Dock.RailStyle,
                     title                  = s.text("editorSurfShortLeftRail"),
                     customization          = customization,
                     onCustomizationChanged = onCustomizationChanged,
-                    onDismiss              = { dock = Dock.Palette },
+                    onDismiss              = { dock = (dock as? Dock.RailStyle)?.back ?: Dock.Palette },
                     modifier               = Modifier.align(Alignment.TopEnd),
                 )
 
@@ -540,10 +568,11 @@ fun EditorSurfaceHost(
                 onTogglePreview    = { previewing = !previewing },
                 screenOpen         = dock == Dock.Screen,
                 onOpenScreen       = { dock = if (dock == Dock.Screen) Dock.Palette else Dock.Screen },
-                onOpenRailStyle    = { dock = if (dock == Dock.RailStyle) Dock.Palette else Dock.RailStyle },
                 onOpenModules      = { modulesPanelOpen = !modulesPanelOpen },
                 onNewScreen        = {
-                    val made = (document.compositions[composition]?.configs?.size ?: 0) + 1
+                    // Numbered among the screens somebody made, so the first one is the first and not the fifteenth.
+                    val shipped = standard.compositions[composition]?.configs?.keys.orEmpty()
+                    val made = (document.compositions[composition]?.configs?.keys.orEmpty() - shipped).size + 1
                     pendingScreen = editor.createScreen(composition, s.text("screenDefaultTitle", made), ScreenIcons.DEFAULT, pagesOf)
                 },
                 resetMenuOpen      = resetMenuOpen,
@@ -571,7 +600,7 @@ fun EditorSurfaceHost(
                 )
             }
 
-            DragGhostOverlay(dragController = dragController)
+            DragGhostOverlay(dragController = dragController, refused = dropRefused)
         }
     }
 }
@@ -628,7 +657,6 @@ private fun EditModePill(
     onTogglePreview: () -> Unit,
     screenOpen: Boolean,
     onOpenScreen: () -> Unit,
-    onOpenRailStyle: () -> Unit,
     onOpenModules: () -> Unit,
     onNewScreen: () -> Unit,
     resetMenuOpen: Boolean,
@@ -666,8 +694,6 @@ private fun EditModePill(
                     Symbol(icon = NxIcon.Tune, contentDescription = null, tint = NxColor.lead(), modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(8.dp))
                     ToolChip(NxIcon.Settings, s.text("editorScreenSettings"), selected = screenOpen, onClick = onOpenScreen, compact = compact)
-                    Spacer(Modifier.width(4.dp))
-                    ToolChip(NxIcon.ViewSidebar, s.text("editorSurfShortLeftRail"), selected = false, onClick = onOpenRailStyle, compact = compact)
                     Spacer(Modifier.width(4.dp))
                     ToolChip(
                         icon     = if (previewing) NxIcon.VisibilityOff else NxIcon.Visibility,
@@ -839,8 +865,9 @@ private fun EditModeVignette(active: Boolean) {
 // ── Drag ghost ──────────────────────────────────────────────────────────────
 
 @Composable
-private fun DragGhostOverlay(dragController: DragController) {
+private fun DragGhostOverlay(dragController: DragController, refused: Boolean) {
     val active = dragController.active ?: return
+    val refusal = NxColor.status(Status.Error)
     // The OS cursor is hidden for the duration of the drag by attaching
     // a transparent AWT cursor as the hover icon of this fullscreen
     // overlay. pointerHoverIcon does not intercept pointer events, so
@@ -877,6 +904,27 @@ private fun DragGhostOverlay(dragController: DragController) {
                 .shadow(elevation = 14.dp, shape = RoundedCornerShape(10.dp)),
         ) {
             active.ghost()
+            // Over a slot that would not take it, the ghost says so before it is let go, rather than the drop doing
+            // nothing.
+            if (refused) {
+                Box(Modifier.matchParentSize().border(2.dp, refusal, RoundedCornerShape(10.dp)))
+            }
+        }
+        if (refused) {
+            Box(
+                modifier = Modifier
+                    .graphicsLayer {
+                        translationX = active.pointerInWindow.x - overlayOriginInWindow.x + 16.dp.toPx()
+                        translationY = active.pointerInWindow.y - overlayOriginInWindow.y + 20.dp.toPx()
+                    }
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(refusal)
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            ) {
+                OnFill(refusal) {
+                    Text(nexiraStrings().text("editorDropRefused"), style = MaterialTheme.typography.labelMedium, color = NxColor.on(refusal))
+                }
+            }
         }
     }
 }

@@ -114,4 +114,10 @@ annotation class Widget(
     // the processor refuses an id named as both, since a need with no answer is marked
     // misplaced and a condition with none is hidden. It also refuses a blank one.
     val shownWhen: String = "",
+    // The ids of the page sources and commands this container hands the widgets in its
+    // slots, each a SourceKey or a CommandKey id. A page's owner key answers only under the
+    // container that hands it, so this is where the editor learns where such a widget can
+    // stand. The processor checks the ids are non-blank, listed once, and that the
+    // container has slots to hand them to.
+    val hands: Array<String> = [],
 )

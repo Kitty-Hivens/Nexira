@@ -114,7 +114,7 @@ fun SettingsScreenWidget(instance: WidgetInstance) {
 @Composable
 fun ThemesScreenWidget(instance: WidgetInstance) = ThemePickerSurface(instance)
 
-@Widget(id = "screen.about", enter = "none", removable = false, slots = ["left", "right"])
+@Widget(id = "screen.about", enter = "none", removable = false, slots = ["left", "right"], hands = ["about.update", "about.update.open"])
 @Composable
 fun AboutScreenWidget(instance: WidgetInstance) = AboutSurface(instance, onBack = rememberBack())
 
@@ -165,7 +165,7 @@ fun PackVersionsScreenWidget() {
     PackVersionsScreen(instanceId = pack, onBack = rememberBack())
 }
 
-@Widget(id = "screen.catalogue.pack", enter = "none", removable = false, slots = ["header", "body"])
+@Widget(id = "screen.catalogue.pack", enter = "none", removable = false, slots = ["header", "body"], hands = ["catalogue.pack.page"])
 @Composable
 fun CataloguePackScreenWidget(instance: WidgetInstance) {
     val pack = pageValue(CataloguePages.Pack) ?: return
@@ -179,7 +179,7 @@ fun CataloguePackScreenWidget(instance: WidgetInstance) {
     )
 }
 
-@Widget(id = "screen.project", enter = "none", removable = false, slots = ["header", "body"])
+@Widget(id = "screen.project", enter = "none", removable = false, slots = ["header", "body"], hands = ["project.page"])
 @Composable
 fun ProjectScreenWidget(instance: WidgetInstance) {
     val target = pageValue(CataloguePages.Project) ?: return

@@ -195,6 +195,9 @@ fun Document.holdsOwn(path: NodePath): Boolean {
     return slot in container.children
 }
 
+/** Whether [path] is a slot of a single, held as its config's own or shared through the record. */
+fun Document.isSingleSlot(path: NodePath): Boolean = singleSlot(path) != null
+
 /**
  * Whether some config of [path]'s composition, in any of its layouts, holds as its own the slot [path] names under a
  * config's root: a slot whose content can change when the composition shows another config.

@@ -54,6 +54,7 @@ class WidgetRegistryProcessor(
                     enter = extracted.enter,
                     needs = extracted.needs,
                     shownWhen = extracted.shownWhen,
+                    hands = extracted.hands,
                 ),
                 containingFile = symbol.containingFile,
                 symbol = symbol,

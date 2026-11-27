@@ -76,6 +76,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.EdgeAutoScroll
 import hivens.ui.editor.DocumentEditor
+import hivens.ui.editor.ShareWithLayersBeneath
 import hivens.ui.editor.ResizeBounds
 import hivens.ui.editor.ResizeEdge
 import hivens.ui.editor.canvasResize
@@ -429,7 +430,9 @@ fun EditableWidgetChrome(
                         .drawWithContent {
                             contentLayer.record { this@drawWithContent.drawContent() }
                             drawLayer(contentLayer)
-                        },
+                        }
+                        // A container's content lies over its press layer: a press on its empty area goes on to it.
+                        .then(if (container) ShareWithLayersBeneath else Modifier),
                 ) { content() }
             }
             // A leaf's content lies under its drag surface: a press arranges the widget rather than operating it.

@@ -40,6 +40,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.DocumentEditor
+import hivens.ui.editor.EditReach
+import hivens.ui.editor.configLabel
+import hivens.ui.editor.reachOf
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
@@ -91,6 +94,8 @@ fun WidgetPropPanel(
     instanceId: String?,
     editor: DocumentEditor,
     onDismiss: () -> Unit,
+    /** One more thing this widget's panel opens, its label and what it does, or null. */
+    action: Pair<String, () -> Unit>? = null,
     modifier: Modifier = Modifier,
 ) {
     val document = LocalDocument.current
@@ -141,6 +146,7 @@ fun WidgetPropPanel(
                 instanceId = resolveId,
                 editor     = editor,
                 onDismiss  = onDismiss,
+                action     = action,
             )
         }
     }
@@ -155,6 +161,7 @@ private fun PropPanelBody(
     instanceId: String,
     editor: DocumentEditor,
     onDismiss: () -> Unit,
+    action: Pair<String, () -> Unit>?,
 ) {
     val s = nexiraStrings()
     val sd = serializer?.descriptor
@@ -211,6 +218,16 @@ private fun PropPanelBody(
                 )
             }
         }
+        // Whom a change reaches, said before anything is changed: a frame widget or a shared slot changes every screen,
+        // and where the widget is shown is its own condition.
+        LocalDocument.current?.let { document ->
+            Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 6.dp)) {
+                val reach = document.reachOf(path, instance)
+                ScopeLine(s.text(if (reach == EditReach.EveryScreen) "editorReachEveryScreen" else "editorReachThisScreen"))
+                instance.shownOn?.let { ScopeLine(s.text("editorShownOn", it.joinToString { id -> document.configLabel(id, s) })) }
+                if (instance.hiddenOn.isNotEmpty()) ScopeLine(s.text("editorHiddenOn", instance.hiddenOn.joinToString { id -> document.configLabel(id, s) }))
+            }
+        }
 
         Column(
             modifier            = Modifier
@@ -220,6 +237,13 @@ private fun PropPanelBody(
                 .padding(horizontal = 14.dp, vertical = 4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            action?.let { (label, open) ->
+                TextButton(onClick = open) {
+                    Symbol(NxIcon.ChevronRight, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(label, style = MaterialTheme.typography.labelMedium)
+                }
+            }
             if (sd != null) {
                 for (i in 0 until sd.elementsCount) {
                     val anns = sd.getElementAnnotations(i)
@@ -329,6 +353,11 @@ private fun PropPanelBody(
         }
     }
     }
+}
+
+@Composable
+private fun ScopeLine(text: String) {
+    Text(text = text, style = MaterialTheme.typography.bodySmall, color = NxInk.quiet)
 }
 
 /**

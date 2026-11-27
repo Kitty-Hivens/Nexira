@@ -25,6 +25,7 @@ import hivens.ui.background.BackgroundSettings
 import hivens.ui.components.LauncherUpdateState
 import hivens.ui.components.SignOutRequests
 import hivens.ui.debug.DebugOverlayState
+import hivens.ui.editor.DocumentAdmission
 import hivens.ui.editor.DocumentEditor
 import hivens.ui.editor.ShellSignals
 import hivens.ui.editor.presets.PresetRepository
@@ -512,7 +513,16 @@ fun uiCoreModule(
     single { BackgroundManager(get<Path>(), get()) }
 
     // The editor's one way to change the document, and the presses the window hands to the editor and the rail.
-    single { DocumentEditor(store = get(), scope = get()) }
+    // It refuses a widget where what it reads has no answer, asking the scope tree's registries where each key lives.
+    single {
+        val appLevel: WidgetScope = get()
+        val widgets: WidgetRegistry = get()
+        DocumentEditor(
+            store     = get(),
+            scope     = get(),
+            admission = DocumentAdmission(appLevel::declarationOf, widgets::get, everyPage = setOf(PageKeys.Entry.id)),
+        )
+    }
     single { ShellSignals() }
 
 

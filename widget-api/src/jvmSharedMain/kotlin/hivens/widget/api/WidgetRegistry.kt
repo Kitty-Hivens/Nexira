@@ -96,6 +96,12 @@ interface WidgetDescriptor {
     val shownWhen: String?
         get() = null
 
+    // The page source and command ids this container hands the widgets in its slots.
+    // Populated by the KSP processor from @Widget(hands = ...). The editor admits a
+    // widget needing one of them only under a container that hands it.
+    val hands: List<String>
+        get() = emptyList()
+
     @Composable
     fun Render(instance: WidgetInstance)
 }

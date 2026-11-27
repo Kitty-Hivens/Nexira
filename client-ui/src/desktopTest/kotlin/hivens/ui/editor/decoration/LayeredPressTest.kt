@@ -11,6 +11,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.test.stopThenDelete
@@ -130,6 +131,59 @@ class LayeredPressTest {
             }
             val payload = assertNotNull(drag.active, "nothing was dragged").payload as DragPayload.ExistingWidget
             assertEquals(expected, payload.source to payload.instance.instanceId)
+        } finally {
+            scene.close()
+        }
+    }
+
+    private object Container : WidgetDescriptor {
+        override val kind = WidgetKind("test.container")
+        override val displayName = "container"
+        override val removable = true
+        override val slots = listOf(SlotId("inner"))
+
+        @Composable
+        override fun Render(instance: WidgetInstance) = Unit
+    }
+
+    /**
+     * A container whose content fills it and takes pointer input without consuming it, as a Material surface does, used
+     * to swallow every press on its empty area: the content is drawn over the container's own press layer.
+     */
+    @OptIn(ExperimentalComposeUiApi::class)
+    @Test
+    fun `a press on a container's empty area goes to the container, through content that fills it`() {
+        val edit = DocumentEditor(DocumentStore(dir.resolve("interface.json"), { Document(start = composition) }), scope)
+        val drag = DragController()
+        val registry = DropTargetRegistry()
+        val rail = WidgetInstance(Container.kind, "rail", JsonObject(emptyMap()))
+        val scene = ImageComposeScene(width = 300, height = 300, density = Density(1f)) {
+            NxThemed(Themes.default, dark = true) {
+                Column {
+                    EditableWidgetChrome(
+                        path = page, index = 0, descriptor = Container, instance = rail,
+                        controller = drag, editor = edit, registry = registry, focus = EditFocus(),
+                        flow = FlowSpec(), dropTarget = null, dropIndex = -1,
+                        onRemove = {}, onEditProps = {}, onCommitDrop = {},
+                    ) {
+                        Box(Modifier.size(100.dp, 250.dp).pointerInput(Unit) { awaitPointerEventScope { while (true) awaitPointerEvent() } })
+                    }
+                }
+            }
+        }
+        try {
+            var t = 0L
+            fun frame() { t += 16_000_000L; scene.render(t) }
+            frame()
+            frame()
+            scene.sendPointerEvent(PointerEventType.Press, Offset(50f, 200f))
+            frame()
+            for (y in 190 downTo 120 step 10) {
+                scene.sendPointerEvent(PointerEventType.Move, Offset(50f, y.toFloat()))
+                frame()
+            }
+            val payload = assertNotNull(drag.active, "the container never heard the press").payload as DragPayload.ExistingWidget
+            assertEquals("rail", payload.instance.instanceId)
         } finally {
             scene.close()
         }

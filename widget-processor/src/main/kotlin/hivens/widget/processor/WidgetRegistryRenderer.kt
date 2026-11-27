@@ -59,6 +59,8 @@ internal data class WidgetModel(
     val shownWhen: String? = null,
     /** Of [slots], the ones that hold a page. */
     val pages: List<String> = emptyList(),
+    /** The page keys a container hands the widgets in its slots, already checked. */
+    val hands: List<String> = emptyList(),
 )
 
 /**
@@ -172,6 +174,9 @@ internal fun renderRegistry(
         }
         if (entry.shownWhen != null) {
             appendLine("            override val shownWhen: String? = \"${entry.shownWhen.kotlinEscape()}\"")
+        }
+        if (entry.hands.isNotEmpty()) {
+            appendLine("            override val hands: List<String> = ${entry.hands.toStringListLiteral()}")
         }
         // Lazy, all three. The registry is built in full at class-init because the
         // palette lists every kind, but these are the expensive members and none of

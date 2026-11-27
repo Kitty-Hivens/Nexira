@@ -497,3 +497,47 @@ class WidgetShownWhenDeclarationTest {
         assertContains(fault, "'theme.nx.drawing'")
     }
 }
+
+/** The page keys a container hands reach the descriptor, and a list that cannot hold never builds. */
+class WidgetHandsDeclarationTest {
+
+    private fun widget(id: String, hands: List<String>) = WidgetModel(
+        id = id,
+        displayName = "Display",
+        removable = true,
+        drawsOwnSurface = false,
+        slots = listOf("body"),
+        propsClassFqn = null,
+        functionFqn = "hivens.ui.widgets.Sample",
+        hands = hands,
+    )
+
+    @Test
+    fun `the handed keys are emitted in their order`() {
+        val src = renderRegistry(listOf(widget("screen.about", hands = listOf("about.update", "about.update.open"))))
+        assertContains(src, """override val hands: List<String> = listOf("about.update", "about.update.open")""")
+    }
+
+    @Test
+    fun `a container that hands nothing emits nothing about it`() {
+        val src = renderRegistry(listOf(widget("screen.home", hands = emptyList())))
+        assertFalse("hands" in src, src)
+    }
+
+    @Test
+    fun `distinct non-blank keys on a container pass`() {
+        assertNull(WidgetValidator.handsFault(emptyList(), emptyList()))
+        assertNull(WidgetValidator.handsFault(listOf("project.page"), listOf("body")))
+    }
+
+    @Test
+    fun `a widget with no slots has nowhere to hand a key`() {
+        assertContains(assertNotNull(WidgetValidator.handsFault(listOf("project.page"), emptyList())), "no slots")
+    }
+
+    @Test
+    fun `a blank key and a repeated one are refused`() {
+        assertNotNull(WidgetValidator.handsFault(listOf(" "), listOf("body")))
+        assertContains(assertNotNull(WidgetValidator.handsFault(listOf("a", "a"), listOf("body"))), "'a'")
+    }
+}

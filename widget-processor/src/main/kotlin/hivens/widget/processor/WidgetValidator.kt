@@ -59,6 +59,8 @@ internal object WidgetValidator {
         val needs: List<String> = emptyList(),
         /** The id of the Boolean source the widget is shown under, or null for one shown everywhere. */
         val shownWhen: String? = null,
+        /** The page keys a container hands the widgets in its slots, in the order declared. */
+        val hands: List<String> = emptyList(),
     )
 
     // KSP entry point. Returns the extracted annotation args, or null
@@ -271,6 +273,12 @@ internal object WidgetValidator {
             return null
         }
 
+        val hands = (args["hands"] as? List<*>).orEmpty().filterIsInstance<String>()
+        handsFault(hands, sanitized)?.let {
+            env.logger.error("@Widget '$id' $it", symbol)
+            return null
+        }
+
         // Until now nothing in the processor referenced the two service
         // annotations, so a widget could claim a contract it never registers,
         // or read one no widget provides, and the build stayed quiet either
@@ -291,7 +299,22 @@ internal object WidgetValidator {
             enter = Entrance.parse(rawEnter)?.name,
             needs = needs,
             shownWhen = shownWhen.ifEmpty { null },
+            hands = hands,
         )
+    }
+
+    /**
+     * What is wrong with the keys a container hands, or null when nothing is. A blank id
+     * hands nothing and a repeated one is a slip, as with needs. A widget with no slots has
+     * nowhere to hand a key, so a list on it says something that can never be true.
+     */
+    internal fun handsFault(hands: List<String>, slots: List<String>): String? {
+        if (hands.isEmpty()) return null
+        if (slots.isEmpty()) return "hands ${hands.joinToString { "'$it'" }} but has no slots to hand them to"
+        if (hands.any { it.isBlank() }) return "hands a blank key"
+        val repeated = hands.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
+        if (repeated.isNotEmpty()) return "hands ${repeated.joinToString { "'$it'" }} more than once"
+        return null
     }
 
     /**

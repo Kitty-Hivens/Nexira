@@ -63,6 +63,8 @@ import hivens.widget.model.NodePath
 import hivens.widget.model.ViewportMode
 import hivens.widget.model.ViewportSpec
 import hivens.widget.model.contentAt
+import hivens.widget.model.holdsOwn
+import hivens.widget.model.isSingleSlot
 import hivens.widget.model.viewportMode
 import kotlin.math.roundToInt
 import hivens.ui.theme.NxInk
@@ -166,17 +168,18 @@ internal fun slotChromeModifier(
 }
 
 /**
- * Lets a press go on to what is drawn beneath the slot as well. A slot drawn over another, the centre's floating lane
- * over the page, covers the whole of it while what stands in it may draw nothing at rest, and Compose hands a press to
- * the uppermost of overlapping siblings only. So a press meant for a widget on the page went to the lane's. Shared,
- * every chrome under the pointer sees the press and the one the registry names takes it.
+ * Lets a press go on to what is drawn beneath as well. A slot drawn over another, the centre's floating lane over the
+ * page, covers the whole of it while what stands in it may draw nothing at rest, and a container's content covers the
+ * container's own press layer. Compose hands a press to the uppermost of overlapping siblings only, so the lane took
+ * presses meant for the page and a rail's content took the presses meant for the rail. Shared, every chrome under the
+ * pointer sees the press and the one the registry names takes it.
  */
-private data object ShareWithLayersBeneath : ModifierNodeElement<ShareWithLayersBeneathNode>() {
+internal data object ShareWithLayersBeneath : ModifierNodeElement<ShareWithLayersBeneathNode>() {
     override fun create() = ShareWithLayersBeneathNode()
     override fun update(node: ShareWithLayersBeneathNode) = Unit
 }
 
-private class ShareWithLayersBeneathNode : Modifier.Node(), PointerInputModifierNode {
+internal class ShareWithLayersBeneathNode : Modifier.Node(), PointerInputModifierNode {
     override fun onPointerEvent(pointerEvent: PointerEvent, pass: PointerEventPass, bounds: IntSize) = Unit
     override fun onCancelPointerInput() = Unit
     override fun sharePointerInputWithSiblings(): Boolean = true
@@ -258,9 +261,20 @@ internal fun SlotLayoutMenuContent(
     onClose: () -> Unit,
 ) {
     val s = nexiraStrings()
-    val live = LocalDocument.current?.contentAt(path) ?: SlotContent()
+    val document = LocalDocument.current
+    val live = document?.contentAt(path) ?: SlotContent()
     val flow = live.flow
 
+    // A slot of a frame widget is shared by every screen unless this screen holds it as its own, and which one it is
+    // decides what every change below reaches, so it is said first and can be changed right here.
+    if (document != null && document.isSingleSlot(path)) {
+        val own = document.holdsOwn(path)
+        MenuSectionTitle(s.text(if (own) "editorSlotOwn" else "editorSlotShared"))
+        NxMenuItem(s.text(if (own) "editorSlotShareOwn" else "editorSlotHoldOwn")) {
+            if (own) editor.shareOwn(path) else editor.holdOwn(path)
+            onClose()
+        }
+    }
     Text(
         text     = s.text("editorSlotLayoutMenuTitle"),
         style    = MaterialTheme.typography.labelSmall,

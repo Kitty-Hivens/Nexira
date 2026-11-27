@@ -44,7 +44,10 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import org.slf4j.LoggerFactory
 import java.util.UUID
+
+private val log = LoggerFactory.getLogger("DocumentEditor")
 
 /**
  * The editor's one way to change the document: every edit is a transform of the document [store] draws, made on one
@@ -59,6 +62,8 @@ import java.util.UUID
 class DocumentEditor(
     private val store: DocumentStore,
     private val scope: CoroutineScope,
+    /** Where a widget may stand. A drop or a move it refuses leaves the document as it was. */
+    private val admission: DocumentAdmission = DocumentAdmission.Open,
     /** A name no widget has yet. */
     private val mint: (String) -> String = { "${it.substringBefore('#')}#${UUID.randomUUID().toString().take(8)}" },
 ) {
@@ -176,6 +181,7 @@ class DocumentEditor(
     fun add(path: NodePath, kind: WidgetKind, slots: List<SlotId>, index: Int, placement: Placement? = null) {
         val id = mint(kind.value)
         edit { document ->
+            if (refuses(kind.value, admission.missing(kind, path, document), path)) return@edit document
             document.edit(path) { content ->
                 val seeded = placement ?: if (content.flow == null) seedPlacement(content.widgets.size, content.grid, content.widgets) else null
                 val widget = WidgetInstance(kind = kind, instanceId = id, children = slots.associateWith { SlotContent() }, placement = seeded)
@@ -188,7 +194,24 @@ class DocumentEditor(
 
     fun reorder(path: NodePath, fromIndex: Int, toIndex: Int) = edit { it.edit(path) { c -> c.reordered(fromIndex, toIndex) } }
 
-    fun move(from: NodePath, to: NodePath, instanceId: String, toIndex: Int) = edit { it.moveWidget(from, to, instanceId, toIndex) }
+    fun move(from: NodePath, to: NodePath, instanceId: String, toIndex: Int) = edit { document ->
+        val moved = document.contentAt(from)?.widgets?.firstOrNull { it.instanceId == instanceId }
+        if (moved != null && refuses(moved.kind.value, admission.missing(moved, to, document), to)) document
+        else document.moveWidget(from, to, instanceId, toIndex)
+    }
+
+    /** What the slot at [path] would not answer for a widget, or nothing. For the host to show on a drag. */
+    fun missingAt(path: NodePath, kind: WidgetKind): List<String> = admission.missing(kind, path, store.document.value)
+
+    fun missingAt(path: NodePath, widget: WidgetInstance): List<String> = admission.missing(widget, path, store.document.value)
+
+    // A refusal is not an error: the host offered a drop the widget cannot take, and the document stays as it was.
+    // Logged, because a drop that does nothing and says nothing is otherwise impossible to tell from one that was lost.
+    private fun refuses(kind: String, missing: List<String>, path: NodePath): Boolean {
+        if (missing.isEmpty()) return false
+        log.info("Not placing {} at {}: nothing there answers {}", kind, path, missing)
+        return true
+    }
 
     /**
      * Changes a widget's props from what they are when the edit lands, so a slider and a toggle writing the same record
