@@ -38,8 +38,8 @@ internal object WidgetValidator {
         val removable: Boolean,
         val drawsOwnSurface: Boolean,
         val slots: List<String>,
-        /** Of [slots], the ones that hold a page. */
-        val pages: List<String>,
+        /** Whether its slots are named by what it holds, beyond [slots]. */
+        val openSlots: Boolean,
         // FQN of the @Serializable props class, or null for Unit::class
         // (a propless widget).
         val propsClassFqn: String?,
@@ -125,7 +125,7 @@ internal object WidgetValidator {
         val drawsOwnSurface = (args["drawsOwnSurface"] as? Boolean) ?: false
         // KSP reports Array<String> annotation values as List<*>.
         val rawSlots = (args["slots"] as? List<*>).orEmpty().filterIsInstance<String>()
-        val pages = (args["pages"] as? List<*>).orEmpty().filterIsInstance<String>()
+        val openSlots = (args["openSlots"] as? Boolean) ?: false
         val rawSurface = (args["surface"] as? String).orEmpty().trim()
 
         if (id.isBlank()) {
@@ -156,14 +156,9 @@ internal object WidgetValidator {
             }
             sanitized.add(raw)
         }
-        val undeclared = pages.filter { it !in seen }
-        if (undeclared.isNotEmpty()) {
-            env.logger.error("@Widget '$id' names pages that are not among its slots: $undeclared", symbol)
-            return null
-        }
         // A container reaches its child slots through its own instance id, so slots
         // on a declaration that takes no instance are places nothing can render.
-        if (sanitized.isNotEmpty() && !takesInstance) {
+        if ((sanitized.isNotEmpty() || openSlots) && !takesInstance) {
             env.logger.error(
                 "@Widget '$id' declares slots but takes no instance " +
                     "-- add `instance: WidgetInstance` to render them",
@@ -274,7 +269,7 @@ internal object WidgetValidator {
         }
 
         val hands = (args["hands"] as? List<*>).orEmpty().filterIsInstance<String>()
-        handsFault(hands, sanitized)?.let {
+        handsFault(hands, sanitized, openSlots)?.let {
             env.logger.error("@Widget '$id' $it", symbol)
             return null
         }
@@ -289,7 +284,7 @@ internal object WidgetValidator {
             removable = removable,
             drawsOwnSurface = drawsOwnSurface,
             slots = sanitized,
-            pages = pages.distinct(),
+            openSlots = openSlots,
             propsClassFqn = propsClassFqn,
             takesInstance = takesInstance,
             provides = symbol.serviceContracts(PROVIDES_SERVICE_FQN, "classes"),
@@ -308,9 +303,9 @@ internal object WidgetValidator {
      * hands nothing and a repeated one is a slip, as with needs. A widget with no slots has
      * nowhere to hand a key, so a list on it says something that can never be true.
      */
-    internal fun handsFault(hands: List<String>, slots: List<String>): String? {
+    internal fun handsFault(hands: List<String>, slots: List<String>, openSlots: Boolean = false): String? {
         if (hands.isEmpty()) return null
-        if (slots.isEmpty()) return "hands ${hands.joinToString { "'$it'" }} but has no slots to hand them to"
+        if (slots.isEmpty() && !openSlots) return "hands ${hands.joinToString { "'$it'" }} but has no slots to hand them to"
         if (hands.any { it.isBlank() }) return "hands a blank key"
         val repeated = hands.groupingBy { it }.eachCount().filterValues { it > 1 }.keys
         if (repeated.isNotEmpty()) return "hands ${repeated.joinToString { "'$it'" }} more than once"

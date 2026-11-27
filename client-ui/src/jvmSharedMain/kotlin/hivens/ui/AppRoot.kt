@@ -24,6 +24,11 @@ import hivens.ui.layout.DocumentStore
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.LauncherScreens
 import hivens.ui.navigation.NavRequests
+import hivens.config.Branding
+import hivens.ui.i18n.nexiraStrings
+import hivens.ui.notifications.Kind
+import hivens.ui.notifications.NotificationCenter
+import hivens.ui.notifications.Severity
 import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.pictures.PictureRechecks
 import hivens.ui.pictures.WarmLibrary
@@ -52,7 +57,6 @@ import org.koin.compose.getKoin
 import org.koin.compose.koinInject
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
-import hivens.ui.navigation.asConfig
 
 /**
  * Whatever the host feeds into the history besides the screens: thumb buttons on a
@@ -132,6 +136,21 @@ fun AppRoot(
     val document by store.document.collectAsState()
     val navRequests: NavRequests = koinInject()
 
+    // An interface of a shape this build no longer reads was deleted on the way in, and the standard one is drawn.
+    val notifications: NotificationCenter = koinInject()
+    val s = nexiraStrings()
+    LaunchedEffect(store) {
+        if (!store.takeOutdatedNotice()) return@LaunchedEffect
+        notifications.push(
+            sourceKey = "interface-outdated",
+            sender    = Branding.TITLE,
+            iconUrl   = null,
+            severity  = Severity.Info,
+            kind      = Kind.Sticky,
+            title     = s.text("interfaceOutdatedReplaced"),
+        )
+    }
+
     // ── Background settings ───────────────────────────────────────────────
     val backgroundManager: BackgroundManager = koinInject()
     val backgroundSettings by backgroundManager.settings.collectAsState()
@@ -168,8 +187,7 @@ fun AppRoot(
     // Where the composition has been, from where the document starts it, as the history
     // module keeps it for the run: an interface that starts over goes on from where it was.
     ProvideCompositionFacts(LauncherConfigs.Composition, document)
-    val start = document.compositions[LauncherConfigs.Composition]?.start ?: LauncherScreens.Home.asConfig()
-    val (history, show) = rememberCompositionHistory(start)
+    val (history, show) = rememberCompositionHistory(LauncherScreens.Home)
     val back = rememberScopedCommand(HistoryKeys.Back)
     val forward = rememberScopedCommand(HistoryKeys.Forward)
     NavigationInputs(back = { back?.invoke(Unit) }, forward = { forward?.invoke(Unit) })

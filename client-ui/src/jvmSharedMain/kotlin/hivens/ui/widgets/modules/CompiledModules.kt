@@ -38,6 +38,8 @@ import hivens.widget.api.ModuleContribution
 import hivens.widget.model.ApiVersion
 import hivens.widget.model.ModuleGraph
 import hivens.widget.model.ModuleNode
+import hivens.pages.PagesModule
+import hivens.ui.screens.LauncherScreensModule
 
 /**
  * The modules compiled into this build. Carrying one is not using it: the host brings
@@ -56,7 +58,7 @@ val CompiledModules: List<CompiledModule> =
         IconModule, IconGoogleRoundedModule,
         CursorModule, CursorSystemModule, CursorNxModule,
         PacksModule, AccountsModule, CatalogueModule, MirrorSourceModule, ModrinthSourceModule,
-        HistoryModule,
+        PagesModule, HistoryModule, LauncherScreensModule,
     )
 
 /**
@@ -79,11 +81,12 @@ private fun offersOf(module: CompiledModule): Map<String, ApiVersion> =
 
 /**
  * What the widgets compiled into the launcher outside any module do not run without, by the APIs they name: the rail,
- * the breadcrumb and the home page read and move the history of the pages shown. Brought in whatever the document
+ * the breadcrumb and the home page read and move the history of the pages shown, and the pages they show are the
+ * launcher's own screens. Brought in whatever the document
  * names, the way what a jar requires is, so a document of a person's own written before the history was a module
  * keeps them. Theirs to declare once those widgets are a module of their own.
  */
-val BuiltInWidgetsRequire: Set<String> = setOf(HistoryApi.ID)
+val BuiltInWidgetsRequire: Set<String> = setOf(HistoryApi.ID, LauncherScreensModule.ID)
 
 /**
  * The modules the host brings in where the document names [named], the jars switched on do not run

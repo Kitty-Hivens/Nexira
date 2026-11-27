@@ -13,6 +13,9 @@ sealed interface DocumentRead {
     /** Written by a build that knows [schema], which this one does not. It is left as it is. */
     data class Newer(val schema: Int) : DocumentRead
 
+    /** Written in an older shape, [schema], which this build no longer draws: nothing of it carries over. */
+    data class Outdated(val schema: Int) : DocumentRead
+
     /** Not a document, with why. */
     data class Broken(val reason: String) : DocumentRead
 }
@@ -33,6 +36,7 @@ object DocumentCodec {
             element == null -> DocumentRead.Broken("not an object")
             schema == null -> DocumentRead.Broken("no schema")
             schema > DOCUMENT_SCHEMA -> DocumentRead.Newer(schema)
+            schema < DOCUMENT_SCHEMA -> DocumentRead.Outdated(schema)
             else -> DocumentRead.Whole(json.decodeFromJsonElement(Document.serializer(), element))
         }
     } catch (e: SerializationException) {

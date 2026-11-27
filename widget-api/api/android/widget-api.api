@@ -78,8 +78,10 @@ public final class hivens/widget/api/CompositionKeys {
 	public final fun getConfig ()Lhivens/widget/model/SourceKey;
 	public final fun getConfigs ()Lhivens/widget/model/SourceKey;
 	public final fun getName ()Lhivens/widget/model/SourceKey;
+	public final fun getRecord ()Lhivens/widget/model/SourceKey;
 	public final fun getShowWindow ()Lhivens/widget/model/CommandKey;
 	public final fun getStart ()Lhivens/widget/model/SourceKey;
+	public final fun getWhere ()Lhivens/widget/model/SourceKey;
 	public final fun getWindows ()Lhivens/widget/model/SourceKey;
 }
 
@@ -222,6 +224,10 @@ public abstract interface class hivens/widget/api/LevelContext {
 	public abstract fun getCoroutineScope ()Lkotlinx/coroutines/CoroutineScope;
 	public abstract fun getLevel ()Lhivens/widget/model/ScopeLevel;
 	public abstract fun getServices ()Lhivens/widget/api/LevelServices;
+}
+
+public final class hivens/widget/api/LevelHostKt {
+	public static final fun getLocalLevelHost ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public abstract interface class hivens/widget/api/LevelServices {
@@ -787,6 +793,7 @@ public final class hivens/widget/api/WidgetDataRegistry {
 
 public abstract interface class hivens/widget/api/WidgetDescriptor {
 	public abstract fun Render (Lhivens/widget/model/WidgetInstance;Landroidx/compose/runtime/Composer;I)V
+	public fun getContainer ()Z
 	public fun getDefaultEntrance ()Lhivens/widget/model/Entrance;
 	public fun getDefaultPropsJson ()Lkotlinx/serialization/json/JsonObject;
 	public fun getDefaultSurface ()Lhivens/widget/model/SurfaceSpec;
@@ -796,7 +803,7 @@ public abstract interface class hivens/widget/api/WidgetDescriptor {
 	public fun getInjects ()Ljava/util/Set;
 	public abstract fun getKind-8SAbBEg ()Ljava/lang/String;
 	public fun getNeeds ()Ljava/util/List;
-	public fun getPages ()Ljava/util/List;
+	public fun getOpenSlots ()Z
 	public fun getPropsSerializer ()Lkotlinx/serialization/KSerializer;
 	public fun getProvides ()Ljava/util/Set;
 	public abstract fun getRemovable ()Z
@@ -806,6 +813,7 @@ public abstract interface class hivens/widget/api/WidgetDescriptor {
 }
 
 public final class hivens/widget/api/WidgetDescriptor$DefaultImpls {
+	public static fun getContainer (Lhivens/widget/api/WidgetDescriptor;)Z
 	public static fun getDefaultEntrance (Lhivens/widget/api/WidgetDescriptor;)Lhivens/widget/model/Entrance;
 	public static fun getDefaultPropsJson (Lhivens/widget/api/WidgetDescriptor;)Lkotlinx/serialization/json/JsonObject;
 	public static fun getDefaultSurface (Lhivens/widget/api/WidgetDescriptor;)Lhivens/widget/model/SurfaceSpec;
@@ -813,7 +821,7 @@ public final class hivens/widget/api/WidgetDescriptor$DefaultImpls {
 	public static fun getHands (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/List;
 	public static fun getInjects (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/Set;
 	public static fun getNeeds (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/List;
-	public static fun getPages (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/List;
+	public static fun getOpenSlots (Lhivens/widget/api/WidgetDescriptor;)Z
 	public static fun getPropsSerializer (Lhivens/widget/api/WidgetDescriptor;)Lkotlinx/serialization/KSerializer;
 	public static fun getProvides (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/Set;
 	public static fun getShownWhen (Lhivens/widget/api/WidgetDescriptor;)Ljava/lang/String;

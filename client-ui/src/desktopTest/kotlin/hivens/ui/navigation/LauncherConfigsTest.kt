@@ -9,7 +9,6 @@ import hivens.ui.chrome.staticCrumbLabel
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.screens.screenKind
 import hivens.ui.widgets.themepicker.launcherAndControls
-import hivens.widget.model.ConfigId
 import hivens.history.api.History
 import hivens.pages.api.HistoryEntry
 import hivens.pages.api.Show
@@ -21,7 +20,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import hivens.pages.api.ScreenId
 
-/** The launcher's own configs: each has a widget that draws it, a name in the trail, and is opened with what its page reads. */
+/** The launcher's own screens: each has a widget that draws it, a name in the trail, and is opened with what its page reads. */
 class LauncherConfigsTest {
 
     private val strings = NexiraStrings.shipped("en")
@@ -29,9 +28,9 @@ class LauncherConfigsTest {
     private fun Show.entry() = HistoryEntry(screen, values)
 
     @Test
-    fun `every config has its widget, and every screen widget its config`() {
+    fun `every screen has its widget, and every screen widget its screen`() {
         val screens = launcherAndControls.all().keys.map { it.value }.filter { it.startsWith("screen.") }.toSet()
-        assertEquals((LauncherScreens.all.map { it.asConfig() } + LauncherConfigs.Console).map { screenKind(it).value }.toSet(), screens)
+        assertEquals((LauncherScreens.all.map { it.value } + LauncherConfigs.Console.value).map { screenKind(it).value }.toSet(), screens)
     }
 
     @Test
@@ -42,18 +41,18 @@ class LauncherConfigsTest {
     }
 
     @Test
-    fun `no two configs share an id`() {
+    fun `no two screens share an id`() {
         val ids = LauncherScreens.all.map { it.value }
         assertEquals(14, ids.toSet().size)
     }
 
     @Test
     fun `a screen widget is not offered in the palette`() {
-        LauncherScreens.all.forEach { assertEquals(false, assertNotNull(launcherAndControls[screenKind(it.asConfig())]).removable, it.value) }
+        LauncherScreens.all.forEach { assertEquals(false, assertNotNull(launcherAndControls[screenKind(it.value)]).removable, it.value) }
     }
 
     @Test
-    fun `a config nothing has to be looked up for names its crumb`() {
+    fun `a screen nothing has to be looked up for names its crumb`() {
         val named = LauncherScreens.all - setOf(LauncherScreens.Pack, LauncherScreens.CataloguePack, LauncherScreens.Project, LauncherScreens.Build)
         val labels = named.associateWith { assertNotNull(staticCrumbLabel(HistoryEntry(it), strings), it.value) }
         labels.forEach { (config, label) -> assertNotEquals("", label, config.value) }

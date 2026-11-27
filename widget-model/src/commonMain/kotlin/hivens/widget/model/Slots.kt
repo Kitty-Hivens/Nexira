@@ -35,17 +35,18 @@ data class WidgetInstance(
     // changes it in the editor.
     val motion: WidgetMotion? = null,
     /**
-     * The configs this instance is shown on, every config where null. A widget of the frame stands in every config the
-     * way a bar stands on every workspace, and what shows in it follows what the composition shows.
+     * Where this instance is shown, everywhere where null: the ids of the places the composition stands at, its config
+     * and the screen its pages show. A widget of the frame stands in every config the way a bar stands on every
+     * workspace, and what shows in it follows what the composition shows.
      */
-    @SerialName("shown_on") val shownOn: List<ConfigId>? = null,
-    /** The configs this instance is hidden on, whatever [shownOn] says. */
-    @SerialName("hidden_on") val hiddenOn: List<ConfigId> = emptyList(),
+    @SerialName("shown_on") val shownOn: List<String>? = null,
+    /** Where this instance is hidden, whatever [shownOn] says. */
+    @SerialName("hidden_on") val hiddenOn: List<String> = emptyList(),
 ) {
-    /** Whether this instance is shown while the composition shows [config]. */
-    fun shownOn(config: ConfigId): Boolean = (shownOn == null || config in shownOn) && config !in hiddenOn
+    /** Whether this instance is shown while the composition stands at [places]. */
+    fun shownAt(places: Set<String>): Boolean = (shownOn == null || shownOn.any { it in places }) && hiddenOn.none { it in places }
 
-    /** Whether this instance says on which configs it is shown at all. */
+    /** Whether this instance says where it is shown at all. */
     val conditional: Boolean get() = shownOn != null || hiddenOn.isNotEmpty()
 }
 

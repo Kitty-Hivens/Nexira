@@ -44,7 +44,7 @@ object LauncherScreens {
     val CataloguePack = ScreenId("catalogue.pack")
 
     /**
-     * A project's page. A config of its own and not a panel, because what it says of the project stands in the right
+     * A project's page. A screen of its own and not a panel, because what it says of the project stands in the right
      * rail, which every screen has, so in place it would have nowhere to stand.
      */
     val Project = ScreenId("project")
@@ -83,8 +83,3 @@ object LauncherScreens {
  */
 val PackSettingsPage: PageValue<String> = PageValue("pack.page.settings", String.serializer())
 
-/** The config of the launcher's composition a screen is drawn as, by the same id, while each screen is a config. */
-internal fun ScreenId.asConfig(): ConfigId = ConfigId(value)
-
-/** The screen a config of the launcher's composition draws, by the same id, while each screen is a config. */
-internal fun ConfigId.asScreen(): ScreenId = ScreenId(value)

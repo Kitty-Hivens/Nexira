@@ -59,10 +59,11 @@ internal fun standardContainer(kind: String): WidgetInstance {
 internal fun standardSlot(kind: String, slot: String): SlotContent =
     checkNotNull(standardContainer(kind).children[SlotId(slot)]) { "$kind has no slot $slot in the standard document" }
 
-/** The right rail's column as [config] shows it: the widgets of the one record that are shown there. */
-internal fun standardRail(config: String): SlotContent {
+/** The right rail's column as the screen [screen] shows it: the widgets of the one record that are shown there. */
+internal fun standardRail(screen: String): SlotContent {
     val rail = standardSlot("appshell.region.right", "main")
-    return rail.copy(widgets = rail.widgets.filter { it.shownOn(ConfigId(config)) })
+    val config = StandardDocument.load().compositions.getValue(CompositionName("launcher")).start
+    return rail.copy(widgets = rail.widgets.filter { it.shownAt(setOf(config.value, screen)) })
 }
 
 /** Draws [content] as the root slot of a document of its own, the way a config's root is drawn. */

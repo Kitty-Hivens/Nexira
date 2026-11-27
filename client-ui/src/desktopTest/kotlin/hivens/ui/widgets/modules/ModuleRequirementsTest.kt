@@ -24,6 +24,8 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import hivens.history.api.HistoryApi
+import hivens.pages.api.PagesApi
+import hivens.ui.screens.LauncherScreensModule
 
 /**
  * What the modules compiled into the build say of each other is what their classes do: every API of
@@ -41,9 +43,11 @@ class ModuleRequirementsTest {
         assertEquals(CompiledModules.map { it.id }.toSet(), graph.order.toSet())
     }
 
+    // A module the launcher carries in its own classes, its own screens say, is read off classes that are the whole
+    // host's, which name every API there is: the host is not a module, and what its module names is the host's.
     @Test
     fun `a module declares the APIs its classes name, and no other`() {
-        val wrong = CompiledModules.mapNotNull { module ->
+        val wrong = CompiledModules.filter { it.javaClass.protectionDomain.codeSource != HOST }.mapNotNull { module ->
             val named = apisNamedBy(module) - module.provides.keys
             val declared = (module.requires.keys + module.uses.keys).filter { packagesOf[it] != null }.toSet()
             if (named == declared) null else "${module.id} names ${(named - declared)} undeclared and declares ${(declared - named)} for nothing"
@@ -84,7 +88,10 @@ class ModuleRequirementsTest {
     // module names none, and the rail, the breadcrumb and the home page would draw nothing in it.
     @Test
     fun `what the built-in widgets require is brought in whatever the document names`() {
-        assertEquals(setOf(HistoryApi.ID), broughtIn(emptySet(), CompiledModules, builtInRequire = BuiltInWidgetsRequire))
+        assertEquals(
+            setOf(HistoryApi.ID, PagesApi.ID, LauncherScreensModule.ID),
+            broughtIn(emptySet(), CompiledModules, builtInRequire = BuiltInWidgetsRequire),
+        )
     }
 
     @Test
@@ -124,5 +131,8 @@ class ModuleRequirementsTest {
 
     private companion object {
         val NAME = Regex("""hivens(/[A-Za-z0-9_$]+)+""")
+
+        /** Where the host's own classes come from, read off a module that is one of them. */
+        val HOST = LauncherScreensModule::class.java.protectionDomain.codeSource
     }
 }

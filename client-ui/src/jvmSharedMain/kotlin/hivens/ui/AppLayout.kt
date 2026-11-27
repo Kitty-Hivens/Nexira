@@ -49,6 +49,7 @@ import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.CompositionName
+import hivens.widget.model.Composition as CompositionRecord
 import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
 import hivens.history.api.History
@@ -60,8 +61,6 @@ import hivens.ui.theme.NxColor
 import org.koin.compose.koinInject
 import hivens.history.api.HistoryKeys
 import hivens.pages.api.PagesKeys
-import hivens.ui.navigation.asConfig
-import hivens.ui.navigation.asScreen
 import hivens.pages.api.ScreenId
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
@@ -89,21 +88,25 @@ fun AppLayout(
     val store: DocumentStore = koinInject()
     val document by store.document.collectAsState()
 
+    // The config the composition draws: the one the document starts it on. Its screens are
+    // the pages host's, which draws the one the history shows.
+    val config = document.compositions[LauncherConfigs.Composition]?.start ?: return
+
     // The config drawn and the windows the composition owns, put over the composition's
     // level, which AppRoot made around everything it draws. Around the editor too, so a
     // widget the palette draws reads the same answers as one on a surface. Everything
     // else a widget reads here, the history and the session among it, the level makes
     // for itself.
-    ProvideComposition(now.current.screen.asConfig()) {
+    ProvideComposition(config) {
     // The editor host wraps the WHOLE shell (rails included) so its decorators
     // reach rail widgets; it puts its own chrome back over the content pane from
     // what the centre region reports. The shell itself is the config's layout.
     EditorSurfaceHost(
         composition            = LauncherConfigs.Composition,
-        config                 = now.current.screen.asConfig(),
+        screen                 = now.current.screen,
         customization          = customization,
         onCustomizationChanged = onCustomizationChanged,
-        onOpen                 = { show(LauncherScreens.section(it.asScreen())) },
+        onOpen                 = { show(LauncherScreens.section(it)) },
     ) {
         // Links that point at a project the launcher can draw stop going out to a
         // browser from here down, and a project's tags open the catalogue. Provided
@@ -118,7 +121,7 @@ fun AppLayout(
             ConfigView(
                 name     = LauncherConfigs.Composition,
                 document = document,
-                history  = now,
+                config   = config,
                 modifier = Modifier.fillMaxSize().background(rowBackground).releaseFocusOnPress(),
             )
         }
@@ -127,11 +130,12 @@ fun AppLayout(
 }
 
 /**
- * Puts over the composition's level for [content] the [config] it draws, and the windows
- * the composition owns: which are open, and the commands that open and close them, drawn
- * here so that they go when the composition goes. Each command is one object for the
- * composition's life that runs the latest lambda it was handed, so a reader does not
- * recompose because the shell did.
+ * Puts over the composition's level for [content] the [config] it draws, where it stands
+ * (the config and the screen its pages show, which a widget's condition of where it is
+ * shown is read against), and the windows the composition owns: which are open, and the
+ * commands that open and close them, drawn here so that they go when the composition goes.
+ * Each command is one object for the composition's life that runs the latest lambda it was
+ * handed, so a reader does not recompose because the shell did.
  *
  * Widgets that cannot stand without what they read draw the placeholder for a widget
  * that stands where something it reads has no answer, which is also put here.
@@ -146,6 +150,7 @@ internal fun ProvideComposition(config: ConfigId, content: @Composable () -> Uni
     val owned = remember { CompositionWindows { it in document.compositions && it != document.start } }
     val openOwned by owned.open.collectAsState()
     ProvideScoped(CompositionKeys.Config, config) {
+    ProvideWhere(config) {
     ProvideScoped(CompositionKeys.Windows, openOwned) {
     ProvideScopedCommand(CompositionKeys.ShowWindow, rememberLatestCommand<CompositionName> { owned.show(it) }) {
     ProvideScopedCommand(CompositionKeys.CloseWindow, rememberLatestCommand(owned::close)) {
@@ -157,16 +162,29 @@ internal fun ProvideComposition(config: ConfigId, content: @Composable () -> Uni
     }
     }
     }
+    }
+}
+
+/**
+ * Puts over the composition's level for [content] where it stands: the config [config] and the screen the pages show,
+ * which a widget's condition of where it is shown is read against.
+ */
+@Composable
+internal fun ProvideWhere(config: ConfigId, content: @Composable () -> Unit) {
+    val shown = rememberScopedSource(PagesKeys.Shown).valueOrNull()?.screen
+    val where = remember(config, shown) { setOfNotNull(config.value, shown?.value) }
+    ProvideScoped(CompositionKeys.Where, where, content)
 }
 
 /**
  * Where the history of the composition this level is stands, as the history module keeps it, and what shows a page
- * in it. Where the document brings in no history module, the composition stands on [start] and shows nothing else.
- * Read inside the composition's level, after [ProvideCompositionFacts].
+ * in it. Where nothing keeps a history, the composition stands on the screen it starts on, or [fallback] where nothing
+ * says which that is, and shows nothing else. Read inside the composition's level, after [ProvideCompositionFacts].
  */
 @Composable
-internal fun rememberCompositionHistory(start: ConfigId): Pair<History, (Show) -> Unit> {
-    val history = rememberScopedSource(HistoryKeys.History).valueOrNull() ?: remember(start) { History(start.asScreen()) }
+internal fun rememberCompositionHistory(fallback: ScreenId): Pair<History, (Show) -> Unit> {
+    val start = rememberScopedSource(PagesKeys.Start).valueOrNull() ?: fallback
+    val history = rememberScopedSource(HistoryKeys.History).valueOrNull() ?: remember(start) { History(start) }
     val command = rememberScopedCommand(PagesKeys.Show)
     val latest by rememberUpdatedState(command)
     val show: (Show) -> Unit = remember { { latest?.invoke(it) } }
@@ -174,8 +192,8 @@ internal fun rememberCompositionHistory(start: ConfigId): Pair<History, (Show) -
 }
 
 /**
- * Hands the composition's level what the document says of the composition [name]: its name, the config it starts on
- * and the configs it has, as the document changes. Into the level itself rather than over it, so what a module makes
+ * Hands the composition's level what the document says of the composition [name]: its name, the config it starts on,
+ * the configs it has and its whole record, as the document changes. Into the level itself rather than over it, so what a module makes
  * there reads them as it makes it: the history module keeps a composition's history by its name, starts it where the
  * document does and lets go of a config the document no longer has.
  */
@@ -183,19 +201,23 @@ internal fun rememberCompositionHistory(start: ConfigId): Pair<History, (Show) -
 internal fun ProvideCompositionFacts(name: CompositionName, document: Document) {
     val level = LocalScope.current?.nearest(ScopeLevel.Composition) ?: return
     val composition = document.compositions[name] ?: return
-    val configs = composition.configs.keys
-    val facts = remember(level, name, composition.start) { CompositionFacts(level, name, composition.start, configs) }
-    SideEffect { facts.configs.value = configs }
+    val facts = remember(level, name, composition.start) { CompositionFacts(level, name, composition) }
+    SideEffect {
+        facts.configs.value = composition.configs.keys
+        facts.record.value = composition
+    }
 }
 
 /** What [ProvideCompositionFacts] put into [level], taken out again when it leaves the composition. */
-private class CompositionFacts(level: WidgetScope, name: CompositionName, start: ConfigId, configs: Set<ConfigId>) : RememberObserver {
-    val configs = MutableStateFlow(configs)
+private class CompositionFacts(level: WidgetScope, name: CompositionName, record: CompositionRecord) : RememberObserver {
+    val configs = MutableStateFlow(record.configs.keys)
+    val record = MutableStateFlow(record)
 
     private val handles = listOf(
         level.provide(CompositionKeys.Name, name),
-        level.provide(CompositionKeys.Start, start),
+        level.provide(CompositionKeys.Start, record.start),
         level.provideSource(CompositionKeys.Configs, flowSource(this.configs)),
+        level.provideSource(CompositionKeys.Record, flowSource(this.record)),
     )
 
     override fun onRemembered() = Unit
@@ -230,13 +252,6 @@ fun AppSidebar(
     PuppetClick("nav.console")  { setConsoleVisible?.invoke(!consoleVisible) }
     if (isAuthenticated) {
         PuppetClick("nav.logout") { onLogout() }
-    }
-    // A made screen has no fixed entry above, so it is driven by its id.
-    val standard: Document = koinInject()
-    val configs = LocalDocument.current?.compositions?.get(LauncherConfigs.Composition)?.configs?.keys.orEmpty()
-    val shipped = standard.compositions[LauncherConfigs.Composition]?.configs?.keys.orEmpty()
-    (configs - shipped).forEach { id ->
-        key(id) { PuppetClick("nav.screen.${id.value}") { onSection(id.asScreen()) } }
     }
 
     NavigationRail(

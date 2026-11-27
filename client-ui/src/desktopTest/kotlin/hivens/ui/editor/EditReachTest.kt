@@ -1,10 +1,10 @@
 package hivens.ui.editor
 
+import hivens.pages.api.ScreenId
+import hivens.pages.api.ScreenView
 import hivens.ui.i18n.NexiraStrings
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.LauncherScreens
-import hivens.widget.model.Config
-import hivens.widget.model.ConfigId
 import hivens.widget.model.NodePath
 import hivens.widget.model.NodeRoot
 import hivens.widget.model.SlotId
@@ -12,54 +12,67 @@ import hivens.widget.model.StandardDocument
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.contentAt
 import hivens.widget.model.holdOwn
-import hivens.widget.model.withConfig
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import hivens.ui.navigation.asConfig
 
 /**
- * Whom an edit reaches, read off the standard document: a screen's page is its own, the rails are shared by every
- * screen until one holds a slot as its own, and a frame widget is one record for all of them.
+ * Whom an edit reaches, read off the standard document: what is in the pages host's slot for a screen is that screen's
+ * own, the frame around the host is every screen's, held as the config's own or not, and a frame widget is one record
+ * for all of them.
  */
 class EditReachTest {
 
     private val standard = StandardDocument.load()
     private val strings = NexiraStrings.shipped("en")
+    private val launcher = standard.compositions.getValue(LauncherConfigs.Composition)
 
-    private fun root(config: ConfigId) = NodePath(LauncherConfigs.Composition, NodeRoot.Layout(config, standard.compositions.getValue(LauncherConfigs.Composition).configs.getValue(config).layouts.first().id))
-    private fun row(config: ConfigId) = root(config).child("appshell-region-body-default", SlotId("content"))
-    private fun page(config: ConfigId) = row(config).child("appshell-region-center-default", SlotId("body")).child("screen.${config.value}", SlotId("main"))
-    private val rail = row(LauncherScreens.Home.asConfig()).child("appshell-region-right-default", SlotId("main"))
+    private val root = NodePath(LauncherConfigs.Composition, NodeRoot.Layout(launcher.start, launcher.configs.getValue(launcher.start).layouts.first().id))
+    private val row = root.child("appshell-region-body-default", SlotId("content"))
+    private val centre = row.child("appshell-region-center-default", SlotId("body"))
+    private fun screen(id: ScreenId) = centre.child("pages-host-default", SlotId(id.value))
+    private fun page(id: ScreenId) = screen(id).child("screen.${id.value}", SlotId("main"))
+    private val rail = row.child("appshell-region-right-default", SlotId("main"))
 
     @Test
-    fun `a widget on a screen's page changes that screen only`() {
-        val hero = standard.contentAt(page(LauncherScreens.Home.asConfig()))?.widgets?.first()
-        assertTrue(hero != null, "the home page holds widgets in the standard document")
-        assertEquals(EditReach.ThisScreen, standard.reachOf(page(LauncherScreens.Home.asConfig()), hero))
+    fun `a widget on a screen changes that screen only`() {
+        val hero = assertNotNull(standard.contentAt(page(LauncherScreens.Home))?.widgets?.first(), "the home page holds widgets in the standard document")
+        assertEquals(EditReach.ThisScreen, standard.reachOf(page(LauncherScreens.Home), hero))
+        assertEquals(EditReach.ThisScreen, standard.reachOf(screen(LauncherScreens.Home), standard.contentAt(screen(LauncherScreens.Home))?.widgets?.first()))
+        assertTrue(standard.onPage(page(LauncherScreens.Home)))
     }
 
     @Test
-    fun `a widget in a shared rail slot changes every screen, and this screen's own once it holds the slot`() {
+    fun `the frame around the host changes every screen, held as the config's own or not`() {
         val news = standard.contentAt(rail)?.widgets?.first()
         assertEquals(EditReach.EveryScreen, standard.reachOf(rail, news))
         val own = standard.holdOwn(rail) { "$it-own" }
-        assertEquals(EditReach.ThisScreen, own.reachOf(rail, own.contentAt(rail)?.widgets?.first()))
+        assertEquals(EditReach.EveryScreen, own.reachOf(rail, own.contentAt(rail)?.widgets?.first()))
+        assertEquals(EditReach.EveryScreen, standard.reachOf(centre, standard.contentAt(centre)?.widgets?.first()), "the host itself is the frame's")
+        assertFalse(standard.onPage(rail))
+        assertFalse(standard.onPage(centre))
     }
 
     @Test
     fun `a frame widget is one record, wherever it stands`() {
-        val right = standard.contentAt(row(LauncherScreens.Home.asConfig()))?.widgets?.first { it.kind == WidgetKind("appshell.region.right") }
-        assertEquals(EditReach.EveryScreen, standard.reachOf(row(LauncherScreens.Home.asConfig()), right))
+        val right = standard.contentAt(row)?.widgets?.first { it.kind == WidgetKind("appshell.region.right") }
+        assertEquals(EditReach.EveryScreen, standard.reachOf(row, right))
     }
 
     @Test
-    fun `a screen is called what its maker named it, or what the launcher calls it`() {
-        val made = standard.withConfig(LauncherConfigs.Composition, ConfigId("screen-1"), Config(title = "Notes"))
-        assertEquals("Notes", made.configLabel(ConfigId("screen-1"), strings))
-        assertEquals("Home", standard.configLabel(LauncherScreens.Home.asConfig(), strings))
-        assertEquals("Project", standard.configLabel(LauncherScreens.Project.asConfig(), strings))
-        assertEquals("Build", standard.configLabel(LauncherScreens.Build.asConfig(), strings))
-        assertEquals("unknown", standard.configLabel(ConfigId("unknown"), strings), "an id with no name is shown as itself")
+    fun `a screen is called what a person named it, or what the launcher calls it`() {
+        val screens = listOf(
+            ScreenView(ScreenId("screen-1"), "Notes", owner = null, made = true),
+            ScreenView(LauncherScreens.Library, "Shelf", owner = null),
+            ScreenView(LauncherScreens.Home, "screen.home", owner = "nexira.launcher.screens"),
+        )
+        assertEquals("Notes", placeLabel("screen-1", screens, strings))
+        assertEquals("Shelf", placeLabel(LauncherScreens.Library.value, screens, strings), "renamed")
+        assertEquals("Home", placeLabel(LauncherScreens.Home.value, screens, strings))
+        assertEquals("Project", placeLabel(LauncherScreens.Project.value, screens, strings))
+        assertEquals("Build", placeLabel(LauncherScreens.Build.value, screens, strings))
+        assertEquals("unknown", placeLabel("unknown", screens, strings), "an id with no name is shown as itself")
     }
 }

@@ -27,6 +27,9 @@ import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetSurfaceRenderer
 import org.koin.compose.koinInject
+import hivens.widget.api.LocalLevelHost
+import hivens.widget.api.LevelHostDecorator
+import hivens.ui.widgets.LevelHost
 
 /**
  * What every window of the launcher hands the widgets it draws, whatever it shows: the widgets that exist, the
@@ -61,6 +64,11 @@ fun KernelLocals(content: @Composable () -> Unit) {
         LocalWidgetEntrance        provides PlayedWidgetEntrance,
         LocalViewportScrollbar     provides NxViewportScrollbar,
         LocalMapControls           provides NxMapControls,
+        // A level a widget opens is drawn with its Koin scope around it, as every level the host opens is.
+        LocalLevelHost             provides LauncherLevelHost,
         content = content,
     )
 }
+
+/** The host's [LocalLevelHost]: a level with what the launcher keeps per level, its Koin scope, around it. */
+private val LauncherLevelHost: LevelHostDecorator = { level, content -> LevelHost(level, content) }

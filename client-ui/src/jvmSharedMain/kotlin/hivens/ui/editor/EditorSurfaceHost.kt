@@ -125,14 +125,16 @@ import hivens.widget.api.LocalSlotChromeModifier
 import hivens.widget.api.LocalSlotMotionMs
 import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.LocalWidgetDecorator
-import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.SlotBoundsReporter
 import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
 import hivens.widget.api.WidgetDescriptor
+import hivens.pages.api.PagesKeys
+import hivens.pages.api.ScreenId
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.widget.model.CompositionName
-import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.NodePath
@@ -170,11 +172,12 @@ private val LEFT_RAIL = WidgetKind("appshell.region.left")
 @Composable
 fun EditorSurfaceHost(
     composition: CompositionName,
-    config: ConfigId,
+    /** The screen the pages host shows, the one the screen settings and a reset of the screen are about. */
+    screen: ScreenId,
     customization: CustomizationSettings = CustomizationSettings(),
     onCustomizationChanged: (CustomizationSettings) -> Unit = {},
-    /** Opens a config, the way the rail does. The editor uses it to show a screen it just made. */
-    onOpen: (ConfigId) -> Unit = {},
+    /** Opens a screen, the way the rail does. The editor uses it to show a screen it just made. */
+    onOpen: (ScreenId) -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     val editor: DocumentEditor = koinInject()
@@ -184,8 +187,7 @@ fun EditorSurfaceHost(
     val widgetModules: WidgetModules = koinInject()
     val notifications: NotificationCenter = koinInject()
     val document by store.document.collectAsState()
-    val widgetRegistry = LocalWidgetRegistry.current
-    val pagesOf = remember(widgetRegistry) { { kind: WidgetKind -> widgetRegistry[kind]?.pages.orEmpty() } }
+    val screens = rememberScopedSource(PagesKeys.Screens).valueOrNull().orEmpty()
     val s = nexiraStrings()
 
     val chromeBounds = remember { ShellChromeBounds() }
@@ -263,8 +265,8 @@ fun EditorSurfaceHost(
     }
 
     // What the panels and the selection point at can go under them: an undo, a removal of the container around it,
-    // another config. Checked against the document after every change.
-    LaunchedEffect(document, config) {
+    // another screen. Checked against the document after every change.
+    LaunchedEffect(document, screen) {
         val target = (dock as? Dock.Props)?.key
         if (target != null && document.contentAt(target.path)?.widgets?.none { it.instanceId == target.instanceId } != false) dock = Dock.Palette
         val slot = selectedSlotState.value
@@ -276,16 +278,23 @@ fun EditorSurfaceHost(
     LaunchedEffect(editing) { if (editing && shortWindow) paletteOpen = false }
 
     // A screen just made: opened once the edit lands, with its settings, so the next thing done is to name it.
-    var pendingScreen by remember { mutableStateOf<ConfigId?>(null) }
-    LaunchedEffect(pendingScreen, document) {
+    var pendingScreen by remember { mutableStateOf<ScreenId?>(null) }
+    LaunchedEffect(pendingScreen, screens) {
         val made = pendingScreen ?: return@LaunchedEffect
-        if (document.compositions[composition]?.configs?.containsKey(made) != true) return@LaunchedEffect
+        if (screens.none { it.id == made }) return@LaunchedEffect
         pendingScreen = null
-        if (config != made) onOpen(made)
+        if (screen != made) onOpen(made)
         dock = Dock.Screen
     }
-    val screen: ScreenTarget? = document.compositions[composition]?.configs?.get(config)?.let { c ->
-        ScreenTarget(composition, config, c, made = standard.compositions[composition]?.configs?.containsKey(config) != true)
+    val screenTarget: ScreenTarget? = screens.firstOrNull { it.id == screen }?.let { view ->
+        ScreenTarget(
+            composition = composition,
+            id          = view.id,
+            title       = if (view.owner == null) view.title else "",
+            label       = if (view.made) "" else placeLabel(view.id.value, emptyList(), s),
+            icon        = view.icon.orEmpty(),
+            made        = view.made,
+        )
     }
     val deleteScreen: (ScreenTarget) -> Unit = { doomed ->
         editor.deleteScreen(doomed.composition, doomed.id) { gone ->
@@ -298,7 +307,7 @@ fun EditorSurfaceHost(
                 title     = s.text("screenDeletedTitle", doomed.title.ifBlank { s.text("screenUntitled") }),
                 actions   = listOf(
                     NotifAction(id = "screen-restore-${doomed.id.value}", label = s.text("screenRestore")) {
-                        editor.restoreScreen(doomed.composition, doomed.id, gone)
+                        editor.restoreScreen(doomed.composition, gone)
                         pendingScreen = doomed.id
                     },
                 ),
@@ -511,8 +520,8 @@ fun EditorSurfaceHost(
                     modifier   = Modifier.align(Alignment.TopEnd),
                 )
                 ScreenPropertiesPanel(
-                    visible   = arranging && dock == Dock.Screen && screen != null,
-                    spec      = screen,
+                    visible   = arranging && dock == Dock.Screen && screenTarget != null,
+                    spec      = screenTarget,
                     editor    = editor,
                     onDelete  = deleteScreen,
                     onDismiss = { dock = Dock.Palette },
@@ -527,12 +536,12 @@ fun EditorSurfaceHost(
                     modifier               = Modifier.align(Alignment.TopEnd),
                 )
 
-                if (editing && resetScreenConfirm && screen != null) {
+                if (editing && resetScreenConfirm && screenTarget != null) {
                     ConfirmDialog(
                         title   = s.text("editorResetSurfaceTitle"),
-                        body    = s.text("editorResetSurfaceBody", screen.title.ifBlank { s.text("screenUntitled") }),
+                        body    = s.text("editorResetSurfaceBody", screenTarget.title.ifBlank { screenTarget.label.ifBlank { s.text("screenUntitled") } }),
                         confirm = s.text("editorReset"),
-                        onConfirm = { editor.resetScreen(composition, config, standard, pagesOf) },
+                        onConfirm = { editor.resetScreen(composition, screen, standard) },
                         onDismiss = { resetScreenConfirm = false },
                     )
                 }
@@ -595,9 +604,8 @@ fun EditorSurfaceHost(
                 onOpenPresets      = { presetsOpen = true },
                 onNewScreen        = {
                     // Numbered among the screens somebody made, so the first one is the first and not the fifteenth.
-                    val shipped = standard.compositions[composition]?.configs?.keys.orEmpty()
-                    val made = (document.compositions[composition]?.configs?.keys.orEmpty() - shipped).size + 1
-                    pendingScreen = editor.createScreen(composition, s.text("screenDefaultTitle", made), ScreenIcons.DEFAULT, pagesOf)
+                    val made = screens.count { it.made } + 1
+                    pendingScreen = editor.createScreen(composition, s.text("screenDefaultTitle", made), ScreenIcons.DEFAULT)
                 },
                 resetMenuOpen      = resetMenuOpen,
                 onResetMenu        = { resetMenuOpen = it },

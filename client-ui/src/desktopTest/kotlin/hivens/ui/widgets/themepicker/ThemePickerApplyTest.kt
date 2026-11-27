@@ -31,6 +31,7 @@ import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.ProvideScoped
 import hivens.widget.api.ProvideScopedCommand
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
@@ -40,6 +41,7 @@ import hivens.widget.api.flowSource
 import hivens.widget.api.rememberLatestCommand
 import hivens.widget.model.Composition
 import hivens.widget.model.Config
+import hivens.widget.model.ConfigId
 import hivens.widget.model.ConfigLayout
 import hivens.widget.model.Document
 import hivens.history.api.History
@@ -59,7 +61,10 @@ import org.koin.dsl.module
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import hivens.history.api.HistoryKeys
-import hivens.ui.navigation.asConfig
+import hivens.pages.PagesHostWidget
+import hivens.pages.api.PagesHost
+import hivens.pages.api.PagesKeys
+import hivens.pages.api.ScreenView
 
 /**
  * Apply on the theme picker puts the choice in use and then leaves, in that order, and with nothing
@@ -68,7 +73,7 @@ import hivens.ui.navigation.asConfig
  * a picker opened afresh starts at the theme in use.
  *
  * The picker is drawn the way the launcher draws it: the standard document's picker, its slots holding
- * the colour provider's controls, held as a config's own in a frame the composition has once, and
+ * the colour provider's controls, in the pages host's slot for it, in a frame the composition has once,
  * drawn by the config view.
  */
 @OptIn(ExperimentalComposeUiApi::class)
@@ -155,7 +160,16 @@ class ThemePickerApplyTest {
         var history by mutableStateOf(History(LauncherScreens.Home).show(Show(LauncherScreens.Themes)))
         onEventThread {
             val scene = ImageComposeScene(900, 700, density = Density(1f)) {
-                world.Draw { ConfigView(LauncherConfigs.Composition, document, history) }
+                world.Draw {
+                    // What the history module answers: the page shown, and the pages it can still bring back.
+                    ProvideScoped(PagesKeys.Screens, SCREENS) {
+                        ProvideScoped(PagesKeys.Shown, history.current) {
+                            ProvideScoped(PagesKeys.Kept, history.entries.mapTo(HashSet()) { it.page }) {
+                                ConfigView(LauncherConfigs.Composition, document, MAIN)
+                            }
+                        }
+                    }
+                }
             }
             var t = 0L
             fun frames(count: Int) = repeat(count) {
@@ -200,20 +214,26 @@ class ThemePickerApplyTest {
     private val picker: WidgetInstance =
         StandardDocument.load().compositions.values.flatMap { it.widgets().toList() }.first { it.kind.value == "screen.theme.picker" }
 
-    /** A frame the composition has once, whose body each config holds as its own: the picker in the picker's config. */
+    /** A frame the composition has once, whose body holds the pages host: the picker in the host's slot for it. */
     private val document: Document = run {
-        fun stands(vararg body: WidgetInstance) = WidgetInstance(FRAME, "frame", children = mapOf(BODY to SlotContent(body.toList())))
-        fun config(vararg body: WidgetInstance) = Config(layouts = listOf(ConfigLayout(LayoutId("main"), SlotContent(listOf(stands(*body))))))
+        val host = WidgetInstance(
+            PagesHost.KIND,
+            "host",
+            children = listOf(LauncherScreens.Home, LauncherScreens.About, LauncherScreens.Themes)
+                .associate { SlotId(it.value) to SlotContent(if (it == LauncherScreens.Themes) listOf(picker) else emptyList()) },
+        )
         Document(
             start = LauncherConfigs.Composition,
             compositions = mapOf(
                 LauncherConfigs.Composition to Composition(
-                    start = LauncherScreens.Home.asConfig(),
+                    start = MAIN,
                     singles = mapOf(FRAME to WidgetInstance(FRAME, "frame", children = mapOf(BODY to SlotContent()))),
                     configs = mapOf(
-                        LauncherScreens.Home.asConfig() to config(),
-                        LauncherScreens.About.asConfig() to config(),
-                        LauncherScreens.Themes.asConfig() to config(picker),
+                        MAIN to Config(
+                            layouts = listOf(
+                                ConfigLayout(LayoutId("main"), SlotContent(listOf(WidgetInstance(FRAME, "frame", children = mapOf(BODY to SlotContent(listOf(host))))))),
+                            ),
+                        ),
                     ),
                 ),
             ),
@@ -225,20 +245,33 @@ class ThemePickerApplyTest {
         override val displayName = "frame"
         override val removable = false
         override val slots = listOf(BODY)
-        override val pages = listOf(BODY)
 
         @Composable
         override fun Render(instance: WidgetInstance) = SlotRenderer(instance, BODY, Modifier.fillMaxSize())
     }
 
-    private object FrameRegistry : WidgetRegistry {
-        override fun all(): Map<WidgetKind, WidgetDescriptor> = mapOf(FRAME to Frame)
+    private object Host : WidgetDescriptor {
+        override val kind = PagesHost.KIND
+        override val displayName = "host"
+        override val removable = false
+        override val openSlots = true
 
-        override fun get(kind: WidgetKind): WidgetDescriptor? = Frame.takeIf { it.kind == kind }
+        @Composable
+        override fun Render(instance: WidgetInstance) = PagesHostWidget(instance)
+    }
+
+    private object FrameRegistry : WidgetRegistry {
+        private val kinds = listOf(Frame, Host).associateBy { it.kind }
+
+        override fun all(): Map<WidgetKind, WidgetDescriptor> = kinds
+
+        override fun get(kind: WidgetKind): WidgetDescriptor? = kinds[kind]
     }
 
     private companion object {
         val FRAME = WidgetKind("test.frame")
         val BODY = SlotId("body")
+        val MAIN = ConfigId("main")
+        val SCREENS = listOf(LauncherScreens.Home, LauncherScreens.About, LauncherScreens.Themes).map { ScreenView(it, it.value, owner = "test") }
     }
 }

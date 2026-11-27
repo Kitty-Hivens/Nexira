@@ -114,6 +114,8 @@ class WidgetRegistryConsistencyTest {
             // unified configurable nav rail item
             "nav.entry",
             "nav.screen",
+            // the screens a person made, one rail item each
+            "nav.screens",
             // Phase A.3 container sample
             "container.group",
             // tab container

@@ -1,6 +1,7 @@
 package hivens.widget.api
 
 import hivens.widget.model.CommandKey
+import hivens.widget.model.Composition
 import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
 import hivens.widget.model.ScopeLevel
@@ -21,8 +22,18 @@ object CompositionKeys {
     /** The configs the document gives the composition, as the document changes. Provided with [Name]. */
     val Configs = SourceKey<Set<ConfigId>>("composition.configs", ScopeLevel.Composition)
 
-    /** The config the composition draws now, which a widget's condition of where it is shown is read against. */
+    /** The composition's own record in the document, as the document changes. Provided with [Name]. */
+    val Record = SourceKey<Composition>("composition.record", ScopeLevel.Composition)
+
+    /** The config the composition draws now. */
     val Config = SourceKey<ConfigId>("composition.config", ScopeLevel.Composition)
+
+    /**
+     * Where the composition stands now, by id: the config it draws and the screen its pages show. A widget's condition
+     * of where it is shown is read against it ([hivens.widget.model.WidgetInstance.shownOn]). Provided by whoever draws
+     * the composition, from what the module that shows its pages publishes.
+     */
+    val Where = SourceKey<Set<String>>("composition.where", ScopeLevel.Composition)
 
     /** The compositions shown in a window this composition opened, which go when it goes. */
     val Windows = SourceKey<Set<CompositionName>>("nav.windows", ScopeLevel.Composition)

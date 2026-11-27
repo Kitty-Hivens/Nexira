@@ -42,15 +42,21 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.OnFill
 import hivens.ui.theme.Status
+import hivens.pages.api.ScreenId
 import hivens.widget.model.CompositionName
-import hivens.widget.model.Config
-import hivens.widget.model.ConfigId
 
-/** A screen of the document, as its settings panel sees it: where it is, what it is, and whether somebody made it. */
-internal data class ScreenTarget(val composition: CompositionName, val id: ConfigId, val config: Config, val made: Boolean) {
-    val title: String get() = config.title
-    val icon: String get() = config.icon
-}
+/**
+ * A screen of the document, as its settings panel sees it: where it is, the name and icon the person gave it, blank
+ * for none, what it is called without them ([label]), the icon it wears, and whether somebody made it.
+ */
+internal data class ScreenTarget(
+    val composition: CompositionName,
+    val id: ScreenId,
+    val title: String,
+    val label: String,
+    val icon: String,
+    val made: Boolean,
+)
 
 /**
  * What a screen is called, what it wears on the rail, and, for one somebody made, the way to delete it.
@@ -97,7 +103,7 @@ internal fun ScreenPropertiesPanel(
         NxField(
             value         = draft,
             onValueChange = rename,
-            placeholder   = s.text("screenUntitled"),
+            placeholder   = current.label.ifBlank { s.text("screenUntitled") },
             modifier      = Modifier.fillMaxWidth(),
         )
         PuppetField("screen.title", draft, onValueChange = rename)
@@ -168,7 +174,7 @@ internal fun ScreenPropertiesPanel(
                 title             = { Text(s.text("screenDelete")) },
                 text              = {
                     Text(
-                        text  = s.text("screenDeleteBody", doomed.title.ifBlank { s.text("screenUntitled") }),
+                        text  = s.text("screenDeleteBody", doomed.title.ifBlank { doomed.label.ifBlank { s.text("screenUntitled") } }),
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 },

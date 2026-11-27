@@ -33,12 +33,11 @@ annotation class Widget(
     // the editor's drop hit-test and by the KSP processor to validate
     // that container.children references only declared slots.
     val slots: Array<String> = [],
-    // Of [slots], the ones whose content a config holds as its own is drawn on a
-    // page of that config's: its own level, its own saved state, swapped as the
-    // composition moves through its history. Any other slot is drawn where it
-    // stands at the composition's level, so what stands in it keeps its node
-    // across a change of config.
-    val pages: Array<String> = [],
+    // True for a container whose slots are named by what it holds, beyond any in
+    // [slots]: a slot per screen of a pages host, say, which no list written here
+    // could name. The editor treats it as a container and lets what is dropped land
+    // in whichever of its slots is drawn.
+    val openSlots: Boolean = false,
     // The @Serializable data class holding this widget's tunable props,
     // or Unit::class (the default) for a propless widget. Every field
     // must have a default so the KSP-generated registry can construct

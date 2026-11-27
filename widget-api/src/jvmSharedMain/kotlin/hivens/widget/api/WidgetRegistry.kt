@@ -30,10 +30,14 @@ interface WidgetDescriptor {
     val slots: List<SlotId>
         get() = emptyList()
 
-    // Of [slots], the ones that hold a page of the config shown. Populated by the KSP
-    // processor from @Widget(pages = ...).
-    val pages: List<SlotId>
-        get() = emptyList()
+    // True for a container whose slots are named by what it holds, beyond [slots]. Populated
+    // by the KSP processor from @Widget(openSlots = ...).
+    val openSlots: Boolean
+        get() = false
+
+    /** Whether this widget holds widgets of its own: it declares slots, or names them by what it holds. */
+    val container: Boolean
+        get() = slots.isNotEmpty() || openSlots
 
     // The plane this widget sits on when nothing has said otherwise. Populated by
     // the KSP processor from @Widget(surface = ...); null means the widget draws

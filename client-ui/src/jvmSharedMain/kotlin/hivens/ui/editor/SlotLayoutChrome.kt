@@ -265,10 +265,12 @@ internal fun SlotLayoutMenuContent(
     val live = document?.contentAt(path) ?: SlotContent()
     val flow = live.flow
 
-    // A slot of a frame widget is shared by every screen unless this screen holds it as its own, and which one it is
-    // decides what every change below reaches, so it is said first and can be changed right here.
-    if (document != null && document.isSingleSlot(path)) {
-        val own = document.holdsOwn(path)
+    // A slot of a frame widget is shared by every config of the composition unless the one drawn holds it as its own,
+    // and which one it is decides what every change below reaches, so it is said first and can be changed right here.
+    // Offered only where there is another config to differ from, or the slot is held already and can be given back.
+    val configs = document?.compositions?.get(path.composition)?.configs?.size ?: 0
+    val own = document?.holdsOwn(path) == true
+    if (document != null && document.isSingleSlot(path) && (own || configs > 1)) {
         MenuSectionTitle(s.text(if (own) "editorSlotOwn" else "editorSlotShared"))
         NxMenuItem(s.text(if (own) "editorSlotShareOwn" else "editorSlotHoldOwn")) {
             if (own) editor.shareOwn(path) else editor.holdOwn(path)

@@ -28,7 +28,8 @@ private val log = LoggerFactory.getLogger("hivens.ui.layout.DocumentStore")
  * its modules, so an update does not change the modules of a person who has edited either.
  *
  * A file this build cannot take as it is, written by a newer build or not a document at all, is left exactly as it
- * is: the standard document is drawn meanwhile, nothing is written, and the session says so. [save] is where a write
+ * is: the standard document is drawn meanwhile, nothing is written, and the session says so. A document of a shape this
+ * build no longer reads is deleted instead and the standard one drawn, which [takeOutdatedNotice] says once. [save] is where a write
  * runs, off the caller's thread in the launcher, one at a time and in order.
  *
  * An edit is drawn at once and written later. A drag edits on every frame, so while one write waits its turn the
@@ -51,6 +52,14 @@ class DocumentStore(
 
     /** Whether the person keeps a document of their own. */
     val own: StateFlow<Boolean> = ownState.asStateFlow()
+
+    private val outdatedUnsaid = AtomicBoolean(read.outdated)
+
+    /**
+     * True once, the first time it is asked after a document of a shape this build no longer reads was deleted, so the
+     * interface says so once however often it is drawn again.
+     */
+    fun takeOutdatedNotice(): Boolean = outdatedUnsaid.getAndSet(false)
 
     /** False for a file this build left as it was, which nothing here writes over for the whole session. */
     val writable: Boolean get() = read.reason == null
@@ -115,7 +124,7 @@ class DocumentStore(
         }
     }
 
-    private class Loaded(val document: Document, val own: Boolean, val reason: ReadOnlyReason?)
+    private class Loaded(val document: Document, val own: Boolean, val reason: ReadOnlyReason?, val outdated: Boolean = false)
 
     private fun load(): Loaded {
         if (!Files.isRegularFile(file)) return Loaded(standard(), own = false, reason = null)
@@ -135,7 +144,21 @@ class DocumentStore(
                 log.warn("The interface in {} is not a document ({}), the standard one is drawn and the file left as it is", file, read.reason)
                 leftAsItIs(ReadOnlyReason.Damaged)
             }
+            is DocumentRead.Outdated -> discarded(read.schema)
         }
+    }
+
+    // Nothing of an older shape is carried over: the interface it described was laid out for screens that are not
+    // configs any more, and a migration that guessed would draw something nobody arranged.
+    private fun discarded(schema: Int): Loaded {
+        try {
+            Files.deleteIfExists(file)
+        } catch (e: Exception) {
+            log.warn("The outdated interface in {} could not be deleted, the standard one is drawn and the file left as it is", file, e)
+            return leftAsItIs(ReadOnlyReason.UnreadableFormat)
+        }
+        log.info("The interface in {} was of schema {}, which this build no longer reads: deleted, the standard one is drawn", file, schema)
+        return Loaded(standard(), own = false, reason = null, outdated = true)
     }
 
     private fun leftAsItIs(reason: ReadOnlyReason): Loaded {

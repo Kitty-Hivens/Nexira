@@ -1,5 +1,5 @@
 {
-    "schema": 1,
+    "schema": 2,
     "modules": [
         "nexira.i18n",
         "nexira.themes",
@@ -11,12 +11,13 @@
         "nexira.catalogue",
         "nexira.source.mirror",
         "nexira.source.modrinth",
+        "nexira.pages",
         "nexira.history"
     ],
     "start": "launcher",
     "compositions": {
         "launcher": {
-            "start": "home",
+            "start": "main",
             "frame": {
                 "width": 1100,
                 "height": 720,
@@ -26,7 +27,7 @@
                 "chrome": "none"
             },
             "configs": {
-                "home": {
+                "main": {
                     "layouts": [
                         {
                             "id": "main",
@@ -53,1075 +54,464 @@
                                                             "body": {
                                                                 "widgets": [
                                                                     {
-                                                                        "kind": "screen.home",
-                                                                        "instance_id": "screen.home",
+                                                                        "kind": "pages.host",
+                                                                        "instance_id": "pages-host-default",
+                                                                        "props": {
+                                                                            "start": "home"
+                                                                        },
                                                                         "children": {
-                                                                            "main": {
+                                                                            "home": {
                                                                                 "widgets": [
                                                                                     {
-                                                                                        "kind": "home.new.continue",
-                                                                                        "instance_id": "home-new-continue-default",
-                                                                                        "placement": {
-                                                                                            "padding": {
-                                                                                                "top": 20.0,
-                                                                                                "end": 24.0,
-                                                                                                "start": 24.0
+                                                                                        "kind": "screen.home",
+                                                                                        "instance_id": "screen.home",
+                                                                                        "children": {
+                                                                                            "main": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "home.new.continue",
+                                                                                                        "instance_id": "home-new-continue-default",
+                                                                                                        "placement": {
+                                                                                                            "padding": {
+                                                                                                                "top": 20.0,
+                                                                                                                "end": 24.0,
+                                                                                                                "start": 24.0
+                                                                                                            }
+                                                                                                        }
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "home.new.whatsnew",
+                                                                                                        "instance_id": "home-new-whatsnew-default",
+                                                                                                        "placement": {
+                                                                                                            "padding": {
+                                                                                                                "end": 24.0,
+                                                                                                                "start": 24.0
+                                                                                                            }
+                                                                                                        }
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "home.new.packlist",
+                                                                                                        "instance_id": "home-new-packlist-default",
+                                                                                                        "placement": {
+                                                                                                            "padding": {
+                                                                                                                "end": 24.0,
+                                                                                                                "bottom": 20.0,
+                                                                                                                "start": 24.0
+                                                                                                            }
+                                                                                                        }
+                                                                                                    }
+                                                                                                ]
                                                                                             }
                                                                                         }
-                                                                                    },
+                                                                                    }
+                                                                                ]
+                                                                            },
+                                                                            "library": {
+                                                                                "widgets": [
                                                                                     {
-                                                                                        "kind": "home.new.whatsnew",
-                                                                                        "instance_id": "home-new-whatsnew-default",
-                                                                                        "placement": {
-                                                                                            "padding": {
-                                                                                                "end": 24.0,
-                                                                                                "start": 24.0
+                                                                                        "kind": "screen.library",
+                                                                                        "instance_id": "screen.library",
+                                                                                        "children": {
+                                                                                            "header": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "library.header",
+                                                                                                        "instance_id": "library-header-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "body": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "library.body",
+                                                                                                        "instance_id": "library-body-default"
+                                                                                                    }
+                                                                                                ]
                                                                                             }
                                                                                         }
-                                                                                    },
+                                                                                    }
+                                                                                ]
+                                                                            },
+                                                                            "browse": {
+                                                                                "widgets": [
                                                                                     {
-                                                                                        "kind": "home.new.packlist",
-                                                                                        "instance_id": "home-new-packlist-default",
-                                                                                        "placement": {
-                                                                                            "padding": {
-                                                                                                "end": 24.0,
-                                                                                                "bottom": 20.0,
-                                                                                                "start": 24.0
+                                                                                        "kind": "screen.browse",
+                                                                                        "instance_id": "screen.browse",
+                                                                                        "children": {
+                                                                                            "header": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "browse.installing",
+                                                                                                        "instance_id": "browse-installing-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "browse.search",
+                                                                                                        "instance_id": "browse-search-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "browse.chips",
+                                                                                                        "instance_id": "browse-chips-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "body": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "browse.results",
+                                                                                                        "instance_id": "browse-results-default"
+                                                                                                    }
+                                                                                                ]
                                                                                             }
                                                                                         }
                                                                                     }
                                                                                 ]
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "library": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.library",
-                                                                        "instance_id": "screen.library",
-                                                                        "children": {
-                                                                            "header": {
+                                                                            },
+                                                                            "profile": {
                                                                                 "widgets": [
                                                                                     {
-                                                                                        "kind": "library.header",
-                                                                                        "instance_id": "library-header-default"
+                                                                                        "kind": "screen.profile",
+                                                                                        "instance_id": "screen.profile",
+                                                                                        "children": {
+                                                                                            "nav": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "profile.nav",
+                                                                                                        "instance_id": "profile-nav-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "skin": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "profile.skin.section",
+                                                                                                        "instance_id": "profile-skin-section-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "account": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "profile.account.section",
+                                                                                                        "instance_id": "profile-account-section-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "signin": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "profile.signin",
+                                                                                                        "instance_id": "profile-signin-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            }
+                                                                                        }
                                                                                     }
                                                                                 ]
                                                                             },
-                                                                            "body": {
+                                                                            "wardrobe": {
                                                                                 "widgets": [
                                                                                     {
-                                                                                        "kind": "library.body",
-                                                                                        "instance_id": "library-body-default"
-                                                                                    }
-                                                                                ]
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "browse": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.browse",
-                                                                        "instance_id": "screen.browse",
-                                                                        "children": {
-                                                                            "header": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "browse.installing",
-                                                                                        "instance_id": "browse-installing-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "browse.search",
-                                                                                        "instance_id": "browse-search-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "browse.chips",
-                                                                                        "instance_id": "browse-chips-default"
+                                                                                        "kind": "screen.wardrobe",
+                                                                                        "instance_id": "screen.wardrobe"
                                                                                     }
                                                                                 ]
                                                                             },
-                                                                            "body": {
+                                                                            "settings": {
                                                                                 "widgets": [
                                                                                     {
-                                                                                        "kind": "browse.results",
-                                                                                        "instance_id": "browse-results-default"
-                                                                                    }
-                                                                                ]
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "profile": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.profile",
-                                                                        "instance_id": "screen.profile",
-                                                                        "children": {
-                                                                            "nav": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "profile.nav",
-                                                                                        "instance_id": "profile-nav-default"
+                                                                                        "kind": "screen.settings",
+                                                                                        "instance_id": "screen.settings",
+                                                                                        "children": {
+                                                                                            "theme.link": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "theme.picker.link",
+                                                                                                        "instance_id": "theme-picker-link-settings"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "theme.daynight": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "theme.daynight",
+                                                                                                        "instance_id": "theme-daynight-settings"
+                                                                                                    }
+                                                                                                ]
+                                                                                            }
+                                                                                        }
                                                                                     }
                                                                                 ]
                                                                             },
-                                                                            "skin": {
+                                                                            "theme.picker": {
                                                                                 "widgets": [
                                                                                     {
-                                                                                        "kind": "profile.skin.section",
-                                                                                        "instance_id": "profile-skin-section-default"
+                                                                                        "kind": "screen.theme.picker",
+                                                                                        "instance_id": "screen.theme.picker",
+                                                                                        "children": {
+                                                                                            "header": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "theme.picker.header",
+                                                                                                        "instance_id": "theme-picker-header-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "grid": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "theme.picker.grid",
+                                                                                                        "instance_id": "theme-picker-grid-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "preview": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "theme.picker.preview",
+                                                                                                        "instance_id": "theme-picker-preview-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            }
+                                                                                        }
                                                                                     }
                                                                                 ]
                                                                             },
-                                                                            "account": {
+                                                                            "about": {
                                                                                 "widgets": [
                                                                                     {
-                                                                                        "kind": "profile.account.section",
-                                                                                        "instance_id": "profile-account-section-default"
+                                                                                        "kind": "screen.about",
+                                                                                        "instance_id": "screen.about",
+                                                                                        "children": {
+                                                                                            "left": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "about.logo",
+                                                                                                        "instance_id": "about-logo-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "about.credits",
+                                                                                                        "instance_id": "about-credits-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "right": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "about.update.panel",
+                                                                                                        "instance_id": "about-update-panel-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "about.system.card",
+                                                                                                        "instance_id": "about-system-card-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "about.links.card",
+                                                                                                        "instance_id": "about-links-card-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            }
+                                                                                        }
                                                                                     }
                                                                                 ]
                                                                             },
-                                                                            "signin": {
+                                                                            "background": {
                                                                                 "widgets": [
                                                                                     {
-                                                                                        "kind": "profile.signin",
-                                                                                        "instance_id": "profile-signin-default"
-                                                                                    }
-                                                                                ]
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "wardrobe": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.wardrobe",
-                                                                        "instance_id": "screen.wardrobe"
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "settings": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.settings",
-                                                                        "instance_id": "screen.settings",
-                                                                        "children": {
-                                                                            "theme.link": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "theme.picker.link",
-                                                                                        "instance_id": "theme-picker-link-settings"
+                                                                                        "kind": "screen.background",
+                                                                                        "instance_id": "screen.background",
+                                                                                        "children": {
+                                                                                            "controls": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "bg.enable.toggle",
+                                                                                                        "instance_id": "bg-enable-toggle-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.image.picker",
+                                                                                                        "instance_id": "bg-image-picker-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.scale.mode",
+                                                                                                        "instance_id": "bg-scale-mode-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.position.x",
+                                                                                                        "instance_id": "bg-position-x-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.position.y",
+                                                                                                        "instance_id": "bg-position-y-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.fx.blur",
+                                                                                                        "instance_id": "bg-fx-blur-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.fx.darken",
+                                                                                                        "instance_id": "bg-fx-darken-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.fx.opacity",
+                                                                                                        "instance_id": "bg-fx-opacity-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.fx.saturation",
+                                                                                                        "instance_id": "bg-fx-saturation-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.fx.parallax",
+                                                                                                        "instance_id": "bg-fx-parallax-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.fx.vignette",
+                                                                                                        "instance_id": "bg-fx-vignette-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.fx.animspeed",
+                                                                                                        "instance_id": "bg-fx-animspeed-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.loop.mode",
+                                                                                                        "instance_id": "bg-loop-mode-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.audio",
+                                                                                                        "instance_id": "bg-audio-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.tint",
+                                                                                                        "instance_id": "bg-tint-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "bg.reset",
+                                                                                                        "instance_id": "bg-reset-default"
+                                                                                                    }
+                                                                                                ],
+                                                                                                "viewport": {
+                                                                                                    "kind": "scroll"
+                                                                                                }
+                                                                                            },
+                                                                                            "theme": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "theme.daynight",
+                                                                                                        "instance_id": "theme-daynight-island"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "theme.darkonly",
+                                                                                                        "instance_id": "theme-darkonly-island"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "theme.mode",
+                                                                                                        "instance_id": "theme-mode-island"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "theme.link": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "theme.picker.link",
+                                                                                                        "instance_id": "theme-picker-link-island"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "motion": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "motion.reduce",
+                                                                                                        "instance_id": "motion-reduce-island"
+                                                                                                    }
+                                                                                                ]
+                                                                                            }
+                                                                                        }
                                                                                     }
                                                                                 ]
                                                                             },
-                                                                            "theme.daynight": {
+                                                                            "pack": {
                                                                                 "widgets": [
                                                                                     {
-                                                                                        "kind": "theme.daynight",
-                                                                                        "instance_id": "theme-daynight-settings"
+                                                                                        "kind": "screen.pack",
+                                                                                        "instance_id": "screen.pack"
+                                                                                    }
+                                                                                ]
+                                                                            },
+                                                                            "pack.versions": {
+                                                                                "widgets": [
+                                                                                    {
+                                                                                        "kind": "screen.pack.versions",
+                                                                                        "instance_id": "screen.pack.versions"
+                                                                                    }
+                                                                                ]
+                                                                            },
+                                                                            "catalogue.pack": {
+                                                                                "widgets": [
+                                                                                    {
+                                                                                        "kind": "screen.catalogue.pack",
+                                                                                        "instance_id": "screen.catalogue.pack",
+                                                                                        "children": {
+                                                                                            "header": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "catalogue.pack.header",
+                                                                                                        "instance_id": "catalogue-pack-header-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "catalogue.pack.tabs",
+                                                                                                        "instance_id": "catalogue-pack-tabs-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "body": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "catalogue.pack.body",
+                                                                                                        "instance_id": "catalogue-pack-body-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                ]
+                                                                            },
+                                                                            "project": {
+                                                                                "widgets": [
+                                                                                    {
+                                                                                        "kind": "screen.project",
+                                                                                        "instance_id": "screen.project",
+                                                                                        "children": {
+                                                                                            "header": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "project.header",
+                                                                                                        "instance_id": "project-header-default"
+                                                                                                    },
+                                                                                                    {
+                                                                                                        "kind": "project.tabs",
+                                                                                                        "instance_id": "project-tabs-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            },
+                                                                                            "body": {
+                                                                                                "widgets": [
+                                                                                                    {
+                                                                                                        "kind": "project.body",
+                                                                                                        "instance_id": "project-body-default"
+                                                                                                    }
+                                                                                                ]
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                ]
+                                                                            },
+                                                                            "project.build": {
+                                                                                "widgets": [
+                                                                                    {
+                                                                                        "kind": "screen.project.build",
+                                                                                        "instance_id": "screen.project.build"
                                                                                     }
                                                                                 ]
                                                                             }
                                                                         }
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "theme.picker": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.theme.picker",
-                                                                        "instance_id": "screen.theme.picker",
-                                                                        "children": {
-                                                                            "header": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "theme.picker.header",
-                                                                                        "instance_id": "theme-picker-header-default"
-                                                                                    }
-                                                                                ]
-                                                                            },
-                                                                            "grid": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "theme.picker.grid",
-                                                                                        "instance_id": "theme-picker-grid-default"
-                                                                                    }
-                                                                                ]
-                                                                            },
-                                                                            "preview": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "theme.picker.preview",
-                                                                                        "instance_id": "theme-picker-preview-default"
-                                                                                    }
-                                                                                ]
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "about": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.about",
-                                                                        "instance_id": "screen.about",
-                                                                        "children": {
-                                                                            "left": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "about.logo",
-                                                                                        "instance_id": "about-logo-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "about.credits",
-                                                                                        "instance_id": "about-credits-default"
-                                                                                    }
-                                                                                ]
-                                                                            },
-                                                                            "right": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "about.update.panel",
-                                                                                        "instance_id": "about-update-panel-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "about.system.card",
-                                                                                        "instance_id": "about-system-card-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "about.links.card",
-                                                                                        "instance_id": "about-links-card-default"
-                                                                                    }
-                                                                                ]
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "background": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.background",
-                                                                        "instance_id": "screen.background",
-                                                                        "children": {
-                                                                            "controls": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "bg.enable.toggle",
-                                                                                        "instance_id": "bg-enable-toggle-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.image.picker",
-                                                                                        "instance_id": "bg-image-picker-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.scale.mode",
-                                                                                        "instance_id": "bg-scale-mode-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.position.x",
-                                                                                        "instance_id": "bg-position-x-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.position.y",
-                                                                                        "instance_id": "bg-position-y-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.fx.blur",
-                                                                                        "instance_id": "bg-fx-blur-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.fx.darken",
-                                                                                        "instance_id": "bg-fx-darken-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.fx.opacity",
-                                                                                        "instance_id": "bg-fx-opacity-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.fx.saturation",
-                                                                                        "instance_id": "bg-fx-saturation-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.fx.parallax",
-                                                                                        "instance_id": "bg-fx-parallax-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.fx.vignette",
-                                                                                        "instance_id": "bg-fx-vignette-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.fx.animspeed",
-                                                                                        "instance_id": "bg-fx-animspeed-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.loop.mode",
-                                                                                        "instance_id": "bg-loop-mode-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.audio",
-                                                                                        "instance_id": "bg-audio-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.tint",
-                                                                                        "instance_id": "bg-tint-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "bg.reset",
-                                                                                        "instance_id": "bg-reset-default"
-                                                                                    }
-                                                                                ],
-                                                                                "viewport": {
-                                                                                    "kind": "scroll"
-                                                                                }
-                                                                            },
-                                                                            "theme": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "theme.daynight",
-                                                                                        "instance_id": "theme-daynight-island"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "theme.darkonly",
-                                                                                        "instance_id": "theme-darkonly-island"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "theme.mode",
-                                                                                        "instance_id": "theme-mode-island"
-                                                                                    }
-                                                                                ]
-                                                                            },
-                                                                            "theme.link": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "theme.picker.link",
-                                                                                        "instance_id": "theme-picker-link-island"
-                                                                                    }
-                                                                                ]
-                                                                            },
-                                                                            "motion": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "motion.reduce",
-                                                                                        "instance_id": "motion-reduce-island"
-                                                                                    }
-                                                                                ]
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "pack": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.pack",
-                                                                        "instance_id": "screen.pack"
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "pack.versions": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.pack.versions",
-                                                                        "instance_id": "screen.pack.versions"
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "catalogue.pack": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.catalogue.pack",
-                                                                        "instance_id": "screen.catalogue.pack",
-                                                                        "children": {
-                                                                            "header": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "catalogue.pack.header",
-                                                                                        "instance_id": "catalogue-pack-header-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "catalogue.pack.tabs",
-                                                                                        "instance_id": "catalogue-pack-tabs-default"
-                                                                                    }
-                                                                                ]
-                                                                            },
-                                                                            "body": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "catalogue.pack.body",
-                                                                                        "instance_id": "catalogue-pack-body-default"
-                                                                                    }
-                                                                                ]
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "project": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.project",
-                                                                        "instance_id": "screen.project",
-                                                                        "children": {
-                                                                            "header": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "project.header",
-                                                                                        "instance_id": "project-header-default"
-                                                                                    },
-                                                                                    {
-                                                                                        "kind": "project.tabs",
-                                                                                        "instance_id": "project-tabs-default"
-                                                                                    }
-                                                                                ]
-                                                                            },
-                                                                            "body": {
-                                                                                "widgets": [
-                                                                                    {
-                                                                                        "kind": "project.body",
-                                                                                        "instance_id": "project-body-default"
-                                                                                    }
-                                                                                ]
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                ]
-                                                            }
-                                                        },
-                                                        "placement": {
-                                                            "weight": 1.0
-                                                        }
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.right",
-                                                        "instance_id": "appshell-region-right-default"
-                                                    }
-                                                ],
-                                                "flow": {
-                                                    "direction": "horizontal"
-                                                }
-                                            }
-                                        },
-                                        "placement": {
-                                            "weight": 1.0
-                                        }
-                                    }
-                                ]
-                            }
-                        }
-                    ]
-                },
-                "project.build": {
-                    "layouts": [
-                        {
-                            "id": "main",
-                            "root": {
-                                "widgets": [
-                                    {
-                                        "kind": "appshell.region.top",
-                                        "instance_id": "appshell-region-top-default"
-                                    },
-                                    {
-                                        "kind": "appshell.region.body",
-                                        "instance_id": "appshell-region-body-default",
-                                        "children": {
-                                            "content": {
-                                                "widgets": [
-                                                    {
-                                                        "kind": "appshell.region.left",
-                                                        "instance_id": "appshell-region-left-default"
-                                                    },
-                                                    {
-                                                        "kind": "appshell.region.center",
-                                                        "instance_id": "appshell-region-center-default",
-                                                        "children": {
-                                                            "body": {
-                                                                "widgets": [
-                                                                    {
-                                                                        "kind": "screen.project.build",
-                                                                        "instance_id": "screen.project.build"
                                                                     }
                                                                 ]
                                                             }
@@ -1263,6 +653,10 @@
                                     "props": {
                                         "target": "About"
                                     }
+                                },
+                                {
+                                    "kind": "nav.screens",
+                                    "instance_id": "nav-screens-default"
                                 }
                             ]
                         },

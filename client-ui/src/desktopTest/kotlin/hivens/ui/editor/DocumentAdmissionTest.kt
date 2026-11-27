@@ -49,7 +49,6 @@ class DocumentAdmissionTest {
     private class Kind(
         id: String,
         override val slots: List<SlotId> = emptyList(),
-        override val pages: List<SlotId> = emptyList(),
         override val hands: List<String> = emptyList(),
         override val needs: List<String> = emptyList(),
     ) : WidgetDescriptor {
@@ -66,7 +65,8 @@ class DocumentAdmissionTest {
     private val main = SlotId("main")
 
     private val kinds = listOf(
-        Kind("frame.centre", slots = listOf(body, bottom), pages = listOf(body)),
+        Kind("frame.centre", slots = listOf(body, bottom)),
+        Kind("pages.host"),
         Kind("screen.home", slots = listOf(main)),
         Kind("screen.project", slots = listOf(body), hands = listOf("project.page")),
         Kind("box", slots = listOf(SlotId("inner"))),
@@ -91,27 +91,24 @@ class DocumentAdmissionTest {
     private val launcher = CompositionName("launcher")
     private val root = NodePath(launcher, NodeRoot.Layout(ConfigId("home"), LayoutId("main")))
     private val frame = root.child("centre", bottom)
-    private val pageSlot = root.child("centre", body)
+    private val aroundHost = root.child("centre", body)
+    private val pageSlot = aroundHost.child("host", SlotId("home"))
     private val homePage = pageSlot.child("screen.home", main)
-    private val projectPage = pageSlot.child("screen.project", body)
+    private val projectPage = aroundHost.child("host", SlotId("project")).child("screen.project", body)
 
     private fun widget(kind: String, id: String, children: Map<SlotId, SlotContent> = emptyMap()) =
         WidgetInstance(WidgetKind(kind), id, children = children)
 
-    /** A centre whose page holds both screens, so one document has a page of each. */
+    /** A centre holding the pages host, which holds both screens, so one document has a page of each. */
     private fun document(projectHolds: List<WidgetInstance> = emptyList()): Document {
-        val centre = widget(
-            "frame.centre", "centre",
+        val host = widget(
+            "pages.host", "host",
             mapOf(
-                body to SlotContent(
-                    listOf(
-                        widget("screen.home", "screen.home", mapOf(main to SlotContent())),
-                        widget("screen.project", "screen.project", mapOf(body to SlotContent(projectHolds))),
-                    ),
-                ),
-                bottom to SlotContent(),
+                SlotId("home") to SlotContent(listOf(widget("screen.home", "screen.home", mapOf(main to SlotContent())))),
+                SlotId("project") to SlotContent(listOf(widget("screen.project", "screen.project", mapOf(body to SlotContent(projectHolds))))),
             ),
         )
+        val centre = widget("frame.centre", "centre", mapOf(body to SlotContent(listOf(host)), bottom to SlotContent()))
         val home = Config(layouts = listOf(ConfigLayout(LayoutId("main"), SlotContent(listOf(centre)))))
         return Document(start = launcher, compositions = mapOf(launcher to Composition(start = ConfigId("home"), configs = mapOf(ConfigId("home") to home))))
     }
@@ -120,14 +117,15 @@ class DocumentAdmissionTest {
 
     @Test
     fun `app and composition keys answer in every slot`() {
-        listOf(frame, pageSlot, homePage, projectPage).forEach { assertTrue(admits("shell.needy", it), it.toString()) }
+        listOf(frame, aroundHost, pageSlot, homePage, projectPage).forEach { assertTrue(admits("shell.needy", it), it.toString()) }
     }
 
     @Test
     fun `a key every page makes answers on a page and not in the frame`() {
         assertTrue(admits("page.made", homePage))
-        assertTrue(admits("page.made", pageSlot), "the page slot itself is on the page")
+        assertTrue(admits("page.made", pageSlot), "the host's slot for a screen is on its page")
         assertFalse(admits("page.made", frame), "the frame is drawn outside any page")
+        assertFalse(admits("page.made", aroundHost), "the slot the host stands in is the frame's")
         assertTrue(admits("page.entry", homePage), "what the history hands every page")
         assertFalse(admits("page.entry", frame))
     }

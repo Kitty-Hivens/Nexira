@@ -41,8 +41,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.editor.DocumentEditor
 import hivens.ui.editor.EditReach
-import hivens.ui.editor.configLabel
+import hivens.ui.editor.placeLabel
 import hivens.ui.editor.reachOf
+import hivens.pages.api.PagesKeys
+import hivens.widget.api.rememberScopedSource
+import hivens.widget.api.valueOrNull
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.theme.Motion
@@ -220,12 +223,13 @@ private fun PropPanelBody(
         }
         // Whom a change reaches, said before anything is changed: a frame widget or a shared slot changes every screen,
         // and where the widget is shown is its own condition.
+        val screens = rememberScopedSource(PagesKeys.Screens).valueOrNull().orEmpty()
         LocalDocument.current?.let { document ->
             Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = 6.dp)) {
                 val reach = document.reachOf(path, instance)
                 ScopeLine(s.text(if (reach == EditReach.EveryScreen) "editorReachEveryScreen" else "editorReachThisScreen"))
-                instance.shownOn?.let { ScopeLine(s.text("editorShownOn", it.joinToString { id -> document.configLabel(id, s) })) }
-                if (instance.hiddenOn.isNotEmpty()) ScopeLine(s.text("editorHiddenOn", instance.hiddenOn.joinToString { id -> document.configLabel(id, s) }))
+                instance.shownOn?.let { ScopeLine(s.text("editorShownOn", it.joinToString { id -> placeLabel(id, screens, s) })) }
+                if (instance.hiddenOn.isNotEmpty()) ScopeLine(s.text("editorHiddenOn", instance.hiddenOn.joinToString { id -> placeLabel(id, screens, s) }))
             }
         }
 

@@ -280,7 +280,6 @@ val NAV_RAIL_DEFAULT_WIDTH = 65.dp
     propsClass = ShellCenterRegionProps::class,
     drawsOwnSurface = true,
     slots = ["layers", "body", "bottom"],
-    pages = ["body"],
 )
 @Composable
 fun ShellCenterRegion(instance: WidgetInstance) {

@@ -183,6 +183,7 @@ include(":catalogue")
 include(":pages-api")
 include(":history-api")
 include(":history")
+include(":pages")
 // The catalogue's sources, one module each: the Hivens mirror and Modrinth. Each brings
 // what it lists, a pack's page and its builds as a contribution of the catalogue API's
 // source contract, which a third party implements the same way.

@@ -13,14 +13,12 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.i18n.api.Strings
 import hivens.packs.api.PackPages
 import hivens.ui.i18n.nexiraStrings
-import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.LauncherScreens
-import hivens.widget.api.LocalDocument
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.pages.api.HistoryEntry
 import org.koin.compose.koinInject
-import hivens.ui.navigation.asConfig
+import hivens.pages.api.PagesKeys
 
 /**
  * The label of a crumb nothing has to be looked up for, or null where it has: a pack and a project are called
@@ -72,7 +70,7 @@ fun rememberCrumbLabel(entry: HistoryEntry): String {
         LauncherScreens.Project -> CataloguePages.Project.read(entry.opened)?.let { modCrumb(it) }.orEmpty()
         // Read live, so a rename in the editor relabels the crumb at once. A screen
         // deleted while it was open says so rather than naming nothing.
-        else -> LocalDocument.current?.compositions?.get(LauncherConfigs.Composition)?.configs?.get(entry.screen.asConfig())
+        else -> rememberScopedSource(PagesKeys.Screens).valueOrNull()?.firstOrNull { it.id == entry.screen && it.owner == null }
             ?.title?.ifBlank { null } ?: s.text("screenMissing")
     }
 }

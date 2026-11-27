@@ -36,7 +36,6 @@ import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
-import hivens.widget.model.ConfigId
 import hivens.pages.api.PageValue
 import hivens.pages.api.Show
 import hivens.widget.model.Widget
@@ -46,13 +45,13 @@ import org.koin.compose.koinInject
 import hivens.history.api.HistoryKeys
 import hivens.pages.api.PagesKeys
 
-// Each of the launcher's own screens as the widget its config holds, a container whose slots hold the widgets the
+// Each of the launcher's own screens as the widget the pages host holds for it, a container whose slots hold the widgets the
 // screen is made of, until the screens are made of widgets themselves. None is an argument's: what an opening sets is
 // a value of the page, and the rest is a source or a command like any widget's. Not removable, which keeps them out of
-// the palette, and with no arrival of their own, since the config that holds one arrives.
+// the palette, and with no arrival of their own, since the page that holds one arrives.
 
-/** The kind of the widget that draws [config] whole. */
-internal fun screenKind(config: ConfigId): WidgetKind = WidgetKind("screen.${config.value}")
+/** The kind of the widget that draws the screen or the config [id] whole. */
+internal fun screenKind(id: String): WidgetKind = WidgetKind("screen.$id")
 
 @Composable
 private fun rememberShow(): (Show) -> Unit = rememberScopedCommand(PagesKeys.Show) ?: {}

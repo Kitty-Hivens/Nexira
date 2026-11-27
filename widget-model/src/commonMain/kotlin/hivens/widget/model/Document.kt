@@ -4,8 +4,13 @@ import kotlinx.serialization.EncodeDefault
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** The schema of [Document] this build reads and writes. */
-const val DOCUMENT_SCHEMA: Int = 1
+/**
+ * The schema of [Document] this build reads and writes.
+ *
+ * 2: a composition's screens are not its configs. A pages host draws them, and the launcher's composition has one
+ * config. A document of schema 1 drew each screen as a config of its own and is not carried over.
+ */
+const val DOCUMENT_SCHEMA: Int = 2
 
 @JvmInline
 @Serializable

@@ -3,9 +3,17 @@ package hivens.ui.editor
 import androidx.compose.runtime.State
 import androidx.compose.runtime.mutableStateOf
 import hivens.ui.layout.DocumentStore
+import hivens.pages.api.MadeScreen
+import hivens.pages.api.ScreenId
+import hivens.pages.api.pagesHost
+import hivens.pages.api.pagesHostProps
+import hivens.pages.api.screenContent
+import hivens.pages.api.withMadeScreen
+import hivens.pages.api.withScreenContent
+import hivens.pages.api.withScreenNamed
+import hivens.pages.api.withoutMadeScreen
+import hivens.ui.screens.custom.ScreenLinks
 import hivens.widget.model.CompositionName
-import hivens.widget.model.Config
-import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.GRID_MAX
@@ -21,6 +29,7 @@ import hivens.widget.model.WidgetKind
 import hivens.widget.model.WidgetMotion
 import hivens.widget.model.contentAt
 import hivens.widget.model.edit
+import hivens.widget.model.flatMapWidgets
 import hivens.widget.model.holdOwn
 import hivens.widget.model.moveWidget
 import hivens.widget.model.parseAnchor
@@ -32,9 +41,7 @@ import hivens.widget.model.shareOwn
 import hivens.widget.model.withFlow
 import hivens.widget.model.withGrid
 import hivens.widget.model.withPlacement
-import hivens.widget.model.withConfig
 import hivens.widget.model.withViewport
-import hivens.widget.model.withoutConfig
 import hivens.widget.model.withWidget
 import hivens.widget.model.withWidgetUpdated
 import hivens.widget.model.withoutWidget
@@ -112,7 +119,7 @@ class DocumentEditor(
 
     // The screens deleted this session, kept so their widgets keep their state while the screen can still be put back.
     // Touched only on [writes].
-    private val deleted = HashMap<ConfigId, Config>()
+    private val deleted = HashMap<ScreenId, DeletedScreen>()
 
     /**
      * The names of the widgets something here can still bring back: the documents undo and redo reach and the screens
@@ -125,7 +132,7 @@ class DocumentEditor(
     suspend fun heldIds(): Set<String> = withContext(writes) {
         val ids = HashSet(store.document.value.instanceIds())
         history.snapshots().forEach { ids += it.instanceIds() }
-        deleted.values.forEach { config -> config.layouts.forEach { layout -> ids += layout.root.instanceIds() } }
+        deleted.values.forEach { ids += it.content.instanceIds() }
         ids
     }
 
@@ -386,40 +393,46 @@ class DocumentEditor(
     // ── Screens ──────────────────────────────────────────────────────
 
     /**
-     * Makes a screen of [composition] called [title], laid out like its start config with nothing on its pages
-     * ([pagesOf] says which slots are pages), and a link to it on the rail. Returns its config id at once, before the
-     * edit lands, so the caller can open it once it is there.
+     * Makes a screen of [composition] called [title] and wearing [icon], in the pages host's record, with nothing on it.
+     * The rail lists it among the screens made. Returns its id at once, before the edit lands, so the caller can open it
+     * once it is there.
      */
-    fun createScreen(composition: CompositionName, title: String, icon: String, pagesOf: (WidgetKind) -> List<SlotId>): ConfigId {
-        val id = ConfigId(mint("screen"))
-        edit { d ->
-            val config = MadeScreens.blank(d, composition, title, icon, pagesOf) ?: return@edit d
-            MadeScreens.ensureLink(d.withConfig(composition, id, config), composition, id)
-        }
+    fun createScreen(composition: CompositionName, title: String, icon: String): ScreenId {
+        val id = ScreenId(mint("screen"))
+        edit { d -> d.withMadeScreen(composition, MadeScreen(id.value, title, icon)) }
         return id
     }
 
-    /** Renames a screen or changes its icon. Null leaves that half as it is. Typing a name is one step. */
-    fun updateScreen(composition: CompositionName, id: ConfigId, title: String? = null, icon: String? = null) = edit("screen:${id.value}") { d ->
-        val config = d.compositions[composition]?.configs?.get(id) ?: return@edit d
-        d.withConfig(composition, id, config.copy(title = title ?: config.title, icon = icon ?: config.icon))
-    }
+    /**
+     * Renames a screen or changes its icon, one made or one a module brought. Null leaves that half as it is, blank puts
+     * back what the screen has without the person. Typing a name is one step.
+     */
+    fun updateScreen(composition: CompositionName, id: ScreenId, title: String? = null, icon: String? = null) =
+        edit("screen:${id.value}") { d -> d.withScreenNamed(composition, id, title, icon) }
 
-    /** Deletes a screen and every link to it. [onDeleted] hears what was deleted, as it stood, for [restoreScreen]. */
-    fun deleteScreen(composition: CompositionName, id: ConfigId, onDeleted: (Config) -> Unit = {}) {
+    /**
+     * Deletes a screen somebody made, what it held and every link to it. [onDeleted] hears what was deleted, as it stood,
+     * for [restoreScreen]. A screen a module brought is the module's, and comes back with a reset instead.
+     */
+    fun deleteScreen(composition: CompositionName, id: ScreenId, onDeleted: (DeletedScreen) -> Unit = {}) {
         scope.launch(writes) {
-            val config = store.document.value.compositions[composition]?.configs?.get(id) ?: return@launch
-            apply(null, { d -> MadeScreens.removeLinks(d.withoutConfig(composition, id), composition, id) })
-            if (store.document.value.compositions[composition]?.configs?.containsKey(id) == false) {
-                deleted[id] = config
-                onDeleted(config)
+            val host = store.document.value.compositions[composition]?.pagesHost() ?: return@launch
+            val made = host.pagesHostProps().made.firstOrNull { it.id == id.value } ?: return@launch
+            val gone = DeletedScreen(made, host.screenContent(id) ?: SlotContent())
+            apply(null, { d ->
+                d.withoutMadeScreen(composition, id).flatMapWidgets(composition) { w -> if (ScreenLinks.target(w) == id.value) emptyList() else listOf(w) }
+            })
+            val still = store.document.value.compositions[composition]?.pagesHost()?.pagesHostProps()?.made.orEmpty()
+            if (still.none { it.id == id.value }) {
+                deleted[id] = gone
+                onDeleted(gone)
             }
         }
     }
 
-    /** Puts a deleted screen back as it stood, with a link on the rail. */
-    fun restoreScreen(composition: CompositionName, id: ConfigId, config: Config) =
-        edit { d -> MadeScreens.ensureLink(d.withConfig(composition, id, config), composition, id) }
+    /** Puts a deleted screen back as it stood. */
+    fun restoreScreen(composition: CompositionName, gone: DeletedScreen) =
+        edit { d -> d.withMadeScreen(composition, gone.screen, gone.content) }
 
     // ── Presets ──────────────────────────────────────────────────────
 
@@ -439,23 +452,27 @@ class DocumentEditor(
     // ── Resets ───────────────────────────────────────────────────────
 
     /**
-     * Puts the config [id] back as [standard] has it. A screen somebody made, which the standard document does not
-     * have, keeps its frame and loses what is on its pages.
+     * Puts the screen [id] back as [standard] has it: what the host holds for it, its name and its icon. A screen
+     * somebody made, which the standard document does not have, keeps its name and loses what is on it.
      */
-    fun resetScreen(composition: CompositionName, id: ConfigId, standard: Document, pagesOf: (WidgetKind) -> List<SlotId>) = edit { d ->
-        val current = d.compositions[composition]?.configs?.get(id) ?: return@edit d
-        val shipped = standard.compositions[composition]?.configs?.get(id)
-        d.withConfig(composition, id, shipped ?: current.copy(layouts = current.layouts.map { it.copy(root = MadeScreens.withoutPages(it.root, pagesOf)) }))
+    fun resetScreen(composition: CompositionName, id: ScreenId, standard: Document) = edit { d ->
+        val host = d.compositions[composition]?.pagesHost() ?: return@edit d
+        if (host.pagesHostProps().made.any { it.id == id.value }) {
+            d.withScreenContent(composition, id, SlotContent())
+        } else {
+            val shipped = standard.compositions[composition]?.pagesHost()?.screenContent(id)
+            d.withScreenContent(composition, id, shipped).withScreenNamed(composition, id, title = "", icon = "")
+        }
     }
 
     /**
      * Puts everything back as [standard] has it, the frame and the modules included. The screens somebody made stay,
-     * each with a link on the rail, so the document stays the person's own. One step, like any other.
+     * with what is on them, so the document stays the person's own. One step, like any other.
      */
     fun resetAll(standard: Document) = edit { d ->
-        standard.compositions.entries.fold(standard) { acc, (name, shipped) ->
-            val made = d.compositions[name]?.configs.orEmpty().filterKeys { it !in shipped.configs }
-            made.entries.fold(acc) { a, (id, config) -> MadeScreens.ensureLink(a.withConfig(name, id, config), name, id) }
+        standard.compositions.keys.fold(standard) { acc, name ->
+            val host = d.compositions[name]?.pagesHost() ?: return@fold acc
+            host.pagesHostProps().made.fold(acc) { a, made -> a.withMadeScreen(name, made, host.screenContent(ScreenId(made.id)) ?: SlotContent()) }
         }
     }
 
@@ -474,6 +491,9 @@ class DocumentEditor(
     /** What the slot at [path] holds now, for a caller deciding what to ask for. */
     fun contentAt(path: NodePath): SlotContent? = store.document.value.contentAt(path)
 }
+
+/** A screen somebody made, as it stood when it was deleted: its entry in the host's record and what it held. */
+class DeletedScreen internal constructor(val screen: MadeScreen, internal val content: SlotContent)
 
 /** Each widget of [from] paired with the one standing in its place in [to], where the two go by different names. */
 internal fun copiedNames(from: SlotContent, to: SlotContent): List<Pair<String, String>> =

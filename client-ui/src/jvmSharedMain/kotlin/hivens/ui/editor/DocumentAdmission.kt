@@ -1,5 +1,6 @@
 package hivens.ui.editor
 
+import hivens.pages.api.PagesHost
 import hivens.widget.api.KeyDeclaration
 import hivens.widget.api.KeyOrigin
 import hivens.widget.api.WidgetDescriptor
@@ -18,8 +19,8 @@ import hivens.widget.model.contentAt
  * Where a key answers is what its declaration says, and where a slot is drawn is what the path to it says:
  *
  * - A key of the app, a window or the composition answers in every slot the editor arranges.
- * - A key of a page answers only in a slot on a page, which is one inside a slot its container declares as a page
- *   ([WidgetDescriptor.pages]). There a key a factory makes answers on every page, the history's own keys
+ * - A key of a page answers only in a slot on a page, which is one inside a slot of the pages host
+ *   ([PagesHost.KIND]). There a key a factory makes answers on every page, the history's own keys
  *   ([everyPage]) too, and a key a page's owner hands answers only under a container that hands it
  *   ([WidgetDescriptor.hands]).
  * - An id nothing declares answers nowhere: it names a key this build does not have, a module not loaded say.
@@ -55,7 +56,7 @@ class DocumentAdmission(
             val above = path.copy(nested = path.nested.take(depth))
             val container = document.contentAt(above)?.widgets?.firstOrNull { it.instanceId == step.parentInstanceId } ?: return null
             val descriptor = descriptorOf(container.kind) ?: return null
-            if (step.slot in descriptor.pages) onPage = true
+            if (container.kind == PagesHost.KIND) onPage = true
             handed += descriptor.hands
         }
         return if (onPage) handed else null

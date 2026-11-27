@@ -31,6 +31,38 @@ public final class hivens/pages/api/HistoryEntry$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
 }
 
+public final class hivens/pages/api/MadeScreen {
+	public static final field Companion Lhivens/pages/api/MadeScreen$Companion;
+	public fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun copy (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lhivens/pages/api/MadeScreen;
+	public static synthetic fun copy$default (Lhivens/pages/api/MadeScreen;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/pages/api/MadeScreen;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIcon ()Ljava/lang/String;
+	public final fun getId ()Ljava/lang/String;
+	public final fun getTitle ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/pages/api/MadeScreen$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/pages/api/MadeScreen$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/pages/api/MadeScreen;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/pages/api/MadeScreen;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/pages/api/MadeScreen$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class hivens/pages/api/PageKeys {
 	public static final field INSTANCE Lhivens/pages/api/PageKeys;
 	public final fun getEntry ()Lhivens/widget/model/SourceKey;
@@ -64,9 +96,75 @@ public final class hivens/pages/api/PagesApi {
 	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
 }
 
+public final class hivens/pages/api/PagesHost {
+	public static final field INSTANCE Lhivens/pages/api/PagesHost;
+	public final fun getKIND-8SAbBEg ()Ljava/lang/String;
+}
+
+public final class hivens/pages/api/PagesHostProps {
+	public static final field Companion Lhivens/pages/api/PagesHostProps$Companion;
+	public fun <init> ()V
+	public fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/List;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/util/List;Ljava/util/List;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()Ljava/util/List;
+	public final fun copy (Ljava/lang/String;Ljava/util/List;Ljava/util/List;)Lhivens/pages/api/PagesHostProps;
+	public static synthetic fun copy$default (Lhivens/pages/api/PagesHostProps;Ljava/lang/String;Ljava/util/List;Ljava/util/List;ILjava/lang/Object;)Lhivens/pages/api/PagesHostProps;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getMade ()Ljava/util/List;
+	public final fun getNamed ()Ljava/util/List;
+	public final fun getStart ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/pages/api/PagesHostProps$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/pages/api/PagesHostProps$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/pages/api/PagesHostProps;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/pages/api/PagesHostProps;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/pages/api/PagesHostProps$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/pages/api/PagesHostRecordKt {
+	public static final fun pagesHost (Lhivens/widget/model/Composition;)Lhivens/widget/model/WidgetInstance;
+	public static final fun pagesHostProps (Lhivens/widget/model/WidgetInstance;)Lhivens/pages/api/PagesHostProps;
+	public static final fun screenContent-qGL7pSc (Lhivens/widget/model/WidgetInstance;Ljava/lang/String;)Lhivens/widget/model/SlotContent;
+	public static final fun withMadeScreen-VteTQBM (Lhivens/widget/model/Document;Ljava/lang/String;Lhivens/pages/api/MadeScreen;Lhivens/widget/model/SlotContent;)Lhivens/widget/model/Document;
+	public static synthetic fun withMadeScreen-VteTQBM$default (Lhivens/widget/model/Document;Ljava/lang/String;Lhivens/pages/api/MadeScreen;Lhivens/widget/model/SlotContent;ILjava/lang/Object;)Lhivens/widget/model/Document;
+	public static final fun withPagesHost-_zUv3TE (Lhivens/widget/model/Document;Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lhivens/widget/model/Document;
+	public static final fun withPagesHostProps (Lhivens/widget/model/WidgetInstance;Lhivens/pages/api/PagesHostProps;)Lhivens/widget/model/WidgetInstance;
+	public static final fun withScreenContent-y-uNMew (Lhivens/widget/model/Document;Ljava/lang/String;Ljava/lang/String;Lhivens/widget/model/SlotContent;)Lhivens/widget/model/Document;
+	public static final fun withScreenNamed-BR_YFnc (Lhivens/widget/model/Document;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/Document;
+	public static synthetic fun withScreenNamed-BR_YFnc$default (Lhivens/widget/model/Document;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILjava/lang/Object;)Lhivens/widget/model/Document;
+	public static final fun withoutMadeScreen-G-kP0o8 (Lhivens/widget/model/Document;Ljava/lang/String;Ljava/lang/String;)Lhivens/widget/model/Document;
+}
+
 public final class hivens/pages/api/PagesKeys {
 	public static final field INSTANCE Lhivens/pages/api/PagesKeys;
+	public final fun getKept ()Lhivens/widget/model/SourceKey;
+	public final fun getScreens ()Lhivens/widget/model/SourceKey;
 	public final fun getShow ()Lhivens/widget/model/CommandKey;
+	public final fun getShown ()Lhivens/widget/model/SourceKey;
+	public final fun getStart ()Lhivens/widget/model/SourceKey;
+}
+
+public final class hivens/pages/api/ScreenContribution : hivens/widget/api/ModuleContribution {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun getIcon ()Ljava/lang/String;
+	public fun getId ()Ljava/lang/String;
+	public final fun getKind-8SAbBEg ()Ljava/lang/String;
+	public fun getLabel ()Ljava/lang/String;
+	public fun getSettings ()Ljava/util/List;
 }
 
 public final class hivens/pages/api/ScreenId {
@@ -97,6 +195,28 @@ public final synthetic class hivens/pages/api/ScreenId$$serializer : kotlinx/ser
 
 public final class hivens/pages/api/ScreenId$Companion {
 	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/pages/api/ScreenView {
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public synthetic fun <init> (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZLkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun component1-nQUo3n8 ()Ljava/lang/String;
+	public final fun component2 ()Ljava/lang/String;
+	public final fun component3 ()Ljava/lang/String;
+	public final fun component4 ()Ljava/lang/String;
+	public final fun component5-sV_OvZs ()Ljava/lang/String;
+	public final fun component6 ()Z
+	public final fun copy-SaGI638 (Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Z)Lhivens/pages/api/ScreenView;
+	public static synthetic fun copy-SaGI638$default (Lhivens/pages/api/ScreenView;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;ZILjava/lang/Object;)Lhivens/pages/api/ScreenView;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getIcon ()Ljava/lang/String;
+	public final fun getId-nQUo3n8 ()Ljava/lang/String;
+	public final fun getKind-sV_OvZs ()Ljava/lang/String;
+	public final fun getMade ()Z
+	public final fun getOwner ()Ljava/lang/String;
+	public final fun getTitle ()Ljava/lang/String;
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
 }
 
 public final class hivens/pages/api/Show {

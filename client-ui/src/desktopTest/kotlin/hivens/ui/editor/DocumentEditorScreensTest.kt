@@ -1,5 +1,10 @@
 package hivens.ui.editor
 
+import hivens.pages.api.MadeScreen
+import hivens.pages.api.PagesHost
+import hivens.pages.api.ScreenId
+import hivens.pages.api.pagesHost
+import hivens.pages.api.pagesHostProps
 import hivens.ui.layout.DocumentStore
 import hivens.ui.screens.custom.ScreenLinks
 import hivens.widget.model.Composition
@@ -22,6 +27,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 import java.nio.file.Files
 import kotlin.test.AfterTest
 import kotlin.test.Test
@@ -32,8 +39,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- * Screens somebody made are configs of the document: made like the start one with empty pages and a link on the rail,
- * renamed, deleted with their links and put back. A reset puts the shipped configs back and keeps the made ones.
+ * Screens somebody made live in the pages host's record: made with nothing on them, renamed, deleted with their links
+ * and put back. A screen a module brought is renamed there too. A reset puts a shipped screen back and empties a made
+ * one, and resetting everything keeps the made ones.
  */
 class DocumentEditorScreensTest {
 
@@ -47,33 +55,45 @@ class DocumentEditorScreensTest {
     }
 
     private val launcher = CompositionName("launcher")
-    private val home = ConfigId("home")
+    private val mainConfig = ConfigId("main")
     private val main = LayoutId("main")
     private val railKind = WidgetKind("appshell.region.left")
     private val centreKind = WidgetKind("test.centre")
     private val top = SlotId("top")
     private val body = SlotId("body")
-    private val pagesOf = { kind: WidgetKind -> if (kind == centreKind) listOf(body) else emptyList() }
+    private val home = ScreenId("home")
 
     private val standard = Document(
         start = launcher,
         compositions = mapOf(
             launcher to Composition(
-                start = home,
+                start = mainConfig,
                 singles = mapOf(
-                    railKind to WidgetInstance(railKind, "rail", children = mapOf(top to SlotContent(listOf(WidgetInstance(WidgetKind("nav.entry"), "home-link"))))),
-                    centreKind to WidgetInstance(centreKind, "centre", children = mapOf(body to SlotContent())),
+                    railKind to WidgetInstance(railKind, "rail", children = mapOf(top to SlotContent(listOf(WidgetInstance(WidgetKind("nav.screens"), "made-links"))))),
                 ),
                 configs = mapOf(
-                    home to Config(
-                        title = "Home",
+                    mainConfig to Config(
                         layouts = listOf(
                             ConfigLayout(
                                 main,
                                 SlotContent(
                                     listOf(
                                         WidgetInstance(railKind, "rail"),
-                                        WidgetInstance(centreKind, "centre", children = mapOf(body to SlotContent(listOf(WidgetInstance(WidgetKind("screen.home"), "screen.home"))))),
+                                        WidgetInstance(
+                                            centreKind,
+                                            "centre",
+                                            children = mapOf(
+                                                body to SlotContent(
+                                                    listOf(
+                                                        WidgetInstance(
+                                                            PagesHost.KIND,
+                                                            "host",
+                                                            children = mapOf(SlotId(home.value) to SlotContent(listOf(WidgetInstance(WidgetKind("screen.home"), "screen.home")))),
+                                                        ),
+                                                    ),
+                                                ),
+                                            ),
+                                        ),
                                     ),
                                 ),
                             ),
@@ -95,81 +115,113 @@ class DocumentEditorScreensTest {
 
     private fun DocumentEditor.settle() = runBlocking { awaitWrites() }
 
-    private fun Document.launcher() = compositions.getValue(launcher)
-    private fun Document.page(config: ConfigId) = contentAt(NodePath(launcher, NodeRoot.Layout(config, main)).child("centre", body))
-    private fun Document.links() = launcher().widgets().mapNotNull { ScreenLinks.target(it) }.toList()
+    private fun Document.host() = assertNotNull(compositions.getValue(launcher).pagesHost())
+    private fun Document.made() = host().pagesHostProps().made
+    private fun screen(id: ScreenId) = NodePath(launcher, NodeRoot.Layout(mainConfig, main)).child("centre", body).child("host", SlotId(id.value))
+    private fun Document.page(id: ScreenId) = contentAt(screen(id))
+    private fun Document.links() = compositions.getValue(launcher).widgets().mapNotNull { ScreenLinks.target(it) }.toList()
 
     @Test
-    fun `a made screen is laid out like the start one, with nothing on its page, and linked from the rail`() {
+    fun `a made screen is kept in the host's record, with nothing on it`() {
         val (editor, store) = editor()
-        val id = editor.createScreen(launcher, "Notes", "star", pagesOf)
+        val id = editor.createScreen(launcher, "Notes", "star")
         editor.settle()
-        val made = assertNotNull(store.document.value.launcher().configs[id])
-        assertEquals("Notes", made.title)
-        assertEquals(emptyList(), assertNotNull(store.document.value.page(id)).widgets)
+        assertEquals(listOf(MadeScreen(id.value, "Notes", "star")), store.document.value.made())
+        assertEquals(SlotContent(), store.document.value.host().children[SlotId(id.value)])
         assertEquals(listOf("screen.home"), store.document.value.page(home)?.widgets?.map { it.instanceId }, "home keeps its page")
-        assertEquals(listOf(id.value), store.document.value.links())
     }
 
     @Test
-    fun `typing a name is one step, and a deleted screen takes its links and comes back with one`() {
+    fun `typing a name is one step, and a deleted screen takes what it held and its links, and comes back with them`() {
         val (editor, store) = editor()
-        val id = editor.createScreen(launcher, "", "star", pagesOf)
+        val id = editor.createScreen(launcher, "", "star")
         editor.settle()
+        editor.add(screen(id), WidgetKind("note"), emptyList(), 0)
+        editor.edit { d ->
+            d.withRailLinks { listOf(WidgetInstance(ScreenLinks.KIND, "link", props = buildJsonObject { put("screen", JsonPrimitive(id.value)) })) }
+        }
         "Notes".indices.forEach { editor.updateScreen(launcher, id, title = "Notes".take(it + 1)) }
         editor.settle()
-        assertEquals("Notes", store.document.value.launcher().configs.getValue(id).title)
+        assertEquals("Notes", store.document.value.made().single().title)
         editor.undo()
         editor.settle()
-        assertEquals("", store.document.value.launcher().configs.getValue(id).title, "the whole name in one step")
+        assertEquals("", store.document.value.made().single().title, "the whole name in one step")
         editor.redo()
-        var gone: Config? = null
+        var gone: DeletedScreen? = null
         editor.deleteScreen(launcher, id) { gone = it }
         editor.settle()
-        assertNull(store.document.value.launcher().configs[id])
+        assertEquals(emptyList(), store.document.value.made())
+        assertNull(store.document.value.host().children[SlotId(id.value)], "what it held goes with it")
         assertEquals(emptyList(), store.document.value.links())
-        editor.restoreScreen(launcher, id, assertNotNull(gone))
+        val kept = runBlocking { editor.heldIds() }
+        assertTrue(kept.any { it.startsWith("note") }, "a deleted screen's widgets keep their state while it can come back: $kept")
+        editor.restoreScreen(launcher, assertNotNull(gone))
         editor.settle()
-        assertEquals("Notes", store.document.value.launcher().configs[id]?.title)
-        assertEquals(listOf(id.value), store.document.value.links())
+        assertEquals("Notes", store.document.value.made().single().title)
+        assertEquals(listOf(WidgetKind("note")), store.document.value.page(id)?.widgets?.map { it.kind })
+    }
+
+    @Test
+    fun `a screen a module brought is renamed in the host's record, and only one a person made is deleted`() {
+        val (editor, store) = editor()
+        editor.updateScreen(launcher, home, title = "Start", icon = "home")
+        editor.settle()
+        assertEquals(listOf(MadeScreen(home.value, "Start", "home")), store.document.value.host().pagesHostProps().named)
+        editor.updateScreen(launcher, home, title = "", icon = "")
+        editor.settle()
+        assertEquals(emptyList(), store.document.value.host().pagesHostProps().named, "blank both ways is no name of the person's")
+        editor.deleteScreen(launcher, home) { error("a shipped screen is not deleted") }
+        editor.settle()
+        assertEquals(listOf("screen.home"), store.document.value.page(home)?.widgets?.map { it.instanceId })
     }
 
     @Test
     fun `a reset puts a shipped screen back, empties a made one, and resetting all keeps the made ones`() {
         val (editor, store) = editor()
-        val id = editor.createScreen(launcher, "Notes", "star", pagesOf)
+        val id = editor.createScreen(launcher, "Notes", "star")
         editor.settle()
-        val homePage = NodePath(launcher, NodeRoot.Layout(home, main)).child("centre", body)
-        val madePage = NodePath(launcher, NodeRoot.Layout(id, main)).child("centre", body)
-        editor.remove(homePage, "screen.home")
-        editor.add(madePage, WidgetKind("note"), emptyList(), 0)
+        editor.remove(screen(home), "screen.home")
+        editor.updateScreen(launcher, home, title = "Start")
+        editor.add(screen(id), WidgetKind("note"), emptyList(), 0)
         editor.settle()
 
-        editor.resetScreen(launcher, home, standard, pagesOf)
-        editor.resetScreen(launcher, id, standard, pagesOf)
+        editor.resetScreen(launcher, home, standard)
+        editor.resetScreen(launcher, id, standard)
         editor.settle()
         assertEquals(listOf("screen.home"), store.document.value.page(home)?.widgets?.map { it.instanceId })
+        assertEquals(emptyList(), store.document.value.host().pagesHostProps().named, "and its name")
         assertEquals(emptyList(), store.document.value.page(id)?.widgets)
+        assertEquals("Notes", store.document.value.made().single().title, "a made one keeps its name")
 
-        editor.remove(homePage, "screen.home")
+        editor.remove(screen(home), "screen.home")
+        editor.add(screen(id), WidgetKind("note"), emptyList(), 0)
         editor.settle()
         editor.resetAll(standard)
         editor.settle()
         assertEquals(listOf("screen.home"), store.document.value.page(home)?.widgets?.map { it.instanceId })
-        assertNotNull(store.document.value.launcher().configs[id], "the made screen stays")
-        assertEquals(listOf(id.value), store.document.value.links(), "and so does the way to it")
+        assertEquals(listOf(id.value), store.document.value.made().map { it.id }, "the made screen stays")
+        assertEquals(listOf(WidgetKind("note")), store.document.value.page(id)?.widgets?.map { it.kind }, "with what is on it")
         assertTrue(store.own.value)
     }
 
     @Test
     fun `back to the standard interface draws it and leaves nothing to undo`() {
         val (editor, store) = editor()
-        editor.createScreen(launcher, "Notes", "star", pagesOf)
+        editor.createScreen(launcher, "Notes", "star")
         editor.settle()
         editor.backToStandard()
         editor.settle()
         assertFalse(store.own.value)
         assertEquals(standard, store.document.value)
         assertFalse(editor.canUndo)
+    }
+
+    /** The document with a link added at the end of the rail's top slot. */
+    private fun Document.withRailLinks(links: () -> List<WidgetInstance>): Document {
+        val composition = compositions.getValue(launcher)
+        val rail = composition.singles.getValue(railKind)
+        val slot = rail.children.getValue(top)
+        val next = rail.copy(children = rail.children + (top to slot.copy(widgets = slot.widgets + links())))
+        return copy(compositions = compositions + (launcher to composition.copy(singles = composition.singles + (railKind to next))))
     }
 }

@@ -25,7 +25,7 @@ class WidgetRegistryRendererTest {
         removable: Boolean = true,
         drawsOwnSurface: Boolean = false,
         slots: List<String> = emptyList(),
-        pages: List<String> = emptyList(),
+        openSlots: Boolean = false,
         propsClassFqn: String? = null,
         functionFqn: String = "hivens.ui.widgets.Sample",
         takesInstance: Boolean = true,
@@ -36,21 +36,21 @@ class WidgetRegistryRendererTest {
         removable = removable,
         drawsOwnSurface = drawsOwnSurface,
         slots = slots,
-        pages = pages,
+        openSlots = openSlots,
         propsClassFqn = propsClassFqn,
         functionFqn = functionFqn,
         takesInstance = takesInstance,
         surfaceJson = surfaceJson,
     )
 
-    // --- slots that hold a page ---
+    // --- slots named by the content ---
 
     @Test
-    fun `the slots that hold a page are emitted only where some are declared`() {
-        val paged = renderRegistry(listOf(widget("frame", slots = listOf("body", "bottom"), pages = listOf("body"))))
-        assertContains(paged, "override val pages: List<SlotId> = listOf(SlotId(\"body\"))")
+    fun `a widget whose slots its content names says so, and only it`() {
+        val open = renderRegistry(listOf(widget("host", openSlots = true)))
+        assertContains(open, "override val openSlots: Boolean = true")
         val plain = renderRegistry(listOf(widget("frame", slots = listOf("body"))))
-        assertFalse("override val pages" in plain, plain)
+        assertFalse("override val openSlots" in plain, plain)
     }
 
     // --- the declared default plane ---
@@ -533,6 +533,11 @@ class WidgetHandsDeclarationTest {
     @Test
     fun `a widget with no slots has nowhere to hand a key`() {
         assertContains(assertNotNull(WidgetValidator.handsFault(listOf("project.page"), emptyList())), "no slots")
+    }
+
+    @Test
+    fun `a widget whose slots its content names hands keys to them`() {
+        assertNull(WidgetValidator.handsFault(listOf("project.page"), emptyList(), openSlots = true))
     }
 
     @Test

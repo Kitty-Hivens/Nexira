@@ -285,6 +285,17 @@ public final class hivens/widget/model/DocumentRead$Newer : hivens/widget/model/
 	public fun toString ()Ljava/lang/String;
 }
 
+public final class hivens/widget/model/DocumentRead$Outdated : hivens/widget/model/DocumentRead {
+	public fun <init> (I)V
+	public final fun component1 ()I
+	public final fun copy (I)Lhivens/widget/model/DocumentRead$Outdated;
+	public static synthetic fun copy$default (Lhivens/widget/model/DocumentRead$Outdated;IILjava/lang/Object;)Lhivens/widget/model/DocumentRead$Outdated;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun getSchema ()I
+	public fun hashCode ()I
+	public fun toString ()Ljava/lang/String;
+}
+
 public final class hivens/widget/model/DocumentRead$Whole : hivens/widget/model/DocumentRead {
 	public fun <init> (Lhivens/widget/model/Document;)V
 	public final fun component1 ()Lhivens/widget/model/Document;
@@ -1177,7 +1188,7 @@ public abstract interface annotation class hivens/widget/model/Widget : java/lan
 	public abstract fun minHeight ()I
 	public abstract fun minWidth ()I
 	public abstract fun needs ()[Ljava/lang/String;
-	public abstract fun pages ()[Ljava/lang/String;
+	public abstract fun openSlots ()Z
 	public abstract fun prefHeight ()I
 	public abstract fun prefWidth ()I
 	public abstract fun propsClass ()Ljava/lang/Class;
@@ -1222,7 +1233,7 @@ public final class hivens/widget/model/WidgetInstance {
 	public final fun getShownOn ()Ljava/util/List;
 	public final fun getSurface ()Lhivens/widget/model/SurfaceSpec;
 	public fun hashCode ()I
-	public final fun shownOn-gwUlEFk (Ljava/lang/String;)Z
+	public final fun shownAt (Ljava/util/Set;)Z
 	public fun toString ()Ljava/lang/String;
 }
 

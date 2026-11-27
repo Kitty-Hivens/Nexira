@@ -245,14 +245,14 @@ fun WidgetDescriptor.shownHere(): Boolean {
 }
 
 /**
- * Whether this instance is shown on the config its composition shows ([WidgetInstance.shownOn]). One that names no
- * config, or one drawn where no composition says what it shows, is shown.
+ * Whether this instance is shown where its composition stands ([WidgetInstance.shownOn], [CompositionKeys.Where]). One
+ * that names no place, or one drawn where no composition says where it stands, is shown.
  */
 @Composable
 fun WidgetInstance.shownHere(): Boolean {
     if (!conditional) return true
-    val config = rememberScopedSource(CompositionKeys.Config).valueOrNull() ?: return true
-    return shownOn(config)
+    val places = rememberScopedSource(CompositionKeys.Where).valueOrNull() ?: return true
+    return shownAt(places)
 }
 
 /**

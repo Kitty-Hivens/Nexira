@@ -1,5 +1,10 @@
 package hivens.ui.editor
 
+import hivens.pages.api.MadeScreen
+import hivens.pages.api.PagesHost
+import hivens.pages.api.PagesHostProps
+import hivens.pages.api.ScreenId
+import hivens.pages.api.withPagesHostProps
 import hivens.test.stopThenDelete
 import hivens.ui.layout.DocumentStore
 import hivens.widget.model.Composition
@@ -16,6 +21,8 @@ import hivens.widget.model.SlotId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.contentAt
+import hivens.widget.model.edit
+import hivens.widget.model.withoutWidget
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -48,6 +55,10 @@ class DocumentEditorStateTest {
     private val root = NodePath(launcher, NodeRoot.Layout(home, LayoutId("main")))
     private val railTop = root.child("rail", top)
 
+    /** The pages host, holding a screen somebody made. */
+    private val host = WidgetInstance(PagesHost.KIND, "host", children = mapOf(SlotId("made") to SlotContent(listOf(WidgetInstance(WidgetKind("notes"), "made-notes")))))
+        .withPagesHostProps(PagesHostProps(made = listOf(MadeScreen("made", "Made"))))
+
     private val document = Document(
         start = launcher,
         compositions = mapOf(
@@ -67,8 +78,14 @@ class DocumentEditorStateTest {
                     ),
                 ),
                 configs = mapOf(
-                    home to Config(layouts = listOf(ConfigLayout(LayoutId("main"), SlotContent(listOf(WidgetInstance(rail, "rail"), WidgetInstance(WidgetKind("clock"), "clock-1")))))),
-                    ConfigId("made") to Config(title = "Made", layouts = listOf(ConfigLayout(LayoutId("main"), SlotContent(listOf(WidgetInstance(WidgetKind("notes"), "made-notes")))))),
+                    home to Config(
+                        layouts = listOf(
+                            ConfigLayout(
+                                LayoutId("main"),
+                                SlotContent(listOf(WidgetInstance(rail, "rail"), WidgetInstance(WidgetKind("clock"), "clock-1"), host)),
+                            ),
+                        ),
+                    ),
                 ),
             ),
         ),
@@ -101,7 +118,7 @@ class DocumentEditorStateTest {
     @Test
     fun `a deleted screen's widgets are held while the screen can be put back`() {
         val (editor, _) = editor()
-        editor.deleteScreen(launcher, ConfigId("made"))
+        editor.deleteScreen(launcher, ScreenId("made"))
         editor.reportEditing(false)
         editor.settle()
         assertTrue("made-notes" in runBlocking { editor.heldIds() })
@@ -122,7 +139,7 @@ class DocumentEditorStateTest {
         val store = DocumentStore(dir.resolve("interface.json"), { document.copy(modules = listOf("hivens.themes")) })
         store.takeOwn()
         val editor = DocumentEditor(store, scope).also { it.reportEditing(true) }
-        val preset = document.copy(compositions = document.compositions.mapValues { (_, c) -> c.copy(configs = c.configs - ConfigId("made")) })
+        val preset = document.edit(root) { it.withoutWidget("clock-1") }
         editor.applyPreset(preset)
         editor.settle()
         assertEquals(preset.copy(modules = listOf("hivens.themes")), store.document.value)
@@ -143,7 +160,7 @@ class DocumentEditorStateTest {
 
     @Test
     fun `a preset says it landed only once the interface is the preset's`() {
-        val preset = document.copy(compositions = document.compositions.mapValues { (_, c) -> c.copy(configs = c.configs - ConfigId("made")) })
+        val preset = document.edit(root) { it.withoutWidget("clock-1") }
 
         val (refused, _) = editor(own = false)
         var heard = 0

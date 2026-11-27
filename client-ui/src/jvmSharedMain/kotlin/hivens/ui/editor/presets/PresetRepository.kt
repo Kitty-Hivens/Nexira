@@ -57,7 +57,7 @@ class PresetRepository(
 
     /**
      * Reads a preset, or null where there is none to apply: none by that name, one made before the interface was a
-     * document, one a newer build wrote, or a file that is not a preset. Each is logged, and the file is left as it is.
+     * document, one of a shape this build no longer reads, one a newer build wrote, or a file that is not a preset. Each is logged, and the file is left as it is.
      */
     fun load(name: String): LoadedPreset? = loadFrom(resolveExisting(name), name)
 
@@ -83,6 +83,10 @@ class PresetRepository(
                 }
                 is DocumentRead.Broken -> {
                     log.warn("Preset '{}' holds no document ({}), not applying it", name, read.reason)
+                    null
+                }
+                is DocumentRead.Outdated -> {
+                    log.warn("Preset '{}' holds an interface of schema {}, which this build no longer reads, not applying it", name, read.schema)
                     null
                 }
             }

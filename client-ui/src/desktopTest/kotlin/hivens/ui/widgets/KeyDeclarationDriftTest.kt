@@ -40,6 +40,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 import hivens.history.api.HistoryApi
+import hivens.pages.api.PagesApi
 
 /**
  * The ids widgets name in their needs, the keys the launcher declares, and the
@@ -93,9 +94,9 @@ class KeyDeclarationDriftTest {
     }
 
     @Test
-    fun `the standard document names the language, themes, look, packs, accounts and catalogue modules, the two sources and the history, so a fresh install has their keys`() {
+    fun `the standard document names the language, themes, look, packs, accounts and catalogue modules, the two sources, the pages and the history, so a fresh install has their keys`() {
         assertEquals(
-            listOf(I18nApi.ID, ThemesApi.ID, LookApi.ID, ColourNxControls.ID, MotionNxControls.ID, PacksApi.ID, AccountsApi.ID, CatalogueApi.ID, MirrorSourceModule.ID, ModrinthSourceModule.ID, HistoryApi.ID),
+            listOf(I18nApi.ID, ThemesApi.ID, LookApi.ID, ColourNxControls.ID, MotionNxControls.ID, PacksApi.ID, AccountsApi.ID, CatalogueApi.ID, MirrorSourceModule.ID, ModrinthSourceModule.ID, PagesApi.ID, HistoryApi.ID),
             StandardDocument.load().modules,
         )
         assertTrue(CompiledModules.any { it.id == PacksApi.ID }, "and the build carries the packs module")
@@ -108,6 +109,7 @@ class KeyDeclarationDriftTest {
         assertTrue(CompiledModules.any { it.id == MotionNxControls.ID }, "and the motion provider's controls")
         assertTrue(CompiledModules.any { it.id == MirrorSourceModule.ID }, "and the mirror source")
         assertTrue(CompiledModules.any { it.id == ModrinthSourceModule.ID }, "and the Modrinth source")
+        assertTrue(CompiledModules.any { it.id == PagesApi.ID }, "and the pages module")
         assertTrue(CompiledModules.any { it.id == HistoryApi.ID }, "and the history module")
     }
 
@@ -152,7 +154,7 @@ class KeyDeclarationDriftTest {
     @Test
     fun `the standard document puts no widget where something it needs has no answer`() {
         val standard = StandardDocument.load()
-        val admission = DocumentAdmission(::declarationOf, GeneratedWidgetRegistry::get, everyPage = setOf(PageKeys.Entry.id))
+        val admission = DocumentAdmission(::declarationOf, ::descriptorOf, everyPage = setOf(PageKeys.Entry.id))
         val misplaced = standard.compositions.flatMap { (name, composition) ->
             composition.configs.flatMap { (id, config) ->
                 config.layouts.flatMap { layout -> standing(standard, NodePath(name, NodeRoot.Layout(id, layout.id))).toList() }
@@ -163,11 +165,20 @@ class KeyDeclarationDriftTest {
         assertTrue(misplaced.isEmpty(), "a fresh install would draw these as misplaced: $misplaced")
     }
 
-    /** Every widget drawn under [path], with the slot it stands in, as the document resolves each slot. */
+    /** A widget the launcher carries, its own or a compiled module's, the pages host among them. */
+    private fun descriptorOf(kind: WidgetKind): WidgetDescriptor? =
+        GeneratedWidgetRegistry[kind] ?: CompiledModules.firstNotNullOfOrNull { it.widgets[kind] }
+
+    /**
+     * Every widget drawn under [path], with the slot it stands in, as the document resolves each slot: the slots a
+     * widget declares, and those it holds where its content names them, the pages host's screens.
+     */
     private fun standing(document: Document, path: NodePath): Sequence<Pair<NodePath, WidgetInstance>> = sequence {
         document.contentAt(path)?.widgets.orEmpty().forEach { widget ->
             yield(path to widget)
-            GeneratedWidgetRegistry[widget.kind]?.slots.orEmpty().forEach { slot -> yieldAll(standing(document, path.child(widget.instanceId, slot))) }
+            val descriptor = descriptorOf(widget.kind) ?: return@forEach
+            val slots = if (descriptor.openSlots) widget.children.keys.toList() else descriptor.slots
+            slots.forEach { slot -> yieldAll(standing(document, path.child(widget.instanceId, slot))) }
         }
     }
 

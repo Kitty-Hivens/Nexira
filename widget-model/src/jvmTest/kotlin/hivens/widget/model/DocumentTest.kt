@@ -234,18 +234,18 @@ class DocumentTest {
     // Shown on
 
     @Test
-    fun `a widget is shown on the configs it names and on none it is hidden on`() {
+    fun `a widget is shown where one of the places it names is, and nowhere one it is hidden on is`() {
         val anywhere = node("news")
-        assertTrue(anywhere.shownOn(home) && !anywhere.conditional)
-        val onHome = node("news").copy(shownOn = listOf(home))
-        assertTrue(onHome.shownOn(home))
-        assertFalse(onHome.shownOn(library))
-        val notOnHome = node("news").copy(hiddenOn = listOf(home))
-        assertFalse(notOnHome.shownOn(home))
-        assertTrue(notOnHome.shownOn(library))
-        assertFalse(node("news").copy(shownOn = listOf(home), hiddenOn = listOf(home)).shownOn(home), "hidden wins")
+        assertTrue(anywhere.shownAt(setOf("home")) && anywhere.shownAt(emptySet()) && !anywhere.conditional)
+        val onHome = node("news").copy(shownOn = listOf("home"))
+        assertTrue(onHome.shownAt(setOf("main", "home")))
+        assertFalse(onHome.shownAt(setOf("main", "library")))
+        val notOnHome = node("news").copy(hiddenOn = listOf("home"))
+        assertFalse(notOnHome.shownAt(setOf("main", "home")))
+        assertTrue(notOnHome.shownAt(setOf("main", "library")))
+        assertFalse(node("news").copy(shownOn = listOf("home"), hiddenOn = listOf("main")).shownAt(setOf("main", "home")), "hidden wins")
         val read = assertIs<DocumentRead.Whole>(DocumentCodec.read(DocumentCodec.write(document.edit(root(home)) { it.withWidget(onHome, 0) })))
-        assertEquals(listOf(home), read.document.at(root(home)).widgets.first().shownOn)
+        assertEquals(listOf("home"), read.document.at(root(home)).widgets.first().shownOn)
     }
 
     // Configs
@@ -404,15 +404,18 @@ class DocumentTest {
         )
         val read = assertIs<DocumentRead.Whole>(DocumentCodec.read(DocumentCodec.write(full)))
         assertEquals(full, read.document)
-        assertTrue("\"schema\": 1" in DocumentCodec.write(full), "a file says which schema it is even where it is the current one")
+        assertTrue("\"schema\": $DOCUMENT_SCHEMA" in DocumentCodec.write(full), "a file says which schema it is even where it is the current one")
     }
 
     @Test
-    fun `a newer build's file is told apart from a broken one, and what it adds is passed over`() {
+    fun `a newer build's file and an older shape are told apart from a broken one, and what a newer one adds is passed over`() {
         val text = DocumentCodec.write(document)
-        assertEquals(DocumentRead.Newer(2), DocumentCodec.read(text.replace("\"schema\": 1", "\"schema\": 2")))
+        val current = "\"schema\": $DOCUMENT_SCHEMA"
+        assertEquals(DocumentRead.Newer(DOCUMENT_SCHEMA + 1), DocumentCodec.read(text.replace(current, "\"schema\": ${DOCUMENT_SCHEMA + 1}")))
+        assertEquals(DocumentRead.Outdated(DOCUMENT_SCHEMA - 1), DocumentCodec.read(text.replace(current, "\"schema\": ${DOCUMENT_SCHEMA - 1}")))
+        assertEquals(DocumentRead.Outdated(1), DocumentCodec.read("{ \"schema\": 1 }"), "an older shape is not read any further than its schema")
         assertEquals(document, assertIs<DocumentRead.Whole>(DocumentCodec.read(text.replaceFirst("{", "{ \"later\": true,"))).document)
-        for (broken in listOf("", "[]", "{", "{}", "{ \"schema\": \"one\" }", "{ \"schema\": 1 }")) {
+        for (broken in listOf("", "[]", "{", "{}", "{ \"schema\": \"one\" }", "{ \"schema\": $DOCUMENT_SCHEMA }")) {
             assertIs<DocumentRead.Broken>(DocumentCodec.read(broken), broken)
         }
     }

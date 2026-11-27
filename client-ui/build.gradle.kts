@@ -154,6 +154,8 @@ kotlin {
                 implementation(project(":history-api"))
                 // The history module, compiled in and brought in by a document that names it.
                 implementation(project(":history"))
+                // The pages module, the same way: the pages host and the screens it shows.
+                implementation(project(":pages"))
                 // The packs module: its API is what the built-in widgets read, and the
                 // module itself is compiled in and handed to the host as a CompiledModule.
                 implementation(project(":packs-api"))
