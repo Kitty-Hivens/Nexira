@@ -154,6 +154,54 @@ class DocumentEditorTest {
         assertFalse(editor.canRedo)
     }
 
+    @Test
+    fun `undo back to the standard document gives the own one up without a word, and redo takes it back`() {
+        val (editor, store) = editor(own = false)
+        editor.remove(root, "clock")
+        editor.settle()
+        editor.answerConsent(yes = true)
+        editor.settle()
+        assertTrue(Files.exists(dir.resolve("interface.json")))
+
+        editor.undo()
+        editor.settle()
+        assertFalse(store.own.value, "nothing of the person's is left in it, so updates reach it again")
+        assertNull(editor.consent.value, "and nobody is asked anything")
+        assertFalse(Files.exists(dir.resolve("interface.json")))
+
+        editor.redo()
+        editor.settle()
+        assertTrue(store.own.value)
+        assertNull(editor.consent.value, "the person said yes to this edit already")
+        assertEquals(emptyList(), store.widgets())
+    }
+
+    @Test
+    fun `undo that leaves the own document unlike the standard one keeps it`() {
+        val (editor, store) = editor()
+        editor.remove(root, "clock")
+        editor.closeStep()
+        editor.offset(root, "missing", 1f, 1f)
+        editor.add(root, WidgetKind("note"), emptyList(), index = 0)
+        editor.settle()
+        editor.undo()
+        editor.settle()
+        assertTrue(store.own.value, "the clock is still gone, so the document is still the person's")
+    }
+
+    @Test
+    fun `a new edit after undo gave the document up asks again`() {
+        val (editor, store) = editor()
+        editor.remove(root, "clock")
+        editor.settle()
+        editor.undo()
+        editor.settle()
+        assertFalse(store.own.value)
+        editor.offset(root, "clock", 9f, 0f)
+        editor.settle()
+        assertNotNull(editor.consent.value)
+    }
+
     // Writes read what is there when they land
 
     @Test

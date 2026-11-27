@@ -144,6 +144,7 @@ class DocumentEditor(
 
     /** Lands [transform], and once it has landed tells [landed] what the document was and became. */
     private fun apply(key: String?, transform: (Document) -> Document, landed: ((Document, Document) -> Unit)? = null) {
+        droppedByUndo = false
         if (!store.own.value) {
             // Only the first one waits. What follows it while the question is open is dropped: the person has not
             // said yet that the document is theirs to change.
@@ -173,19 +174,30 @@ class DocumentEditor(
         scope.launch(writes) { history.close() }
     }
 
-    /** Steps back. Nothing to undo, or a store that does not take it, is a no-op. */
+    // Whether the last step back made the document the standard one again and gave it up, so a step forward takes it
+    // back without asking. Touched only on [writes].
+    private var droppedByUndo = false
+
+    /**
+     * Steps back. Nothing to undo, or a store that does not take it, is a no-op. A step back that leaves the person's own
+     * document the same as the standard one gives it up without a word: nothing of theirs is left in it, and updates
+     * reach the interface again.
+     */
     fun undo() {
         scope.launch(writes) {
             val current = store.document.value
             val previous = history.undo(current) ?: return@launch
             if (!store.update { previous }) history.redo(previous)
+            else if (store.matchesStandard && store.dropOwn()) droppedByUndo = true
             publish()
         }
     }
 
-    /** Steps forward again, until the next edit branches away. */
+    /** Steps forward again, until the next edit branches away. One out of the standard document a step back left takes it back. */
     fun redo() {
         scope.launch(writes) {
+            if (droppedByUndo && !store.own.value) store.takeOwn()
+            droppedByUndo = false
             val current = store.document.value
             val next = history.redo(current) ?: return@launch
             if (!store.update { next }) history.undo(next)
