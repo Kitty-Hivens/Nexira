@@ -1,10 +1,6 @@
 package hivens.ui.editor
 
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.SlotContent
-import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlin.test.Test
@@ -23,21 +19,11 @@ import kotlin.test.assertTrue
  */
 class EditHistoryTest {
 
-    private fun history(limit: Int = 64) = EditHistory<LayoutGraph>(limit = limit)
+    private fun history(limit: Int = 64) = EditHistory<SlotContent>(limit = limit)
 
-    /** Graphs that differ by the number of widgets in one slot, so equality is cheap to reason about. */
-    private fun graph(widgets: Int): LayoutGraph = LayoutGraph(
-        surfaces = mapOf(
-            SurfaceId("home") to SurfaceLayout(
-                mapOf(
-                    SlotId("main") to SlotContent(
-                        widgets = (0 until widgets).map {
-                            WidgetInstance(kind = WidgetKind("w"), instanceId = "w$it")
-                        },
-                    ),
-                ),
-            ),
-        ),
+    /** Slots that differ by the number of widgets in them, so equality is cheap to reason about. */
+    private fun graph(widgets: Int): SlotContent = SlotContent(
+        widgets = (0 until widgets).map { WidgetInstance(kind = WidgetKind("w"), instanceId = "w$it") },
     )
 
     @Test

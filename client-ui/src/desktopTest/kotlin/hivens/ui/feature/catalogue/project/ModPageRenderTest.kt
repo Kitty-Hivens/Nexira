@@ -1,5 +1,8 @@
 package hivens.ui.feature.catalogue.project
 
+import hivens.ui.standardSlot
+import hivens.ui.standardRail
+import hivens.ui.DocumentSlot
 import kotlinx.coroutines.Dispatchers
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -52,24 +55,16 @@ import hivens.ui.surface.NxSurface
 import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.WidgetSurface
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
-import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
-import hivens.widget.api.SlotRenderer
-import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
 import hivens.widget.api.ProvideScoped
 import hivens.widget.generated.GeneratedWidgetRegistry
-import hivens.widget.model.DefaultLayout
-import hivens.widget.model.FamilyId
 import hivens.widget.model.ScopeLevel
-import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
 import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -193,7 +188,6 @@ class ModPageRenderTest {
     private fun Screen(slug: String, local: Boolean = false) {
         val pageState = if (local) localState() else state(slug)
         val railProject = if (local) openLocal() else open(slug)
-        val rail = SurfaceId("appshell.rightrail")
         val registry = WidgetDataRegistry().apply {
             // The rail reads the open project off its window, which the page publishes into.
             registerFactory(CatalogueKeys.OpenProject) { flowSource(MutableStateFlow<OpenProject?>(railProject)) }
@@ -201,14 +195,11 @@ class ModPageRenderTest {
             // the key they need lives on the page and find it there.
             declare(ProjectPageSource)
         }
-        val families = SurfaceFamilies().apply { switch(rail, FamilyId("projectView"), owner = Unit) }
         val window = remember { windowLevel(registry) }
 
         CompositionLocalProvider(
-            LocalLayoutGraph provides DefaultLayout.load(),
             LocalWidgetRegistry provides GeneratedWidgetRegistry,
             LocalWidgetDataRegistry provides registry,
-            LocalSurfaceFamilies provides families,
             LocalWidgetSurfaceRenderer provides { spec, content -> WidgetSurface(spec, content) },
             LocalScope provides window,
         ) {
@@ -230,9 +221,8 @@ class ModPageRenderTest {
                             kind = SurfaceKind.Panel,
                             modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 14.dp),
                         ) {
-                            SlotRenderer(
-                                SurfaceId(PROJECT_SURFACE),
-                                SlotId("header"),
+                            DocumentSlot(
+                                standardSlot("screen.project", "header"),
                                 Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 16.dp),
                             )
                         }
@@ -241,7 +231,7 @@ class ModPageRenderTest {
                             modifier = Modifier.weight(1f).fillMaxWidth()
                                 .padding(start = 14.dp, end = 14.dp, top = 12.dp, bottom = 14.dp),
                         ) {
-                            SlotRenderer(SurfaceId(PROJECT_SURFACE), SlotId("body"), Modifier.fillMaxSize())
+                            DocumentSlot(standardSlot("screen.project", "body"), Modifier.fillMaxSize())
                         }
                     }
                   }
@@ -260,8 +250,7 @@ class ModPageRenderTest {
                             .padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        SlotRenderer(rail, SlotId("modData"), Modifier.fillMaxWidth(), spacing = 12.dp)
-                        SlotRenderer(rail, SlotId("authorData"), Modifier.fillMaxWidth(), spacing = 12.dp)
+                        DocumentSlot(standardRail("project"), Modifier.fillMaxWidth(), spacing = 12.dp)
                     }
                 }
             }

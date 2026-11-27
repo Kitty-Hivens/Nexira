@@ -18,8 +18,6 @@ import hivens.ui.widgets.Commands
 import hivens.ui.widgets.LevelHost
 import hivens.ui.widgets.Sources
 import hivens.widget.api.LocalScope
-import hivens.widget.api.LocalSurfaceFamilies
-import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.command
 import hivens.widget.api.find
@@ -80,11 +78,9 @@ fun HostedWindow(
     // An effect runs after that content, which would find no window on its first pass.
     @Suppress("RememberReturnType")
     if (level != null) remember(level, backend) { level.provideWindow(backend) }
-    val families = remember(level) { level?.launcherServices?.find<SurfaceFamilies>() ?: SurfaceFamilies() }
     CompositionLocalProvider(
         // A refused window is in no registry, so nothing may be held against it.
         LocalHostWindow provides host.takeUnless { registered.refused },
-        LocalSurfaceFamilies provides families,
     ) {
         LevelHost(level, content)
     }

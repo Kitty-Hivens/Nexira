@@ -71,24 +71,22 @@ class ViewportLatticeTest {
 
     // ── Turning the page ─────────────────────────────────────────────
 
-    private val path = SlotPath(SurfaceId("s"), SlotId("main"))
 
-    private fun graph(content: SlotContent) =
-        LayoutGraph(surfaces = mapOf(SurfaceId("s") to SurfaceLayout(slots = mapOf(SlotId("main") to content))))
+    private fun graph(content: SlotContent) = content
 
     @Test
     fun `a lattice that starts scrolling sideways is turned on its side, and back`() {
         val start = graph(lattice("a" to cell(1, 3, w = 1, h = 2), sideways = false))
-        val sideways = start.setViewport(path, ViewportSpec.ScrollRight)
-        assertEquals(cell(3, 1, w = 2, h = 1), sideways.traverse(path)!!.at("a"), "every widget lands in a row that exists")
-        val back = sideways.setViewport(path, null)
-        assertEquals(cell(1, 3, w = 1, h = 2), back.traverse(path)!!.at("a"), "and going back gives the arrangement back")
+        val sideways = start.withViewport(ViewportSpec.ScrollRight)
+        assertEquals(cell(3, 1, w = 2, h = 1), sideways.at("a"), "every widget lands in a row that exists")
+        val back = sideways.withViewport(null)
+        assertEquals(cell(1, 3, w = 1, h = 2), back.at("a"), "and going back gives the arrangement back")
     }
 
     @Test
     fun `a lattice scrolling down keeps its placements`() {
         val start = graph(lattice("a" to cell(1, 3), sideways = false))
-        assertEquals(cell(1, 3), start.setViewport(path, ViewportSpec.ScrollDown).traverse(path)!!.at("a"))
+        assertEquals(cell(1, 3), start.withViewport(ViewportSpec.ScrollDown).at("a"))
     }
 
     @Test
@@ -97,8 +95,8 @@ class ViewportLatticeTest {
             widgets = listOf(WidgetInstance(WidgetKind("k"), "a", placement = Placement(x = 10f, y = 300f))),
             flow = null,
         )
-        val out = graph(free).setViewport(path, ViewportSpec.ScrollRight)
-        assertEquals(Placement(x = 10f, y = 300f), out.traverse(path)!!.at("a"), "a dp offset means the same on either axis")
+        val out = graph(free).withViewport(ViewportSpec.ScrollRight)
+        assertEquals(Placement(x = 10f, y = 300f), out.at("a"), "a dp offset means the same on either axis")
     }
 
     @Test
@@ -108,7 +106,7 @@ class ViewportLatticeTest {
             grid = 2,
             viewport = ViewportSpec.ScrollRight,
         )
-        val out = graph(flow).setFlow(path, null).traverse(path)!!
+        val out = graph(flow).withFlow(null)
         assertEquals(listOf(cell(0, 0), cell(0, 1), cell(1, 0)), out.widgets.map { it.placement })
     }
 

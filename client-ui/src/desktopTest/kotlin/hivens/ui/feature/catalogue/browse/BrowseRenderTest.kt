@@ -1,5 +1,8 @@
 package hivens.ui.feature.catalogue.browse
 
+import hivens.ui.standardSlot
+import hivens.ui.standardRail
+import hivens.ui.DocumentSlot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -54,26 +57,18 @@ import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.WidgetSurface
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
-import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
-import hivens.widget.api.SlotRenderer
-import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.command
 import hivens.widget.api.flowSource
 import hivens.widget.generated.GeneratedWidgetRegistry
-import hivens.widget.model.DefaultLayout
-import hivens.widget.model.FamilyId
 import hivens.widget.model.ScopeLevel
-import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
@@ -282,14 +277,9 @@ class BrowseRenderTest {
     }
 
     @Composable
-    private fun Kernel(surface: SurfaceId, family: FamilyId?, content: @Composable () -> Unit) {
-        // Switched the way the screen switches it, so the slot resolves in the
-        // browse family rather than in the general one that has no such slot.
-        val families = SurfaceFamilies().apply { if (family != null) switch(surface, family, owner = Unit) }
+    private fun Kernel(content: @Composable () -> Unit) {
         CompositionLocalProvider(
-            LocalLayoutGraph provides DefaultLayout.load(),
             LocalWidgetRegistry provides GeneratedWidgetRegistry,
-            LocalSurfaceFamilies provides families,
             LocalWidgetSurfaceRenderer provides { spec, body -> WidgetSurface(spec, body) },
             LocalWidgetDataRegistry provides sources,
             LocalWidgetCommandRegistry provides commands,
@@ -299,11 +289,11 @@ class BrowseRenderTest {
 
     @Composable
     private fun Rail() {
-        val surface = SurfaceId("appshell.rightrail")
-        Kernel(surface, FamilyId("browse")) {
+        // The rail's blocks shown on Browse, the filters.
+        Kernel {
             NxSurface(kind = SurfaceKind.Field, modifier = Modifier.width(300.dp).fillMaxHeight()) {
                 Column(Modifier.fillMaxSize().padding(12.dp)) {
-                    SlotRenderer(surface, SlotId("controls"), Modifier.fillMaxWidth(), spacing = 12.dp)
+                    DocumentSlot(standardRail("browse"), Modifier.fillMaxWidth(), spacing = 12.dp)
                 }
             }
         }
@@ -357,9 +347,8 @@ class BrowseRenderTest {
             ),
         )
         sheet("browse-header", width = 900, height = 300) {
-            val surface = SurfaceId("browse")
-            Kernel(surface, null) {
-                SlotRenderer(surface, SlotId("header"), Modifier.fillMaxWidth(), spacing = 8.dp)
+            Kernel {
+                DocumentSlot(standardSlot("screen.browse", "header"), Modifier.fillMaxWidth(), spacing = 8.dp)
             }
         }
         assertTrue(asked.isEmpty(), "drawing the search box searched for nothing")

@@ -1,5 +1,7 @@
 package hivens.ui.editor.palette
 
+import hivens.widget.model.StandardDocument
+import hivens.widget.api.LocalDocument
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.currentCompositionLocalContext
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -29,7 +31,6 @@ import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.themepicker.bringInControls
 import hivens.ui.widgets.themepicker.launcherAndControls
 import hivens.widget.api.ContributedServices
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
@@ -40,7 +41,6 @@ import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
 import hivens.widget.api.registerModuleKeys
-import hivens.widget.model.DefaultLayout
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SourceKey
 import hivens.widget.model.WidgetKind
@@ -130,7 +130,7 @@ class PalettePreviewSamplesTest {
                             LocalWidgetCommandRegistry provides commands,
                             LocalScope provides app,
                             LocalWidgetRegistry provides launcherAndControls,
-                            LocalLayoutGraph provides DefaultLayout.load(),
+                            LocalDocument provides StandardDocument.load(),
                             LocalWidgetSurfaceRenderer provides { spec, body -> WidgetSurface(spec, body) },
                         ) {
                             ChildLevel(ScopeLevel.Composition) {

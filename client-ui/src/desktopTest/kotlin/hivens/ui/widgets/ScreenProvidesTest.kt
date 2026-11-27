@@ -30,22 +30,17 @@ import hivens.ui.widgets.about.AboutSurface
 import hivens.ui.widgets.themepicker.ThemePickerSurface
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.LocalScope
-import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
-import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
 import hivens.widget.generated.GeneratedWidgetRegistry
-import hivens.widget.model.DefaultLayout
-import hivens.widget.model.FamilyId
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotContent
-import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.Dispatchers
@@ -98,7 +93,7 @@ class ScreenProvidesTest {
     }
 
     /**
-     * Draws [screen], the container [kind] that drew [surface], with a probe in every slot the surface had, and says
+     * Draws [screen], the container [kind] that once drew [surface], with a probe in every slot it declares, and says
      * what the probes drew and what they missed.
      */
     private fun probe(
@@ -109,7 +104,6 @@ class ScreenProvidesTest {
     ): Pair<List<String>, Set<String>> {
         val koin = graph(services)
         val app: WidgetScope = koin.koin.get()
-        val id = SurfaceId(surface)
         val provides = GeneratedWidgetRegistry[WidgetKind(kind)]?.hands.orEmpty()
         val drew = ArrayList<String>()
         val missed = HashSet<String>()
@@ -118,7 +112,7 @@ class ScreenProvidesTest {
             override fun all() = mapOf(descriptor.kind to descriptor)
             override fun get(kind: WidgetKind) = descriptor.takeIf { it.kind == kind }
         }
-        val slots = DefaultLayout.load().surfaces[id]?.slotsOf(FamilyId.GENERAL)?.keys.orEmpty()
+        val slots = GeneratedWidgetRegistry[WidgetKind(kind)]?.slots.orEmpty()
         val container = WidgetInstance(
             kind = WidgetKind(kind),
             instanceId = kind,
@@ -136,7 +130,6 @@ class ScreenProvidesTest {
                                 LocalWidgetCommandRegistry provides commands,
                                 LocalScope provides app,
                                 LocalWidgetRegistry provides registry,
-                                LocalSurfaceFamilies provides SurfaceFamilies(),
                                 LocalMisplacedWidget provides { _, _, missing -> missed += missing },
                             ) {
                                 ChildLevel(ScopeLevel.Composition) {
@@ -154,7 +147,7 @@ class ScreenProvidesTest {
                 koin.close()
             }
         }
-        assertTrue(slots.isNotEmpty(), "$surface has no slots in the bundled layout, so nothing was probed")
+        assertTrue(slots.isNotEmpty(), "$kind declares no slots, so nothing was probed")
         return drew to missed
     }
 

@@ -1,5 +1,6 @@
 package hivens.ui.widgets.modules
 
+import hivens.widget.model.StandardDocument
 import hivens.accounts.api.AccountsApi
 import hivens.catalogue.api.CatalogueApi
 import hivens.i18n.api.I18nApi
@@ -10,7 +11,6 @@ import hivens.themes.api.ThemesApi
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.ModuleContribution
 import hivens.widget.model.ApiVersion
-import hivens.widget.model.DefaultLayout
 import java.lang.classfile.ClassFile
 import java.lang.classfile.constantpool.Utf8Entry
 import java.nio.file.FileSystems
@@ -81,7 +81,7 @@ class ModuleRequirementsTest {
 
     @Test
     fun `the standard document names what its modules require, but for what comes in by itself`() {
-        val named = DefaultLayout.modules().toSet()
+        val named = StandardDocument.load().modules.toSet()
         assertEquals(setOf(MotionNxModule.ID), broughtIn(named, CompiledModules) - named)
     }
 

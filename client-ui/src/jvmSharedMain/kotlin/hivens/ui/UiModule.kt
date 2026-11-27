@@ -46,9 +46,7 @@ import hivens.ui.identity.ClanRoleProvider
 import hivens.ui.identity.DefaultSkinProvider
 import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
-import hivens.ui.layout.LayoutGraphFlushHook
 import hivens.ui.layout.DocumentStore
-import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.navigation.CompositionHistories
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.MainWindowRequests
@@ -107,7 +105,6 @@ import hivens.widget.api.LevelServicesHost
 import hivens.widget.api.ModuleKeysResult
 import hivens.widget.api.PageKeys
 import hivens.widget.api.SettingsStores
-import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.TakenContributions
 import hivens.widget.api.TakenWords
 import hivens.widget.api.WidgetCommandRegistry
@@ -122,11 +119,9 @@ import hivens.widget.api.get
 import hivens.widget.api.hostServices
 import hivens.widget.api.read
 import hivens.widget.api.registerModuleKeys
-import hivens.widget.model.DefaultLayout
 import hivens.widget.model.Document
 import hivens.widget.model.History
 import hivens.widget.model.HistoryEntry
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.StandardDocument
 import hivens.widget.model.WidgetDataSource
@@ -158,10 +153,6 @@ val levelServicesModule: Module = module {
         // What Browse searches and the project the rail describes are the catalogue
         // module's, one of each per window, made by the window's level from its keys.
         //
-        // Which family each surface is showing. Kept out of the composition because
-        // a switch is something the window does, a navigation or a pack opening.
-        // Deliberately not persisted: it describes the moment, not the arrangement.
-        scoped { SurfaceFamilies() }
         // A screen asked for from inside the window, by a card or a link, lands in
         // the window's own history. One from outside every window goes through
         // MainWindowRequests instead.
@@ -474,28 +465,6 @@ fun uiCoreModule(
             get<SourceWorks>().attach(sourceWorksOf(app))
         }
     }
-
-    // Widget layout graph persistence. Default graph lives at
-    // /widget/default-layout.json inside :widget-model; first run seeds the
-    // file, thereafter the on-disk copy is the source of truth. Reactive via
-    // StateFlow so the editor mutates the graph live. Lives in the ui module:
-    // the layout graph is UI-shell state, the engine has no reader.
-    single {
-        val dataDir: Path = get()
-        LayoutGraphRepository(
-            file         = dataDir.resolve(Storage.LAYOUT_GRAPH_FILE),
-            json         = get(),
-            scope        = get(),
-            defaultGraph = { DefaultLayout.load(get()) },
-            standardModules = { DefaultLayout.modules(get()) },
-        )
-    }
-
-    // Flush pending debounced layout writes on JVM shutdown. createdAtStart so
-    // the hook registers while the Koin application starts. Runs in parallel with the scope
-    // cancellation hook (JVM shutdown hooks run concurrently); flush() is
-    // mutex-locked and cancellation-safe, so the race is fine.
-    single(createdAtStart = true) { LayoutGraphFlushHook(get()) }
 
     // Per-instance widget runtime state (rememberWidgetState): the store backs the
     // WidgetStateHost local, the GC collector prunes the state of widgets the document

@@ -9,7 +9,6 @@ import hivens.themes.Themes
 import hivens.ui.CompositionContent
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.layout.DocumentStore
-import hivens.ui.layout.LayoutGraphRepository
 import hivens.ui.levelServicesModule
 import hivens.ui.navigation.CompositionHistories
 import hivens.ui.navigation.LauncherConfigs
@@ -23,7 +22,6 @@ import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.modules.NoWidgetModuleHost
 import hivens.ui.widgets.modules.WidgetModules
 import hivens.ui.widgets.state.WidgetStateStore
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
@@ -36,7 +34,6 @@ import hivens.widget.api.WidgetScope
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.generated.GeneratedWidgetRegistry
 import hivens.widget.model.Document
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.StandardDocument
 import kotlin.test.AfterTest
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -84,7 +81,6 @@ class CompositionWindowContentTest {
                 single<Document> { StandardDocument.load() }
                 single { DocumentStore(dir.resolve("interface.json"), { get<Document>() }) }
                 single { WidgetModules(dir.resolve("widgets"), dir.resolve("widget-modules.json"), json, GeneratedWidgetRegistry, scope, NoWidgetModuleHost) }
-                single { LayoutGraphRepository(dir.resolve("layout-graph.json"), json, scope) { LayoutGraph.EMPTY } }
                 single { WidgetServiceRegistry() }
                 single { WidgetDataRegistry() }
                 single { uiCommandRegistry({}, {}, {}) }
@@ -115,7 +111,6 @@ class CompositionWindowContentTest {
                         seen += LocalWidgetServiceRegistry.current
                         seen += LocalWidgetStateHost.current
                         seen += LocalScope.current
-                        seen += LocalLayoutGraph.current
                     }
                 }
             }
@@ -129,7 +124,7 @@ class CompositionWindowContentTest {
         assertEquals(
             listOf<Any?>(
                 koin.get<WidgetModules>().state.value.registry, koin.get<WidgetDataRegistry>(), koin.get<WidgetCommandRegistry>(),
-                koin.get<WidgetServiceRegistry>(), koin.get<WidgetStateStore>(), koin.get<WidgetScope>(), LayoutGraph.EMPTY,
+                koin.get<WidgetServiceRegistry>(), koin.get<WidgetStateStore>(), koin.get<WidgetScope>(),
             ),
             seen,
         )

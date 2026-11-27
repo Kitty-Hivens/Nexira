@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.widget.api.LocalDocument
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalSingleSlotHost
 import hivens.widget.api.LocalWidgetDecorator
 import hivens.widget.api.LocalWidgetRegistry
@@ -28,18 +27,13 @@ import hivens.widget.model.ConfigId
 import hivens.widget.model.ConfigLayout
 import hivens.widget.model.Document
 import hivens.widget.model.FlowSpec
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.LayoutId
 import hivens.widget.model.NodePath
 import hivens.widget.model.NodeRoot
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SlotPath
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
-import hivens.widget.model.toNodePath
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlin.test.Test
@@ -122,7 +116,7 @@ class DocumentSlotTest {
     fun `a document replaced is drawn as it now is`() {
         val state = mutableStateOf<Document?>(document(root = slot(leaf("a"))))
         val seen = ArrayList<Seen>()
-        val scene = scene(state, LayoutGraph.EMPTY, HOME, seen)
+        val scene = scene(state, HOME, seen)
         try {
             scene.render().close()
             seen.clear()
@@ -132,15 +126,6 @@ class DocumentSlotTest {
         } finally {
             scene.close()
         }
-    }
-
-    @Test
-    fun `a slot under a surface reads the graph and a document's slot does not`() {
-        val surface = SlotPath(SurfaceId("s"), SlotId("main")).toNodePath()
-        val graph = LayoutGraph(surfaces = mapOf(SurfaceId("s") to SurfaceLayout(slots = mapOf(SlotId("main") to slot(leaf("graph"))))))
-        val document = document(root = slot(leaf("document")))
-        assertEquals(listOf(Seen(surface, "graph")), draw(document, surface, graph))
-        assertEquals(listOf(Seen(HOME, "document")), draw(document, HOME, graph))
     }
 
     @Test
@@ -177,9 +162,9 @@ class DocumentSlotTest {
         ),
     )
 
-    private fun draw(document: Document?, path: NodePath, graph: LayoutGraph = LayoutGraph.EMPTY, host: SingleSlotHost? = null): List<Seen> {
+    private fun draw(document: Document?, path: NodePath, host: SingleSlotHost? = null): List<Seen> {
         val seen = ArrayList<Seen>()
-        val scene = scene(mutableStateOf(document), graph, path, seen, host)
+        val scene = scene(mutableStateOf(document), path, seen, host)
         try {
             scene.render().close()
         } finally {
@@ -190,7 +175,6 @@ class DocumentSlotTest {
 
     private fun scene(
         document: MutableState<Document?>,
-        graph: LayoutGraph,
         path: NodePath,
         seen: MutableList<Seen>,
         host: SingleSlotHost? = null,
@@ -202,7 +186,6 @@ class DocumentSlotTest {
         return ImageComposeScene(width = 200, height = 200, density = Density(1f)) {
             CompositionLocalProvider(
                 LocalDocument provides document.value,
-                LocalLayoutGraph provides graph,
                 LocalWidgetRegistry provides registry,
                 LocalWidgetDecorator provides decorator,
             ) {

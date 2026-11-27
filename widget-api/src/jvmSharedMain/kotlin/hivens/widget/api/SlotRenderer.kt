@@ -102,8 +102,6 @@ import hivens.widget.model.NodePath
 import hivens.widget.model.Placement
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SlotPath
-import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceInsets
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.ViewportMode
@@ -114,20 +112,12 @@ import hivens.widget.model.contentAt
 import hivens.widget.model.clampPlacementAxis
 import hivens.widget.model.flowPlacement
 import hivens.widget.model.parseAnchor
-import hivens.widget.model.slotPath
-import hivens.widget.model.toNodePath
-import hivens.widget.model.traverse
 import hivens.widget.model.viewportMode
 
-// Renders every widget at the addressed slot. Three entry forms:
-//
-//   * Top-level: SlotRenderer(surface, slot) -- used by surface
-//     composables (NewHomeScreen, LibraryScreen, AppLayout rails, ...).
-//     Initialises LocalSlotPath at the surface root, inside whichever
-//     family that surface is currently showing, and reads the layout graph.
+// Renders every widget at the addressed slot of the document (LocalDocument). Two entry forms:
 //
 //   * Top-level: SlotRenderer(path) -- a root of a document: a config's
-//     layout or a composition's residents, read from LocalDocument.
+//     layout or a composition's residents.
 //
 //   * Nested: SlotRenderer(parent, slot) -- used by container widgets
 //     inside their @Composable body. Extends LocalSlotPath with the
@@ -157,35 +147,6 @@ import hivens.widget.model.viewportMode
 // somebody is arranging (see shownOf).
 @Composable
 fun SlotRenderer(
-    surface: SurfaceId,
-    slot: SlotId,
-    modifier: Modifier = Modifier,
-    spacing: Dp = 0.dp,
-    contentPadding: PaddingValues = NO_PADDING,
-) {
-    // The family is resolved here rather than taken from an argument so a surface
-    // that switches families does not have to thread the id through every slot it
-    // declares, and so a slot declared before families existed keeps meaning the
-    // general one without saying so.
-    val path = SlotPath(surface, slot, family = activeFamilyOf(surface)).toNodePath()
-    val mounted = LocalMountedSurfaces.current
-    // Open above already: this slot is inside its own surface, through some widget
-    // that opens it. Refused rather than drawn, because drawing it draws it again.
-    // It keeps the slot's footprint, the way an empty slot does, so the layout
-    // around it does not jump because one of its slots refused.
-    if (surface in mounted) {
-        val refused = LocalRefusedMount.current
-        Box(modifier) { refused(surface) }
-        return
-    }
-    val nowMounted = remember(mounted, surface) { mounted + surface }
-    CompositionLocalProvider(LocalSlotPath provides path, LocalMountedSurfaces provides nowMounted) {
-        RenderSlotContent(path, modifier, spacing, contentPadding)
-    }
-}
-
-@Composable
-fun SlotRenderer(
     path: NodePath,
     modifier: Modifier = Modifier,
     spacing: Dp = 0.dp,
@@ -207,8 +168,7 @@ fun SlotRenderer(
     val parentPath = LocalSlotPath.current
     val childPath = parentPath.child(parent.instanceId, slot)
     // A slot of a widget the composition has once can change with the config shown, which is the composition's to draw.
-    val single = parentPath.slotPath == null &&
-        LocalDocument.current?.compositions?.get(parentPath.composition)?.singles?.containsKey(parent.kind) == true
+    val single = LocalDocument.current?.compositions?.get(parentPath.composition)?.singles?.containsKey(parent.kind) == true
     if (!single) {
         CompositionLocalProvider(LocalSlotPath provides childPath) {
             RenderSlotContent(childPath, modifier, spacing, contentPadding)
@@ -288,12 +248,9 @@ private fun RenderSlotContent(path: NodePath, modifier: Modifier, spacing: Dp, c
     }
 }
 
-/** What is stored at [path]: under a surface in the layout graph, anywhere else in the document. */
+/** What the document holds at [path]. */
 @Composable
-private fun storedAt(path: NodePath): SlotContent? {
-    val surfacePath = path.slotPath
-    return if (surfacePath != null) LocalLayoutGraph.current.traverse(surfacePath) else LocalDocument.current?.contentAt(path)
-}
+private fun storedAt(path: NodePath): SlotContent? = LocalDocument.current?.contentAt(path)
 
 /**
  * [content] less the widgets whose show condition does not hold here ([WidgetDescriptor.shownWhen]), or that are not

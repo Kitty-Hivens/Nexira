@@ -63,36 +63,28 @@ class ViewportSpecTest {
 
     // ── The transform ────────────────────────────────────────────────
 
-    private val path = SlotPath(SurfaceId("s"), SlotId("main"))
 
-    private fun graph(content: SlotContent = SlotContent()) =
-        LayoutGraph(surfaces = mapOf(SurfaceId("s") to SurfaceLayout(slots = mapOf(SlotId("main") to content))))
+    private fun graph(content: SlotContent = SlotContent()) = content
 
     @Test
     fun `setting a viewport writes it to the slot`() {
-        val out = graph().setViewport(path, ViewportSpec.ScrollDown)
-        assertEquals(ViewportSpec.ScrollDown, out.traverse(path)?.viewport)
+        val out = graph().withViewport(ViewportSpec.ScrollDown)
+        assertEquals(ViewportSpec.ScrollDown, out.viewport)
     }
 
     @Test
     fun `putting a slot back to static clears the field`() {
         val scrolled = graph(SlotContent(viewport = ViewportSpec.ScrollRight))
-        assertNull(scrolled.setViewport(path, ViewportSpec()).traverse(path)?.viewport)
-        assertNull(scrolled.setViewport(path, null).traverse(path)?.viewport)
+        assertNull(scrolled.withViewport(ViewportSpec()).viewport)
+        assertNull(scrolled.withViewport(null).viewport)
     }
 
     @Test
     fun `a write that changes nothing hands back the same graph`() {
         val g = graph(SlotContent(viewport = ViewportSpec.ScrollDown))
-        assertSame(g, g.setViewport(path, ViewportSpec.ScrollDown))
+        assertSame(g, g.withViewport(ViewportSpec.ScrollDown))
         val static = graph()
-        assertSame(static, static.setViewport(path, ViewportSpec()))
-    }
-
-    @Test
-    fun `a slot that is not there is left alone`() {
-        val g = graph()
-        assertSame(g, g.setViewport(SlotPath(SurfaceId("s"), SlotId("missing")), ViewportSpec.ScrollDown))
+        assertSame(static, static.withViewport(ViewportSpec()))
     }
 
     // ── Map ──────────────────────────────────────────────────────────
@@ -105,7 +97,7 @@ class ViewportSpecTest {
     @Test
     fun `a flow put on a map becomes a placement slot in the same step`() {
         val flow = graph(SlotContent(widgets = listOf(WidgetInstance(WidgetKind("k"), "a"), WidgetInstance(WidgetKind("k"), "b"))))
-        val out = flow.setViewport(path, ViewportSpec.Map).traverse(path)!!
+        val out = flow.withViewport(ViewportSpec.Map)
         assertEquals(ViewportMode.Map, out.viewportMode)
         assertEquals(null, out.flow, "a map holds placed widgets")
         assertTrue(out.widgets.all { it.placement != null }, "and every widget was given a point on it")
@@ -122,8 +114,8 @@ class ViewportSpecTest {
     @Test
     fun `a widget is pinned and let go`() {
         val g = graph(SlotContent(widgets = listOf(WidgetInstance(WidgetKind("k"), "a"))))
-        val pinned = g.setWidgetPinned(path, "a", true)
-        assertEquals(true, pinned.traverse(path)!!.widgets.single().placement?.pinned)
-        assertEquals(false, pinned.setWidgetPinned(path, "a", false).traverse(path)!!.widgets.single().placement?.pinned)
+        val pinned = g.withPlacement("a") { it.copy(pinned = true) }
+        assertEquals(true, pinned.widgets.single().placement?.pinned)
+        assertEquals(false, pinned.withPlacement("a") { it.copy(pinned = false) }.widgets.single().placement?.pinned)
     }
 }

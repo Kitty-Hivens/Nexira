@@ -12,8 +12,8 @@ plugins {
     alias(libs.plugins.android.kmp.library)
 }
 
-// Compose-bound surface for the widget kernel. Data shapes (ids,
-// layout graph, default-layout resource, @Widget annotation) live in
+// Compose-bound surface for the widget kernel. Data shapes (ids, the
+// document and its standard resource, @Widget annotation) live in
 // :widget-model so non-UI surfaces -- launcher persistence today,
 // future CLI / TUI -- can consume them without dragging compose-runtime.
 kotlin {

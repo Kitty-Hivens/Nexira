@@ -3,6 +3,7 @@ package hivens.widget.model
 import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -37,19 +38,9 @@ class EntranceTest {
     }
 
     @Test
-    fun `an arrival that says nothing is not written into the instance`() {
-        val path = SlotPath(SurfaceId("home"), SlotId("main"))
-        val graph = LayoutGraph(
-            surfaces = mapOf(
-                SurfaceId("home") to SurfaceLayout(
-                    slots = mapOf(SlotId("main") to SlotContent(listOf(WidgetInstance(WidgetKind("w"), "w1")))),
-                ),
-            ),
-        )
-        val pinned = graph.updateWidgetMotion(path, "w1", WidgetMotion(enter = "settle"))
-        assertEquals(WidgetMotion(enter = "settle"), pinned.traverse(path)!!.widgets.single().motion)
-
-        val cleared = pinned.updateWidgetMotion(path, "w1", WidgetMotion())
-        assertNull(cleared.traverse(path)!!.widgets.single().motion)
+    fun `an arrival that says nothing is nothing, so the editor writes none into the instance`() {
+        assertTrue(WidgetMotion().isEmpty)
+        assertFalse(WidgetMotion(enter = "settle").isEmpty)
+        assertFalse(WidgetMotion(delayMs = 0).isEmpty, "a delay pinned at zero is a delay somebody chose")
     }
 }

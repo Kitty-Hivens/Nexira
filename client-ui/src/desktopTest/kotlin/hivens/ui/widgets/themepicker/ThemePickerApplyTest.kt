@@ -28,12 +28,10 @@ import hivens.widget.api.SlotRenderer
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.LocalScope
-import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.ProvideScopedCommand
-import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetCommandRegistry
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
@@ -108,7 +106,6 @@ class ThemePickerApplyTest {
                         LocalWidgetCommandRegistry provides commands,
                         LocalScope provides app,
                         LocalWidgetRegistry provides CompositeWidgetRegistry(listOf(launcherAndControls, FrameRegistry)),
-                        LocalSurfaceFamilies provides SurfaceFamilies(),
                     ) {
                         ChildLevel(ScopeLevel.Composition) {
                             val back = rememberLatestCommand<Unit> { fired += "back" }

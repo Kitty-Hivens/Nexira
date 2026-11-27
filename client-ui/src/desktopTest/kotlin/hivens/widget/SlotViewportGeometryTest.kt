@@ -1,5 +1,8 @@
 package hivens.widget
 
+import hivens.ui.STANDING_ROOT
+import hivens.ui.documentOf
+import hivens.widget.api.LocalDocument
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,7 +24,6 @@ import androidx.compose.ui.input.pointer.PointerButtons
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMapControls
 import hivens.widget.api.LocalUnknownWidgetDecorator
 import hivens.widget.api.UnknownWidgetDecorator
@@ -31,12 +33,9 @@ import hivens.widget.api.SlotRenderer
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.FlowSpec
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.Placement
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.ViewportSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
@@ -57,7 +56,6 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalComposeUiApi::class)
 class SlotViewportGeometryTest {
 
-    private val surface = SurfaceId("s")
     private val slot = SlotId("main")
 
     // ── Down ──────────────────────────────────────────────────────────
@@ -444,15 +442,15 @@ class SlotViewportGeometryTest {
     ) {
         private var content by mutableStateOf(initial)
         private val scene = ImageComposeScene(width = SIDE, height = SIDE, density = Density(1f)) {
-            val graph = LayoutGraph(surfaces = mapOf(surface to SurfaceLayout(slots = mapOf(slot to content))))
+            val graph = documentOf(content)
             CompositionLocalProvider(
-                LocalLayoutGraph provides graph,
+                LocalDocument provides graph,
                 LocalWidgetRegistry provides registry,
                 LocalMapControls provides controls,
                 LocalUnknownWidgetDecorator provides unknown,
             ) {
                 Box(Modifier.fillMaxSize().background(PAGE_COLOUR)) {
-                    SlotRenderer(surface, slot, Modifier.fillMaxSize())
+                    SlotRenderer(STANDING_ROOT, Modifier.fillMaxSize())
                 }
             }
         }

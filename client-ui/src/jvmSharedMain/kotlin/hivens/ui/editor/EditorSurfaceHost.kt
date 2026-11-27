@@ -118,7 +118,6 @@ import hivens.widget.api.LocalEmptySlotDecorator
 import hivens.widget.api.LocalHiddenWidget
 import hivens.widget.api.LocalMapPanOnPrimary
 import hivens.widget.api.LocalPlacementReflow
-import hivens.widget.api.LocalRefusedMount
 import hivens.widget.api.LocalSlotBoundsReporter
 import hivens.widget.api.LocalSlotBoundsWithdrawal
 import hivens.widget.api.LocalSlotChromeModifier
@@ -135,11 +134,8 @@ import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.NodePath
-import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.contentAt
-import hivens.widget.model.screen
-import hivens.widget.model.slotPath
 import org.koin.compose.koinInject
 import org.slf4j.LoggerFactory
 
@@ -340,12 +336,7 @@ fun EditorSurfaceHost(
     val parentWidgetDecorator = LocalWidgetDecorator.current
     val chromeDecorator: WidgetDecorator = remember(arranging, parentWidgetDecorator) {
         if (!arranging) return@remember parentWidgetDecorator
-        decorator@{ path, index, descriptor, instance, content ->
-            // A slot of a surface is the layout graph's, which this editor does not arrange.
-            if (path.slotPath != null) {
-                content()
-                return@decorator
-            }
+        { path, index, descriptor, instance, content ->
             val slot = LocalDocument.current?.contentAt(path)
             val drop = dropTarget
             EditableWidgetChrome(
@@ -380,7 +371,7 @@ fun EditorSurfaceHost(
         }
     }
     val emptyDecorator: EmptySlotDecorator = remember(arranging) {
-        if (arranging) { path -> if (path.slotPath == null) EmptySlotPlaceholder() } else { _ -> }
+        if (arranging) { _ -> EmptySlotPlaceholder() } else { _ -> }
     }
     val unknownDecorator: UnknownWidgetDecorator = remember(arranging) {
         if (arranging) {
@@ -393,23 +384,16 @@ fun EditorSurfaceHost(
     val slotChromeFactory: SlotChromeModifier = remember(arranging, parentSlotChrome) {
         if (!arranging) return@remember parentSlotChrome
         { path, slotContent ->
-            if (path.slotPath != null) {
-                Modifier
-            } else {
-                slotChromeModifier(
-                    path          = path,
-                    empty         = slotContent.widgets.isEmpty(),
-                    registry      = registry,
-                    selectedSlot  = selectedSlotState,
-                    onSelect      = { selectedSlotState.value = it; handleMenuOpen = false; slotMenuCursor = null },
-                    onContextMenu = { p, off -> selectedSlotState.value = p; slotMenuCursor = off; handleMenuOpen = false },
-                    onReportRect  = { selectedSlotRect = it },
-                )
-            }
+            slotChromeModifier(
+                path          = path,
+                empty         = slotContent.widgets.isEmpty(),
+                registry      = registry,
+                selectedSlot  = selectedSlotState,
+                onSelect      = { selectedSlotState.value = it; handleMenuOpen = false; slotMenuCursor = null },
+                onContextMenu = { p, off -> selectedSlotState.value = p; slotMenuCursor = off; handleMenuOpen = false },
+                onReportRect  = { selectedSlotRect = it },
+            )
         }
-    }
-    val refusedMount: @Composable (SurfaceId) -> Unit = remember(arranging) {
-        if (arranging) { _ -> RefusedMountPlaceholder() } else { _ -> }
     }
     // Remembered: a static local changed on every recomposition of this host would recompose the whole shell.
     val slotBoundsReporter: SlotBoundsReporter = remember(arranging, registry) {
@@ -435,7 +419,6 @@ fun EditorSurfaceHost(
         LocalPlacementReflow provides !arranging,
         LocalSlotBoundsReporter provides slotBoundsReporter,
         LocalSlotBoundsWithdrawal provides slotBoundsWithdrawal,
-        LocalRefusedMount provides refusedMount,
         LocalHiddenWidget provides if (arranging) HiddenWidget else null,
         LocalMapPanOnPrimary provides !arranging,
     ) {
@@ -855,23 +838,6 @@ private fun ToolChip(
 
 private val CHIP_SHAPE = RoundedCornerShape(12.dp)
 
-/**
- * What a surface that refused to open inside itself draws while somebody is
- * arranging: a dashed box saying so, where the surface would have been, so the
- * widget that caused it can be found and moved.
- */
-@Composable
-private fun RefusedMountPlaceholder() {
-    val s = nexiraStrings()
-    Box(
-        modifier = Modifier
-            .padding(8.dp)
-            .border(1.dp, NxColor.status(Status.Warning), RoundedCornerShape(8.dp))
-            .padding(horizontal = 12.dp, vertical = 8.dp),
-    ) {
-        Text(s.text("editorMountRefused"), style = MaterialTheme.typography.labelMedium, color = NxColor.status(Status.Warning))
-    }
-}
 
 // ── Vignette ────────────────────────────────────────────────────────────────
 

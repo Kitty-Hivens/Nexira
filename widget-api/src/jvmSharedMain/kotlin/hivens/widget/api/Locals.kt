@@ -18,37 +18,19 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.unit.Dp
 import hivens.widget.model.Document
 import hivens.widget.model.Entrance
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.NodePath
 import hivens.widget.model.SlotContent
-import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceSpec
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetSizing
 
 /**
- * The arrangement every slot renders from.
+ * The document every slot renders from, null where none is drawn.
  *
- * Dynamic, and the reason is the editor. A static local does not track reads: it
- * recomposes the WHOLE subtree it is provided over whenever its value changes,
- * which is cheap when the value changes on whole-tree events and ruinous when it
- * changes on every frame of a gesture. Dragging a widget writes a new graph per
- * pointer move, so this was recomposing the entire shell -- every widget on every
- * surface, the rails, the top bar and all sixty tiles of the open gallery -- sixty
- * times a second, to move one box.
- *
- * Ten places in the whole codebase read it. Tracking those ten is the cheaper
- * side of that trade by a very long way.
- */
-val LocalLayoutGraph: ProvidableCompositionLocal<LayoutGraph> =
-    compositionLocalOf { LayoutGraph.EMPTY }
-
-/**
- * The document the slots of a composition's configs render from, null where none is drawn. A slot addressed under a
- * surface reads [LocalLayoutGraph] instead.
- *
- * Dynamic, for the reason [LocalLayoutGraph] is: an edit replaces it on every frame of a gesture, and only the slots
- * that read it should recompose.
+ * Dynamic, and the reason is the editor. A static local does not track reads: it recomposes the whole subtree it is
+ * provided over whenever its value changes, which is cheap when the value changes on whole-tree events and ruinous
+ * when it changes on every frame of a gesture. Dragging a widget writes a new document per pointer move, so a static
+ * one recomposed the entire shell sixty times a second to move one box. Only the slots that read it recompose.
  */
 val LocalDocument: ProvidableCompositionLocal<Document?> =
     compositionLocalOf { null }
@@ -358,25 +340,6 @@ typealias ViewportScrollbar = @Composable BoxScope.(state: ScrollState, horizont
 
 val LocalViewportScrollbar: ProvidableCompositionLocal<ViewportScrollbar> =
     staticCompositionLocalOf { { _, _, _ -> } }
-
-/**
- * The surfaces open above the slot rendering now, innermost last.
- *
- * A widget does not contain a surface, it opens one, so nothing in the model can
- * say that a surface ends up inside itself: the edge only exists inside a widget's
- * body. Composition is depth first, so the check is a stack. A surface that finds
- * itself already on it refuses to open and draws [LocalRefusedMount] instead,
- * before the recursion can reach the stack's own limit. Two of the same surface
- * side by side are different branches and both open.
- */
-val LocalMountedSurfaces: ProvidableCompositionLocal<Set<SurfaceId>> = compositionLocalOf { emptySet() }
-
-/**
- * Drawn where a surface refused to open inside itself. Nothing by default, which
- * is what a person not arranging anything should see; the editor says why.
- */
-val LocalRefusedMount: ProvidableCompositionLocal<@Composable (SurfaceId) -> Unit> =
-    staticCompositionLocalOf { {} }
 
 /**
  * The nearest scrolling slot above, for a gesture that has to move it.

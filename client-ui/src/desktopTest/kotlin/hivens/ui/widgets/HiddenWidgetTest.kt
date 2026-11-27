@@ -3,6 +3,9 @@
 
 package hivens.ui.widgets
 
+import hivens.ui.STANDING_ROOT
+import hivens.ui.documentOf
+import hivens.widget.api.LocalDocument
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,7 +31,6 @@ import hivens.widget.api.HostApi
 import hivens.widget.api.LevelServices
 import hivens.widget.api.LevelServicesHost
 import hivens.widget.api.LocalHiddenWidget
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
@@ -39,13 +41,9 @@ import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotContent
-import hivens.widget.model.SlotId
 import hivens.widget.model.SourceKey
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.Dispatchers
@@ -80,13 +78,7 @@ class HiddenWidgetTest {
         }
     }
 
-    private val graph = LayoutGraph(
-        surfaces = mapOf(
-            SurfaceId("s") to SurfaceLayout(
-                slots = mapOf(SlotId("main") to SlotContent(widgets = listOf(WidgetInstance(kind = WidgetKind("test.block"), instanceId = "b")))),
-            ),
-        ),
-    )
+    private val graph = documentOf(SlotContent(widgets = listOf(WidgetInstance(kind = WidgetKind("test.block"), instanceId = "b"))))
 
     private class Drawn(val composed: Int, val frame: Bitmap, val texts: List<String>)
 
@@ -107,11 +99,11 @@ class HiddenWidgetTest {
                         CompositionLocalProvider(
                             LocalWidgetDataRegistry provides data,
                             LocalScope provides app,
-                            LocalLayoutGraph provides graph,
+                            LocalDocument provides graph,
                             LocalWidgetRegistry provides registry,
                             LocalHiddenWidget provides hidden,
                         ) {
-                            Box(Modifier.fillMaxSize()) { SlotRenderer(SurfaceId("s"), SlotId("main")) }
+                            Box(Modifier.fillMaxSize()) { SlotRenderer(STANDING_ROOT) }
                         }
                     }
                 }

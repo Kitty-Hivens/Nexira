@@ -3,6 +3,16 @@
 
 package hivens.look.colour.nx.controls
 
+import hivens.widget.model.NodeRoot
+import hivens.widget.model.NodePath
+import hivens.widget.model.LayoutId
+import hivens.widget.model.ConfigLayout
+import hivens.widget.model.ConfigId
+import hivens.widget.model.Config
+import hivens.widget.model.CompositionName
+import hivens.widget.model.Composition
+import hivens.widget.model.Document
+import hivens.widget.api.LocalDocument
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
@@ -28,7 +38,6 @@ import hivens.widget.api.ContributedServices
 import hivens.widget.api.HostApi
 import hivens.widget.api.LevelServices
 import hivens.widget.api.LevelServicesHost
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
@@ -41,12 +50,8 @@ import hivens.widget.api.command
 import hivens.widget.api.current
 import hivens.widget.api.flowSource
 import hivens.widget.api.registerModuleKeys
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotContent
-import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.Dispatchers
@@ -104,8 +109,14 @@ class ControlsHideTest {
         val (data, commands) = registries(state?.let { MutableStateFlow(it) })
         val page = WidgetScope.app(data, NoServices, Dispatchers.Unconfined, commands)
             .child(ScopeLevel.Window).child(ScopeLevel.Composition).child(ScopeLevel.Page)
-        val graph = LayoutGraph(
-            surfaces = mapOf(SURFACE to SurfaceLayout(slots = mapOf(SLOT to SlotContent(widgets = listOf(WidgetInstance(WidgetKind(kind), "probe")))))),
+        val document = Document(
+            start = COMPOSITION,
+            compositions = mapOf(
+                COMPOSITION to Composition(
+                    start = CONFIG,
+                    configs = mapOf(CONFIG to Config(layouts = listOf(ConfigLayout(LAYOUT, SlotContent(widgets = listOf(WidgetInstance(WidgetKind(kind), "probe"))))))),
+                ),
+            ),
         )
         var size = IntSize.Zero
         var offered = false
@@ -115,10 +126,10 @@ class ControlsHideTest {
                     LocalWidgetDataRegistry provides data,
                     LocalWidgetCommandRegistry provides commands,
                     LocalScope provides page,
-                    LocalLayoutGraph provides graph,
+                    LocalDocument provides document,
                     LocalWidgetRegistry provides ColourNxControls.widgets,
                 ) {
-                    Box(Modifier.onSizeChanged { size = it }) { SlotRenderer(SURFACE, SLOT) }
+                    Box(Modifier.onSizeChanged { size = it }) { SlotRenderer(ROOT) }
                 }
             }
         }
@@ -203,7 +214,9 @@ class ControlsHideTest {
     }
 
     private companion object {
-        val SURFACE = SurfaceId("controls.test")
-        val SLOT = SlotId("main")
+        val COMPOSITION = CompositionName("controls.test")
+        val CONFIG = ConfigId("main")
+        val LAYOUT = LayoutId("main")
+        val ROOT = NodePath(COMPOSITION, NodeRoot.Layout(CONFIG, LAYOUT))
     }
 }

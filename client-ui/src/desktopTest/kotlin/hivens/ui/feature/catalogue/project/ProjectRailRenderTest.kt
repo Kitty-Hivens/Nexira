@@ -1,5 +1,7 @@
 package hivens.ui.feature.catalogue.project
 
+import hivens.ui.standardRail
+import hivens.ui.DocumentSlot
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -39,23 +41,15 @@ import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.WidgetSurface
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetDataRegistry
-import hivens.widget.api.LocalSurfaceFamilies
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.LocalWidgetSurfaceRenderer
-import hivens.widget.api.SlotRenderer
-import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
 import hivens.widget.generated.GeneratedWidgetRegistry
-import hivens.widget.model.DefaultLayout
-import hivens.widget.model.FamilyId
 import hivens.widget.model.ScopeLevel
-import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.serialization.json.Json
@@ -152,17 +146,8 @@ class ProjectRailRenderTest {
 
     @Composable
     private fun RailInWindow() {
-        val surface = SurfaceId("appshell.rightrail")
-        // Switched the way the page switches it. Without this the sheet drew three
-        // empty columns, because SlotRenderer resolves the family from the holder
-        // and an unswitched holder answers "general" -- which has no modData slot,
-        // so every block silently rendered nothing. Which is also exactly what the
-        // rail does on screen for a family nobody switched to.
-        val families = SurfaceFamilies().apply { switch(surface, FamilyId("projectView"), owner = Unit) }
         CompositionLocalProvider(
-            LocalLayoutGraph provides DefaultLayout.load(),
             LocalWidgetRegistry provides GeneratedWidgetRegistry,
-            LocalSurfaceFamilies provides families,
             LocalWidgetSurfaceRenderer provides { spec, content -> WidgetSurface(spec, content) },
         ) {
             // The rail as the shell sits it: 300 wide, its own plane, rounded only
@@ -177,11 +162,8 @@ class ProjectRailRenderTest {
                         .padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    // Addressed into the project-view family explicitly rather than
-                    // through the live holder, because a sheet has no navigation to
-                    // have switched it.
-                    SlotRenderer(surface, SlotId("modData"), Modifier.fillMaxWidth(), spacing = 12.dp)
-                    SlotRenderer(surface, SlotId("authorData"), Modifier.fillMaxWidth(), spacing = 12.dp)
+                    // The rail's blocks shown on a project's page.
+                    DocumentSlot(standardRail("project"), Modifier.fillMaxWidth(), spacing = 12.dp)
                 }
             }
         }

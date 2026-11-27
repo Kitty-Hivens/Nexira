@@ -1,8 +1,9 @@
 package hivens.widget
 
+import hivens.widget.model.widgets
+import hivens.widget.model.StandardDocument
 import hivens.ui.widgets.modules.CompiledModules
 import hivens.widget.generated.GeneratedWidgetRegistry
-import hivens.widget.model.DefaultLayout
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -36,22 +37,16 @@ class WidgetRegistryConsistencyTest {
     )
 
     @Test
-    fun `every default-layout widget kind exists in the generated registry or a compiled module's`() {
-        val graph = DefaultLayout.load()
-        // Every family, not just the general one: a kind that only the project-view
-        // rail names is just as capable of being renamed out from under the layout.
-        val referenced = graph.surfaces.values
-            .flatMap { it.allSlots().toList() }
-            .flatMap { it.widgets }
-            .map { it.kind }
-            .toSet()
+    fun `every widget kind the standard document names exists in the generated registry or a compiled module's`() {
+        // Every widget of every composition, nested ones and the singles' records included.
+        val referenced = StandardDocument.load().compositions.values.flatMap { it.widgets().map { w -> w.kind }.toList() }.toSet()
         val available = GeneratedWidgetRegistry.all().keys + CompiledModules.flatMap { it.widgets.all().keys }
 
         val missing = referenced - available
         assertEquals(
             emptySet(),
             missing,
-            "default-layout.json references widget kinds that the registry does not know about: $missing",
+            "the standard document names widget kinds that the registry does not know about: $missing",
         )
     }
 

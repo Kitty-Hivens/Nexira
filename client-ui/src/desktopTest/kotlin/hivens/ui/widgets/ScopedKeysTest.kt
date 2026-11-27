@@ -1,5 +1,8 @@
 package hivens.ui.widgets
 
+import hivens.ui.STANDING_ROOT
+import hivens.ui.documentOf
+import hivens.widget.api.LocalDocument
 import hivens.widget.model.CompositionName
 import hivens.widget.model.Document
 import hivens.ui.layout.DocumentStore
@@ -25,7 +28,6 @@ import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.profile.ProfileSelection
 import hivens.ui.widgets.profile.ProfileSelectionSource
 import hivens.widget.api.CompositionKeys
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
@@ -48,14 +50,10 @@ import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.History
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.Show
 import hivens.widget.model.SlotContent
-import hivens.widget.model.SlotId
 import hivens.widget.model.SourceKey
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
@@ -268,26 +266,20 @@ class ScopedKeysTest {
         override fun get(kind: WidgetKind) = Needy.takeIf { it.kind == kind }
     }
 
-    private val graph = LayoutGraph(
-        surfaces = mapOf(
-            SurfaceId("s") to SurfaceLayout(
-                slots = mapOf(SlotId("main") to SlotContent(widgets = listOf(WidgetInstance(kind = kind, instanceId = "one")))),
-            ),
-        ),
-    )
+    private val graph = documentOf(SlotContent(widgets = listOf(WidgetInstance(kind = kind, instanceId = "one"))))
 
     @Test
     fun `a widget missing what it needs hands its place to the placeholder`() {
         var placed: List<String>? = null
         draw {
             CompositionLocalProvider(
-                LocalLayoutGraph provides graph,
+                LocalDocument provides graph,
                 LocalWidgetRegistry provides registry,
                 LocalMisplacedWidget provides { descriptor, _, missing ->
                     if (descriptor === Needy) placed = missing
                 },
             ) {
-                ChildLevel(ScopeLevel.Composition) { SlotRenderer(SurfaceId("s"), SlotId("main")) }
+                ChildLevel(ScopeLevel.Composition) { SlotRenderer(STANDING_ROOT) }
             }
         }
         assertEquals(listOf("test.page.owned"), placed)
@@ -298,14 +290,14 @@ class ScopedKeysTest {
         var placed: List<String>? = null
         draw {
             CompositionLocalProvider(
-                LocalLayoutGraph provides graph,
+                LocalDocument provides graph,
                 LocalWidgetRegistry provides registry,
                 LocalMisplacedWidget provides { _, _, missing -> placed = missing },
             ) {
                 ChildLevel(ScopeLevel.Composition) {
                     ChildLevel(ScopeLevel.Page) {
                         ProvideScoped(SourceKey<String>("test.page.owned", ScopeLevel.Page), "here") {
-                            SlotRenderer(SurfaceId("s"), SlotId("main"))
+                            SlotRenderer(STANDING_ROOT)
                         }
                     }
                 }
@@ -325,12 +317,12 @@ class ScopedKeysTest {
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides commands,
                             LocalScope provides app,
-                            LocalLayoutGraph provides graph,
+                            LocalDocument provides graph,
                             LocalWidgetRegistry provides registry,
                             LocalMisplacedWidget provides MisplacedWidget,
                             LocalEditMode provides editing,
                         ) {
-                            Box(Modifier.fillMaxSize()) { SlotRenderer(SurfaceId("s"), SlotId("main")) }
+                            Box(Modifier.fillMaxSize()) { SlotRenderer(STANDING_ROOT) }
                         }
                     }
                 }

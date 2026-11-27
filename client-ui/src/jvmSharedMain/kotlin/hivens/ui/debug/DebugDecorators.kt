@@ -88,7 +88,6 @@ fun debugSlotChromeModifier(state: DebugOverlayState): SlotChromeModifier =
 
 /** The slot's own name: the one it has in its container, or the one its root gives it. */
 private fun slotName(path: NodePath): String = path.nested.lastOrNull()?.slot?.value ?: when (val root = path.root) {
-    is NodeRoot.Surface -> root.slot.value
     is NodeRoot.Layout -> root.config.value
     NodeRoot.Residents -> "residents"
 }

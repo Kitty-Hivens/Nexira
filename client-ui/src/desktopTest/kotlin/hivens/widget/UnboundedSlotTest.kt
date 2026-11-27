@@ -1,5 +1,8 @@
 package hivens.widget
 
+import hivens.ui.STANDING_ROOT
+import hivens.ui.documentOf
+import hivens.widget.api.LocalDocument
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,7 +28,6 @@ import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.widgets.themepicker.bringInControls
 import hivens.ui.widgets.themepicker.launcherAndControls
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
@@ -37,13 +39,10 @@ import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.Placement
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.WidgetSizing
@@ -73,7 +72,6 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalComposeUiApi::class)
 class UnboundedSlotTest {
 
-    private val surface = SurfaceId("s")
     private val slot = SlotId("main")
     private val kind = WidgetKind("scroller")
 
@@ -116,16 +114,16 @@ class UnboundedSlotTest {
             ),
             flow = if (flow) hivens.widget.model.FlowSpec.Column else null,
         )
-        val graph = LayoutGraph(surfaces = mapOf(surface to SurfaceLayout(slots = mapOf(slot to content))))
+        val graph = documentOf(content)
         val scene = ImageComposeScene(width = 200, height = 200, density = Density(1f))
         return runCatching {
             scene.setContent {
                 CompositionLocalProvider(
-                    LocalLayoutGraph provides graph,
+                    LocalDocument provides graph,
                     LocalWidgetRegistry provides Registry(Scroller(kind, sizing)),
                 ) {
                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                        SlotRenderer(surface, slot, Modifier.fillMaxWidth())
+                        SlotRenderer(STANDING_ROOT, Modifier.fillMaxWidth())
                     }
                 }
             }
@@ -205,14 +203,14 @@ class UnboundedSlotTest {
             widgets = listOf(WidgetInstance(kind = kind, instanceId = "real", placement = Placement())),
             flow = null,
         )
-        val graph = LayoutGraph(surfaces = mapOf(surface to SurfaceLayout(slots = mapOf(slot to content))))
+        val graph = documentOf(content)
         val scene = ImageComposeScene(width = 320, height = 320, density = Density(1f))
         return runCatching {
             scene.setContent {
                 ShippedLanguageProvider("en") {
                     NxThemed(Themes.default, dark = true) {
                         CompositionLocalProvider(
-                            LocalLayoutGraph provides graph,
+                            LocalDocument provides graph,
                             LocalWidgetRegistry provides launcherAndControls,
                             LocalWidgetSurfaceRenderer provides { spec, inner -> WidgetSurface(spec, inner) },
                             LocalWidgetDataRegistry provides data,
@@ -221,7 +219,7 @@ class UnboundedSlotTest {
                             ChildLevel(ScopeLevel.Composition) {
                                 ChildLevel(ScopeLevel.Page) {
                                     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
-                                        SlotRenderer(surface, slot, Modifier.fillMaxWidth())
+                                        SlotRenderer(STANDING_ROOT, Modifier.fillMaxWidth())
                                     }
                                 }
                             }

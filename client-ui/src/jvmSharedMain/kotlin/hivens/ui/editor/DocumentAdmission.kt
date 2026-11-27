@@ -9,7 +9,6 @@ import hivens.widget.model.ScopeLevel
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.contentAt
-import hivens.widget.model.slotPath
 
 /**
  * Whether a widget can stand in a slot of the document: every source and command it declares in its needs has an answer
@@ -24,8 +23,6 @@ import hivens.widget.model.slotPath
  *   ([everyPage]) too, and a key a page's owner hands answers only under a container that hands it
  *   ([WidgetDescriptor.hands]).
  * - An id nothing declares answers nowhere: it names a key this build does not have, a module not loaded say.
- *
- * A slot of the layout graph is not the editor's to arrange and is not asked about.
  */
 class DocumentAdmission(
     private val declarationOf: (String) -> KeyDeclaration?,
@@ -36,7 +33,7 @@ class DocumentAdmission(
     /** The needs of [kind] that nothing answers at [path], in the order the widget declared them. */
     fun missing(kind: WidgetKind, path: NodePath, document: Document): List<String> {
         val needs = descriptorOf(kind)?.needs.orEmpty()
-        if (needs.isEmpty() || path.slotPath != null) return emptyList()
+        if (needs.isEmpty()) return emptyList()
         val page = pageAt(path, document)
         return needs.filterNot { answers(declarationOf(it), page) }
     }

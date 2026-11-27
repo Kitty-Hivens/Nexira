@@ -32,18 +32,14 @@ import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.ui.widgets.Sources
 import hivens.widget.api.ContributedServices
 import hivens.widget.api.LocalScope
-import hivens.widget.api.LocalSurfaceFamilies
-import hivens.widget.api.SurfaceFamilies
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
-import hivens.widget.model.FamilyId
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.Show
-import hivens.widget.model.SurfaceId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -140,7 +136,6 @@ class HostedWindowTest {
         var maximize: (() -> Unit)? = null
         var openProject: OpenProjects? = null
         var project: OpenProject? = null
-        var families: SurfaceFamilies? = null
         var nav: NavRequests? = null
         var level: WidgetScope? = null
     }
@@ -151,7 +146,6 @@ class HostedWindowTest {
         seen.maximize = rememberScopedAction(Commands.MaximizeWindow)
         seen.openProject = LocalScope.current?.services?.get<OpenProjects>()
         seen.project = rememberScopedSource(CatalogueKeys.OpenProject).valueOrNull()
-        seen.families = LocalSurfaceFamilies.current
         seen.nav = koinInject<NavRequests>()
         seen.level = LocalScope.current
     }
@@ -213,11 +207,6 @@ class HostedWindowTest {
                 scene.settle(4)
                 assertEquals("Sodium", inMain.project?.title)
                 assertNull(inConsole.project, "the console's rail has no project open")
-
-                val rail = SurfaceId("appshell.rightrail")
-                assertNotSame(inMain.families, inConsole.families)
-                assertNotNull(inMain.families).switch(rail, FamilyId("projectView"), owner = page)
-                assertEquals(FamilyId.GENERAL, assertNotNull(inConsole.families).activeIn(rail))
 
                 assertNotSame(inMain.nav, inConsole.nav)
             } finally {
@@ -356,7 +345,6 @@ class HostedWindowTest {
                 assertEquals(500, inPicker.state?.width)
                 assertEquals(640, inConsole.state?.width)
                 assertNotSame(inMain.nav, inPicker.nav)
-                assertNotSame(inMain.families, inPicker.families)
                 assertNotSame(inMain.openProject, inPicker.openProject)
             } finally {
                 scene.close()

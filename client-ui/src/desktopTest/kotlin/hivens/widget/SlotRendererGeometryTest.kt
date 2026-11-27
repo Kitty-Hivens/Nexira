@@ -1,5 +1,8 @@
 package hivens.widget
 
+import hivens.ui.STANDING_ROOT
+import hivens.ui.documentOf
+import hivens.widget.api.LocalDocument
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,19 +19,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalPlacementReflow
 import hivens.widget.api.LocalWidgetRegistry
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
 import hivens.widget.model.FlowSpec
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.Placement
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import org.jetbrains.skia.Bitmap
@@ -52,7 +51,6 @@ import kotlin.test.assertTrue
  */
 class SlotRendererGeometryTest {
 
-    private val surface = SurfaceId("s")
     private val slot = SlotId("main")
 
     // ── Placement, measured in dp ─────────────────────────────────────
@@ -367,7 +365,7 @@ class SlotRendererGeometryTest {
      */
     @OptIn(ExperimentalComposeUiApi::class)
     private fun renderGapped(content: SlotContent, gap: Int): Frame {
-        val graph = LayoutGraph(surfaces = mapOf(surface to SurfaceLayout(slots = mapOf(slot to content))))
+        val graph = documentOf(content)
         val registry = Registry(
             mapOf(
                 WidgetKind("a") to ColourWidget(WidgetKind("a"), RED, 40),
@@ -376,9 +374,9 @@ class SlotRendererGeometryTest {
             ),
         )
         val scene = ImageComposeScene(width = SIDE, height = SIDE, density = Density(1f)) {
-            CompositionLocalProvider(LocalLayoutGraph provides graph, LocalWidgetRegistry provides registry) {
+            CompositionLocalProvider(LocalDocument provides graph, LocalWidgetRegistry provides registry) {
                 Column(Modifier.fillMaxSize().background(PAGE_COLOUR)) {
-                    SlotRenderer(surface, slot, Modifier.fillMaxWidth(), spacing = gap.dp)
+                    SlotRenderer(STANDING_ROOT, Modifier.fillMaxWidth(), spacing = gap.dp)
                     Box(Modifier.fillMaxWidth().height(40.dp).background(BLUE))
                 }
             }
@@ -405,7 +403,7 @@ class SlotRendererGeometryTest {
 
     @OptIn(ExperimentalComposeUiApi::class)
     private fun render(content: SlotContent, fixedHeight: Int = 0, reflow: Boolean = true, slotWidth: Int = 0): Frame {
-        val graph = LayoutGraph(surfaces = mapOf(surface to SurfaceLayout(slots = mapOf(slot to content))))
+        val graph = documentOf(content)
         val registry = Registry(
             mapOf(
                 WidgetKind("a") to ColourWidget(WidgetKind("a"), RED, fixedHeight),
@@ -415,13 +413,13 @@ class SlotRendererGeometryTest {
         )
         val scene = ImageComposeScene(width = SIDE, height = SIDE, density = Density(1f)) {
             CompositionLocalProvider(
-                LocalLayoutGraph provides graph,
+                LocalDocument provides graph,
                 LocalWidgetRegistry provides registry,
                 LocalPlacementReflow provides reflow,
             ) {
                 Box(Modifier.fillMaxSize().background(PAGE_COLOUR)) {
                     val slotMod = if (slotWidth > 0) Modifier.width(slotWidth.dp).fillMaxHeight() else Modifier.fillMaxSize()
-                    SlotRenderer(surface, slot, slotMod)
+                    SlotRenderer(STANDING_ROOT, slotMod)
                 }
             }
         }

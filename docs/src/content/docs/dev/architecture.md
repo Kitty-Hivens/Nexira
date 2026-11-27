@@ -58,7 +58,7 @@ The launcher is made of Gradle modules. The dependency direction is one-way and 
 | `source-modrinth`          | Modrinth as a catalogue source: its modpacks, its installs, updates and reattach, and its project search with the lists the filters are built from.                                                                            |
 | `client-render3d`          | Software 3D: the rasteriser and scene graph, and the Minecraft skin rig built on them.                                                                                                                                         |
 | `nx-ui`                    | The design system: tokens, surfaces, primitives, and the drawing of whatever theme it is handed.                                                                                                                               |
-| `widget-model`             | Layout graph, slot and widget identity, service and command keys. Compose-free.                                                                                                                                                |
+| `widget-model`             | The interface document, slot and widget identity, service and command keys. Compose-free.                                                                                                                                      |
 | `widget-api`               | Widget runtime: the slot renderer, the registries, the composition locals.                                                                                                                                                     |
 | `widget-processor`         | KSP processor that generates the widget registry from `@Widget`.                                                                                                                                                               |
 | `widget-loader`            | Finds widget modules in the widgets folder at startup, checks the interface version they declare and hands back their registries. Separate from `widget-api`, so a module author builds against the kernel without the loader. |
@@ -138,7 +138,7 @@ db/             Xodus: the pack registry and the content-scan cache
 cache/          TTL cache namespaces for pack and Modrinth metadata
 loader-cache/   headless loader-installer output
 snapshots/      pre-apply snapshots for update rollback
-presets/        layout presets
+presets/        interface presets
 logs/  crash-reports/  skin-cache/  video-cache/  tools/
 ```
 
@@ -171,11 +171,11 @@ Structural mutations of an instance serialise on a per-directory lock, so a sync
 
 ## Widget kernel
 
-The shell is itself a widget surface. `AppLayout` ends in a single slot render of `appshell.root`; the left rail, the centre and the right panel are widgets in the layout graph. Navigation is not a surface yet, so the screen router is passed down through the shell context.
+The shell is itself a widget surface. `AppLayout` ends in a single slot render of `appshell.root`; the left rail, the centre and the right panel are widgets of the interface document. Navigation is not a surface yet, so the screen router is passed down through the shell context.
 
 Four modules, four roles:
 
-- `widget-model` holds the graph (`LayoutGraph`, `SurfaceLayout`, `SlotContent`, `WidgetInstance`, recursive through `children`) and the identity types. It carries no Compose dependency, so a headless consumer can read a layout.
+- `widget-model` holds the interface document (`Document`, its compositions and their configs, `SlotContent`, `WidgetInstance`, recursive through `children`), the edits made to it, and the identity types. It carries no Compose dependency, so a headless consumer can read an interface.
 - `widget-api` holds the runtime: the slot renderer, the widget registry, and the service, data and command registries.
 - `widget-processor` generates the registry from `@Widget` annotations.
 - `widget-loader` finds widget modules in the widgets folder at startup and hands their registries to the runtime. It loads each after what it requires, over one graph of the jars and what the launcher offers (`ModuleGraph` in `widget-model`), and leaves one whose requirements are not met waiting with the reason. The modules compiled in declare the same (`requires` and `uses`), a test holds them to what their classes name, and the host brings in what a named module requires.

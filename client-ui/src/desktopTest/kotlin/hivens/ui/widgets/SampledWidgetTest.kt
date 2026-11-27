@@ -1,5 +1,8 @@
 package hivens.ui.widgets
 
+import hivens.ui.STANDING_ROOT
+import hivens.ui.documentOf
+import hivens.widget.api.LocalDocument
 import hivens.widget.model.CompositionName
 import hivens.widget.model.Document
 import hivens.ui.layout.DocumentStore
@@ -23,7 +26,6 @@ import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.theme.NxThemed
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
@@ -37,13 +39,9 @@ import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotContent
-import hivens.widget.model.SlotId
 import hivens.widget.model.SourceKey
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.CoroutineScope
@@ -89,13 +87,7 @@ class SampledWidgetTest {
         }
     }
 
-    private val graph = LayoutGraph(
-        surfaces = mapOf(
-            SurfaceId("s") to SurfaceLayout(
-                slots = mapOf(SlotId("main") to SlotContent(widgets = listOf(WidgetInstance(kind = WidgetKind("test.block"), instanceId = "b")))),
-            ),
-        ),
-    )
+    private val graph = documentOf(SlotContent(widgets = listOf(WidgetInstance(kind = WidgetKind("test.block"), instanceId = "b"))))
 
     private fun editing(): EditModeState {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -120,13 +112,13 @@ class SampledWidgetTest {
                             LocalWidgetDataRegistry provides data,
                             LocalWidgetCommandRegistry provides WidgetCommandRegistry(),
                             LocalScope provides app,
-                            LocalLayoutGraph provides graph,
+                            LocalDocument provides graph,
                             LocalWidgetRegistry provides registry,
                             LocalMisplacedWidget provides MisplacedWidget,
                             LocalEditMode provides mode,
                         ) {
                             ChildLevel(ScopeLevel.Composition) {
-                                Box(Modifier.fillMaxSize()) { SlotRenderer(SurfaceId("s"), SlotId("main")) }
+                                Box(Modifier.fillMaxSize()) { SlotRenderer(STANDING_ROOT) }
                             }
                         }
                     }

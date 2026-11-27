@@ -3,6 +3,9 @@
 
 package hivens.widget
 
+import hivens.ui.STANDING_ROOT
+import hivens.ui.documentOf
+import hivens.widget.api.LocalDocument
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,7 +26,6 @@ import hivens.widget.api.HostApi
 import hivens.widget.api.LevelServices
 import hivens.widget.api.LevelServicesHost
 import hivens.widget.api.LocalHiddenWidget
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetDataRegistry
 import hivens.widget.api.LocalWidgetRegistry
@@ -35,15 +37,12 @@ import hivens.widget.api.WidgetRegistry
 import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
 import hivens.widget.model.FlowSpec
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.Placement
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.SourceKey
-import hivens.widget.model.SurfaceId
 import hivens.widget.model.SurfaceInsets
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.Dispatchers
@@ -226,10 +225,10 @@ class SlotAbsenceTest {
     private inner class Live(content: SlotContent, shown: MutableStateFlow<Boolean>?, hidden: HiddenWidgetDecorator? = null) : AutoCloseable {
         private val data = WidgetDataRegistry().apply { if (shown != null) register(CONDITION, flowSource(shown)) }
         private val app = WidgetScope.app(data, NoServices, Dispatchers.Unconfined, WidgetCommandRegistry())
-        private val graph = LayoutGraph(surfaces = mapOf(SURFACE to SurfaceLayout(slots = mapOf(SLOT to content))))
+        private val graph = documentOf(content)
         private val scene = ImageComposeScene(width = SIDE, height = SIDE, density = Density(1f)) {
             CompositionLocalProvider(
-                LocalLayoutGraph provides graph,
+                LocalDocument provides graph,
                 LocalWidgetRegistry provides registry,
                 LocalWidgetDataRegistry provides data,
                 LocalScope provides app,
@@ -238,7 +237,7 @@ class SlotAbsenceTest {
                 Box(Modifier.fillMaxSize().background(PAGE)) {
                     Column {
                         Row {
-                            SlotRenderer(SURFACE, SLOT, spacing = GAP.dp)
+                            SlotRenderer(STANDING_ROOT, spacing = GAP.dp)
                             Box(Modifier.size(MARKER.dp).background(Color.Black))
                         }
                         Box(Modifier.size(MARKER.dp).background(Color.Black))
@@ -289,8 +288,6 @@ class SlotAbsenceTest {
         const val GAP = 10
         const val MARKER = 6
         val PAGE = Color(0xFFFF00FF)
-        val SURFACE = SurfaceId("s")
-        val SLOT = SlotId("main")
         val CONDITION = SourceKey<Boolean>("test.shown", ScopeLevel.App)
     }
 }

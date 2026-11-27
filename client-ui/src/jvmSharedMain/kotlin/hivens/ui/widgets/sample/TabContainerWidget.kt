@@ -35,8 +35,8 @@ import kotlinx.serialization.Serializable
 // live inside it -- drop them in while that tab is selected in the editor.
 //
 // The active tab is EPHEMERAL view state: it survives recomposition but is
-// never written back to the layout graph, so flipping tabs at runtime does
-// not rewrite layout-graph.json. The tab count is bounded by the declared
+// never written back to the document, so flipping tabs at runtime does not
+// rewrite the person's interface file. The tab count is bounded by the declared
 // slots (3); `tabCount` only hides the trailing tabs (their slot content is
 // preserved), and the labels are editable props.
 @Serializable

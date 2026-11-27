@@ -1,5 +1,8 @@
 package hivens.ui.widgets
 
+import hivens.ui.STANDING_ROOT
+import hivens.ui.documentOf
+import hivens.widget.api.LocalDocument
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.ImageComposeScene
@@ -20,7 +23,6 @@ import hivens.ui.uiCommandRegistry
 import hivens.ui.uiDataRegistry
 import hivens.widget.api.CompositionKeys
 import hivens.widget.api.ContributedServices
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
@@ -31,12 +33,8 @@ import hivens.widget.api.WidgetScope
 import hivens.widget.api.flowSource
 import hivens.widget.api.rememberCommand
 import hivens.widget.generated.GeneratedWidgetRegistry
-import hivens.widget.model.LayoutGraph
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.SlotContent
-import hivens.widget.model.SlotId
-import hivens.widget.model.SurfaceId
-import hivens.widget.model.SurfaceLayout
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.coroutines.Dispatchers
@@ -59,13 +57,7 @@ class ModuleKeysTest {
 
     private val packList = WidgetKind("home.new.packlist")
 
-    private val graph = LayoutGraph(
-        surfaces = mapOf(
-            SurfaceId("s") to SurfaceLayout(
-                slots = mapOf(SlotId("main") to SlotContent(widgets = listOf(WidgetInstance(kind = packList, instanceId = "one")))),
-            ),
-        ),
-    )
+    private val graph = documentOf(SlotContent(widgets = listOf(WidgetInstance(kind = packList, instanceId = "one"))))
 
     private class Host(named: Set<String>) {
         val data = uiDataRegistry(
@@ -103,13 +95,13 @@ class ModuleKeysTest {
                     LocalWidgetDataRegistry provides host.data,
                     LocalWidgetCommandRegistry provides host.commands,
                     LocalScope provides host.app,
-                    LocalLayoutGraph provides graph,
+                    LocalDocument provides graph,
                     LocalWidgetRegistry provides GeneratedWidgetRegistry,
                     LocalMisplacedWidget provides { descriptor, _, missing -> if (descriptor.kind == packList) placed = missing },
                 ) {
                     ChildLevel(ScopeLevel.Window) {
                         ChildLevel(ScopeLevel.Composition) {
-                            SlotRenderer(SurfaceId("s"), SlotId("main"))
+                            SlotRenderer(STANDING_ROOT)
                             // The plain app read, which a module widget might use.
                             stop = rememberCommand(PackKeys.StopPack)
                         }

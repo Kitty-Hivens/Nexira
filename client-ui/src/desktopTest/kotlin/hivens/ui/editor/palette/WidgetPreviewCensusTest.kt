@@ -1,5 +1,12 @@
 package hivens.ui.editor.palette
 
+import hivens.widget.model.LayoutId
+import hivens.widget.model.ConfigId
+import hivens.widget.model.CompositionName
+import hivens.widget.model.NodeRoot
+import hivens.widget.model.NodePath
+import hivens.widget.model.StandardDocument
+import hivens.widget.api.LocalDocument
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -13,7 +20,6 @@ import hivens.themes.Themes
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.widgets.WidgetSurface
 import hivens.ui.theme.NxThemed
-import hivens.widget.api.LocalLayoutGraph
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.LocalWidgetCommandRegistry
 import hivens.widget.api.LocalWidgetDataRegistry
@@ -26,11 +32,6 @@ import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetServiceRegistry
 import hivens.widget.api.WidgetStateHost
 import hivens.widget.generated.GeneratedWidgetRegistry
-import hivens.widget.model.DefaultLayout
-import hivens.widget.model.SlotId
-import hivens.widget.model.SlotPath
-import hivens.widget.model.toNodePath
-import hivens.widget.model.SurfaceId
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import kotlinx.serialization.json.JsonObject
@@ -73,7 +74,7 @@ class WidgetPreviewCensusTest {
     /**
      * What a preview scene can reasonably be handed.
      *
-     * The registries and the graph a surface would have, and a slot path, which
+     * The registries and the document a slot would have, and a slot path, which
      * several widgets read and which errors when absent. Everything here is cheap
      * and process-local. What is NOT here is the part that costs: live services
      * behind Koin, any data a widget draws from, and the scope tree a widget reads
@@ -83,13 +84,13 @@ class WidgetPreviewCensusTest {
     @Composable
     private fun Environment(content: @Composable () -> Unit) {
         CompositionLocalProvider(
-            LocalLayoutGraph provides DefaultLayout.load(),
+            LocalDocument provides StandardDocument.load(),
             LocalWidgetRegistry provides GeneratedWidgetRegistry,
             LocalWidgetDataRegistry provides WidgetDataRegistry(),
             LocalWidgetCommandRegistry provides WidgetCommandRegistry(),
             LocalWidgetServiceRegistry provides WidgetServiceRegistry(),
             LocalWidgetStateHost provides NoState,
-            LocalSlotPath provides SlotPath(SurfaceId("home.new"), SlotId("main")).toNodePath(),
+            LocalSlotPath provides NodePath(CompositionName("launcher"), NodeRoot.Layout(ConfigId("home"), LayoutId("main"))),
             LocalWidgetSurfaceRenderer provides { spec, inner -> WidgetSurface(spec, inner) },
         ) {
             content()
