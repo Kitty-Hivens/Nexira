@@ -2,7 +2,7 @@ package hivens.history.api
 
 import hivens.pages.api.HistoryEntry
 import hivens.pages.api.Show
-import hivens.widget.model.ConfigId
+import hivens.pages.api.ScreenId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive
@@ -19,24 +19,24 @@ import kotlin.test.assertTrue
 
 class HistoryTest {
 
-    private val home = ConfigId("home")
-    private val library = ConfigId("library")
-    private val browse = ConfigId("browse")
-    private val pack = ConfigId("pack")
-    private val versions = ConfigId("pack.versions")
+    private val home = ScreenId("home")
+    private val library = ScreenId("library")
+    private val browse = ScreenId("browse")
+    private val pack = ScreenId("pack")
+    private val versions = ScreenId("pack.versions")
 
     private fun id(value: String): Map<String, JsonElement> = mapOf("pack.open" to JsonPrimitive(value))
 
-    private fun History.show(config: ConfigId, values: Map<String, JsonElement> = emptyMap()) = show(Show(config, values))
+    private fun History.show(config: ScreenId, values: Map<String, JsonElement> = emptyMap()) = show(Show(config, values))
 
-    private fun History.section(config: ConfigId) = show(Show(config, over = home))
+    private fun History.section(config: ScreenId) = show(Show(config, over = home))
 
-    private val History.trail get() = entries.map { it.config }
+    private val History.trail get() = entries.map { it.screen }
 
     @Test
     fun `a history starts at its root with nowhere to go`() {
         val history = History(home)
-        assertEquals(home, history.current.config)
+        assertEquals(home, history.current.screen)
         assertFalse(history.canGoBack)
         assertFalse(history.canGoForward)
         assertSame(history, history.forward())
@@ -67,7 +67,7 @@ class HistoryTest {
     fun `a section goes over the config it names`() {
         val history = History(home).show(pack, id("a")).section(library)
         assertEquals(listOf(home, library), history.trail)
-        assertEquals(home, history.back().current.config)
+        assertEquals(home, history.back().current.screen)
         assertEquals(listOf(home, browse), history.section(browse).trail, "sections do not pile up")
     }
 
@@ -92,7 +92,7 @@ class HistoryTest {
 
     @Test
     fun `a section keeps what stands under the config it goes over`() {
-        val start = ConfigId("welcome")
+        val start = ScreenId("welcome")
         assertEquals(listOf(start, home, library), History(start).show(home).show(browse).section(library).trail)
     }
 
@@ -118,7 +118,7 @@ class HistoryTest {
     fun `a link to a section keeps the way back`() {
         val history = History(home).section(library).show(browse)
         assertEquals(listOf(home, library, browse), history.trail)
-        assertEquals(library, history.back().current.config)
+        assertEquals(library, history.back().current.screen)
     }
 
     @Test
@@ -134,7 +134,7 @@ class HistoryTest {
     @Test
     fun `forward goes where back came from, in order`() {
         val history = History(home).show(library).show(pack, id("a")).back().back()
-        assertEquals(library, history.forward().current.config)
+        assertEquals(library, history.forward().current.screen)
         assertEquals(HistoryEntry(pack, id("a")), history.forward().forward().current)
         assertFalse(history.forward().forward().canGoForward)
     }
@@ -165,8 +165,8 @@ class HistoryTest {
     @Test
     fun `what back and forward reach is in the history, and what a section dropped is not`() {
         val history = History(home).show(library).show(pack, id("a")).back()
-        assertEquals(setOf(home, library, pack), history.reachable.map { it.config }.toSet())
-        assertEquals(setOf(home, browse), history.section(browse).reachable.map { it.config }.toSet())
+        assertEquals(setOf(home, library, pack), history.reachable.map { it.screen }.toSet())
+        assertEquals(setOf(home, browse), history.section(browse).reachable.map { it.screen }.toSet())
     }
 
     @Test
@@ -202,28 +202,28 @@ class HistoryTest {
 
     @Test
     fun `a place that stopped existing leaves the history both ways`() {
-        val gone = ConfigId("gone")
-        val kept = ConfigId("kept")
-        val history = History(home).show(gone).show(library).show(kept).back().retain(home) { it.config != gone }
+        val gone = ScreenId("gone")
+        val kept = ScreenId("kept")
+        val history = History(home).show(gone).show(library).show(kept).back().retain(home) { it.screen != gone }
         assertEquals(listOf(home, library), history.trail)
-        assertEquals(kept, history.forward().current.config)
+        assertEquals(kept, history.forward().current.screen)
 
-        val ahead = History(home).show(library).show(gone).back().retain(home) { it.config != gone }
+        val ahead = History(home).show(library).show(gone).back().retain(home) { it.screen != gone }
         assertFalse(ahead.canGoForward)
     }
 
     @Test
     fun `a history of nothing but what is gone starts over at the fallback`() {
-        assertEquals(History(home), History(browse).retain(home) { it.config != browse })
+        assertEquals(History(home), History(browse).retain(home) { it.screen != browse })
     }
 
     @Test
     fun `the same page on both sides of what is gone becomes one`() {
-        val gone = ConfigId("gone")
-        val behind = History(home).show(library).show(gone).show(library).retain(home) { it.config != gone }
+        val gone = ScreenId("gone")
+        val behind = History(home).show(library).show(gone).show(library).retain(home) { it.screen != gone }
         assertEquals(listOf(home, library), behind.trail)
 
-        val ahead = History(home).show(library).show(gone).show(library).back().back().retain(home) { it.config != gone }
+        val ahead = History(home).show(library).show(gone).show(library).back().back().retain(home) { it.screen != gone }
         assertEquals(listOf(home, library), ahead.trail)
         assertFalse(ahead.canGoForward, "a forward that goes nowhere")
     }

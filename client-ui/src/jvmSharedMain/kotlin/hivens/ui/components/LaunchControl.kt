@@ -25,7 +25,7 @@ import hivens.packs.api.PackView
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.notifications.IndicationCenter.Companion.controlMode
@@ -200,7 +200,7 @@ fun rememberLaunchControl(
             },
             progress = if (block is LaunchBlock.Busy) workProgress else null,
             onClick = if (block == LaunchBlock.NoIdentity && appState != null) {
-                { navRequests.open(Show(LauncherConfigs.Profile)) }
+                { navRequests.open(Show(LauncherScreens.Profile)) }
             } else {
                 {}
             },

@@ -41,7 +41,7 @@ import hivens.ui.theme.NxInk
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
-import hivens.widget.model.ConfigId
+import hivens.pages.api.ScreenId
 import hivens.pages.api.Show
 import hivens.widget.model.Widget
 import hivens.pages.api.PagesKeys
@@ -53,8 +53,8 @@ import hivens.pages.api.PagesKeys
 // for the same reason: a need with no answer draws the misplaced placeholder, where these are to be
 // absent. Already there when their page opens, as the rows around them are.
 
-/** The config the picker link shows: the theme picker's. */
-private val PICKER_CONFIG = ConfigId("theme.picker")
+/** The screen the picker link shows: the theme picker's. */
+private val PICKER_SCREEN = ScreenId("theme.picker")
 
 // Day or night by the person's own hand, which hands what decides it back to the manual mode. The
 // puppet id is the one the settings screen had, kept so a driver finds the switch where it was.
@@ -129,14 +129,14 @@ fun ThemeModeWidget() {
     }
 }
 
-// The way to the theme picker, which shows its config in the composition this is drawn in. The puppet
+// The way to the theme picker, which shows its screen in the composition this is drawn in. The puppet
 // id is the one the settings screen had.
 @Widget(id = "theme.picker.link", displayName = "widget.theme.picker.link", enter = "none", shownWhen = NX_DRAWING_ID)
 @Composable
 fun ThemePickerLinkWidget() {
     val show = rememberScopedCommand(PagesKeys.Show)
     val s = strings(ColourNxControls.ID)
-    val open: () -> Unit = { show?.invoke(Show(PICKER_CONFIG)) }
+    val open: () -> Unit = { show?.invoke(Show(PICKER_SCREEN)) }
     PuppetClick("settings.openThemePicker") { open() }
     NxRow(
         title    = s.text("settingsThemePicker"),

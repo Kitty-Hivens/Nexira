@@ -28,7 +28,7 @@ import coil3.compose.AsyncImage
 import coil3.compose.SubcomposeAsyncImage
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.nexiraStrings
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.nx.InitialsAvatar
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
@@ -91,7 +91,7 @@ fun HomeNewHero(instance: WidgetInstance) {
     val art = rememberPackArt(target)
 
     val eyebrow = if (target.lastPlayedEpochSecond > 0L) s.text("homeQuickContinue") else s.text("homeQuickStart")
-    val openDetail = { show(LauncherConfigs.pack(target.id)) }
+    val openDetail = { show(LauncherScreens.pack(target.id)) }
 
     BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 12.dp)) {
         val height = when {

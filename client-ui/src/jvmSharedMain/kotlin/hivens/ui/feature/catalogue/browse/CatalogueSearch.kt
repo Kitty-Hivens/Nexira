@@ -16,7 +16,7 @@ import hivens.catalogue.api.ProjectTypes
 import hivens.catalogue.api.SearchFilter
 import hivens.catalogue.api.TagSearch
 import hivens.ui.feature.catalogue.project.Environment
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.widget.api.LocalScope
 import hivens.widget.api.rememberScopedCommand
 import hivens.pages.api.HistoryEntry
@@ -118,7 +118,7 @@ internal suspend fun searchFromTag(
     if (current() != from) return
     val filters = filtersFor(tag, type, tags) ?: return
     search(TagSearch(type, filters, packId))
-    show(Show(LauncherConfigs.Browse))
+    show(Show(LauncherScreens.Browse))
 }
 
 /** How long a tag waits for the catalogue's lists before it searches without them. */

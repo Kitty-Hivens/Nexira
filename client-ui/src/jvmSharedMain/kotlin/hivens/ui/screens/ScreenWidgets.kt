@@ -16,7 +16,7 @@ import hivens.ui.feature.catalogue.browse.BrowseScreen
 import hivens.ui.feature.catalogue.browse.CataloguePackDetailScreen
 import hivens.ui.feature.catalogue.project.ModDetailScreen
 import hivens.ui.feature.catalogue.project.ModVersionScreen
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.navigation.PackSettingsPage
 import hivens.ui.screens.detail.PackDetailScreen
 import hivens.ui.screens.detail.settings.PackSettingsCategory
@@ -77,7 +77,7 @@ fun HomeScreenWidget(instance: WidgetInstance) = NewHomeScreen(instance)
 @Composable
 fun LibraryScreenWidget(instance: WidgetInstance) {
     val show = rememberShow()
-    LibraryScreen(instance, onOpenPack = { show(LauncherConfigs.pack(it)) })
+    LibraryScreen(instance, onOpenPack = { show(LauncherScreens.pack(it)) })
 }
 
 @Widget(id = "screen.browse", enter = "none", removable = false, slots = ["header", "body"])
@@ -106,8 +106,8 @@ fun SettingsScreenWidget(instance: WidgetInstance) {
         currentLanguage          = language,
         languages                = languages,
         onLanguageChanged        = { tag -> update?.invoke(SettingsChange { it.copy(language = tag) }) },
-        onOpenBackgroundSettings = { show(Show(LauncherConfigs.Background)) },
-        onOpenAbout              = { show(Show(LauncherConfigs.About)) },
+        onOpenBackgroundSettings = { show(Show(LauncherScreens.Background)) },
+        onOpenAbout              = { show(Show(LauncherScreens.About)) },
     )
 }
 
@@ -149,12 +149,12 @@ fun PackScreenWidget() {
         onOpenVersions         = { fromSettings ->
             // The builds are reached from the section named, so that is the one back lands on.
             if (fromSettings) rewrite?.invoke(mapOf(PackSettingsPage.of(PackSettingsCategory.Version.name)))
-            show(LauncherConfigs.packVersions(pack))
+            show(LauncherScreens.packVersions(pack))
         },
-        onOpenProject          = { show(LauncherConfigs.project(it)) },
+        onOpenProject          = { show(LauncherScreens.project(it)) },
         onFindProjects         = {
             aim?.invoke(pack)
-            show(LauncherConfigs.browseInto(pack))
+            show(LauncherScreens.browseInto(pack))
         },
     )
 }
@@ -176,7 +176,7 @@ fun CataloguePackScreenWidget(instance: WidgetInstance) {
         origin      = pack.origin,
         packId      = pack.packId,
         onBack      = rememberBack(),
-        onInstalled = { show(LauncherConfigs.pack(it)) },
+        onInstalled = { show(LauncherScreens.pack(it)) },
     )
 }
 
@@ -185,7 +185,7 @@ fun CataloguePackScreenWidget(instance: WidgetInstance) {
 fun ProjectScreenWidget(instance: WidgetInstance) {
     val target = pageValue(CataloguePages.Project) ?: return
     val show = rememberShow()
-    ModDetailScreen(instance, target = target, onOpenVersion = { id, number -> show(LauncherConfigs.build(target, id, number)) })
+    ModDetailScreen(instance, target = target, onOpenVersion = { id, number -> show(LauncherScreens.build(target, id, number)) })
 }
 
 @Widget(id = "screen.project.build", enter = "none", removable = false)

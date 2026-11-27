@@ -5,7 +5,7 @@ import hivens.pages.api.HistoryEntry
 import hivens.pages.api.Show
 import hivens.widget.api.InterfaceRestarts
 import hivens.widget.model.CompositionName
-import hivens.widget.model.ConfigId
+import hivens.pages.api.ScreenId
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,14 +16,14 @@ import kotlinx.serialization.json.JsonElement
  * A composition's history as it is [now]. What each move does is [History]'s. [root] is what it starts with, and what
  * it starts over with when nothing in it exists any more. Moved from any thread.
  */
-class CompositionHistory internal constructor(private val root: ConfigId) {
+class CompositionHistory internal constructor(private val root: ScreenId) {
     private val state = MutableStateFlow(History(root))
 
     val now: StateFlow<History> = state.asStateFlow()
 
-    /** Shows what [show] asks for, where [has] says the composition has its config. */
-    fun show(show: Show, has: (ConfigId) -> Boolean = { true }) {
-        if (has(show.config)) state.update { it.show(show) }
+    /** Shows what [show] asks for, where [has] says the composition has its screen. */
+    fun show(show: Show, has: (ScreenId) -> Boolean = { true }) {
+        if (has(show.screen)) state.update { it.show(show) }
     }
 
     fun back() = state.update { it.back() }
@@ -53,7 +53,7 @@ class Histories {
      * [restarts] not yet seen moves every history off what it showed first, see [afterCrash].
      */
     @Synchronized
-    fun of(composition: CompositionName, root: ConfigId, restarts: InterfaceRestarts? = null): CompositionHistory {
+    fun of(composition: CompositionName, root: ScreenId, restarts: InterfaceRestarts? = null): CompositionHistory {
         if (restarts != null && restarts.count > restartsSeen) {
             restartsSeen = restarts.count
             afterCrash(restarts.again)

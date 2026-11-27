@@ -14,29 +14,31 @@ import hivens.i18n.api.Strings
 import hivens.packs.api.PackPages
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.widget.api.LocalDocument
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.pages.api.HistoryEntry
 import org.koin.compose.koinInject
+import hivens.ui.navigation.asConfig
 
 /**
  * The label of a crumb nothing has to be looked up for, or null where it has: a pack and a project are called
  * what they are called, and a made screen what its maker named it. Pure, so the mapping is checked whole.
  */
-fun staticCrumbLabel(entry: HistoryEntry, s: Strings): String? = when (entry.config) {
-    LauncherConfigs.Home         -> s.text("crumbHome")
-    LauncherConfigs.Library      -> s.text("libraryHeaderTitle")
-    LauncherConfigs.Browse       -> s.text(if (CataloguePages.Into.read(entry.opened) == null) "browseTitle" else "contentFindProjects")
-    LauncherConfigs.Profile      -> s.text("profileTitle")
-    LauncherConfigs.Wardrobe     -> s.text("wardrobeTitle")
-    LauncherConfigs.Settings     -> s.text("settingsTitle")
-    LauncherConfigs.Themes       -> s.text("themePickerTitle")
-    LauncherConfigs.About        -> s.text("aboutTitle")
-    LauncherConfigs.Background   -> s.text("backgroundTitle")
-    LauncherConfigs.PackVersions -> s.text("packVersionsTitle")
+fun staticCrumbLabel(entry: HistoryEntry, s: Strings): String? = when (entry.screen) {
+    LauncherScreens.Home         -> s.text("crumbHome")
+    LauncherScreens.Library      -> s.text("libraryHeaderTitle")
+    LauncherScreens.Browse       -> s.text(if (CataloguePages.Into.read(entry.opened) == null) "browseTitle" else "contentFindProjects")
+    LauncherScreens.Profile      -> s.text("profileTitle")
+    LauncherScreens.Wardrobe     -> s.text("wardrobeTitle")
+    LauncherScreens.Settings     -> s.text("settingsTitle")
+    LauncherScreens.Themes       -> s.text("themePickerTitle")
+    LauncherScreens.About        -> s.text("aboutTitle")
+    LauncherScreens.Background   -> s.text("backgroundTitle")
+    LauncherScreens.PackVersions -> s.text("packVersionsTitle")
     // The entry carries the build's own number, so this one needs nothing fetched.
-    LauncherConfigs.Build        -> CataloguePages.Build.read(entry.opened)?.versionNumber.orEmpty()
+    LauncherScreens.Build        -> CataloguePages.Build.read(entry.opened)?.versionNumber.orEmpty()
     else                         -> null
 }
 
@@ -64,13 +66,13 @@ private fun modFallbackLabel(target: ProjectTarget): String = when (target) {
 fun rememberCrumbLabel(entry: HistoryEntry): String {
     val s = nexiraStrings()
     staticCrumbLabel(entry, s)?.let { return it }
-    return when (entry.config) {
-        LauncherConfigs.Pack -> installedCrumb(PackPages.Pack.read(entry.opened).orEmpty())
-        LauncherConfigs.CataloguePack -> CataloguePages.Pack.read(entry.opened)?.let { catalogueCrumb(it.origin, it.packId) }.orEmpty()
-        LauncherConfigs.Project -> CataloguePages.Project.read(entry.opened)?.let { modCrumb(it) }.orEmpty()
+    return when (entry.screen) {
+        LauncherScreens.Pack -> installedCrumb(PackPages.Pack.read(entry.opened).orEmpty())
+        LauncherScreens.CataloguePack -> CataloguePages.Pack.read(entry.opened)?.let { catalogueCrumb(it.origin, it.packId) }.orEmpty()
+        LauncherScreens.Project -> CataloguePages.Project.read(entry.opened)?.let { modCrumb(it) }.orEmpty()
         // Read live, so a rename in the editor relabels the crumb at once. A screen
         // deleted while it was open says so rather than naming nothing.
-        else -> LocalDocument.current?.compositions?.get(LauncherConfigs.Composition)?.configs?.get(entry.config)
+        else -> LocalDocument.current?.compositions?.get(LauncherConfigs.Composition)?.configs?.get(entry.screen.asConfig())
             ?.title?.ifBlank { null } ?: s.text("screenMissing")
     }
 }

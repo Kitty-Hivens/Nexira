@@ -22,6 +22,7 @@ import hivens.ui.customization.CustomizationSettings
 import hivens.ui.host.CompositionWindows
 import hivens.ui.layout.DocumentStore
 import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.render.NotificationStack
 import hivens.ui.pictures.PictureRechecks
@@ -51,6 +52,7 @@ import org.koin.compose.getKoin
 import org.koin.compose.koinInject
 import java.nio.file.Path
 import kotlin.time.Duration.Companion.milliseconds
+import hivens.ui.navigation.asConfig
 
 /**
  * Whatever the host feeds into the history besides the screens: thumb buttons on a
@@ -166,7 +168,7 @@ fun AppRoot(
     // Where the composition has been, from where the document starts it, as the history
     // module keeps it for the run: an interface that starts over goes on from where it was.
     ProvideCompositionFacts(LauncherConfigs.Composition, document)
-    val start = document.compositions[LauncherConfigs.Composition]?.start ?: LauncherConfigs.Home
+    val start = document.compositions[LauncherConfigs.Composition]?.start ?: LauncherScreens.Home.asConfig()
     val (history, show) = rememberCompositionHistory(start)
     val back = rememberScopedCommand(HistoryKeys.Back)
     val forward = rememberScopedCommand(HistoryKeys.Forward)

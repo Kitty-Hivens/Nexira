@@ -3,6 +3,7 @@ package hivens.history
 import hivens.history.api.HistoryKeys
 import hivens.pages.api.PageValue
 import hivens.pages.api.PagesKeys
+import hivens.pages.api.ScreenId
 import hivens.pages.api.Show
 import hivens.widget.api.CompositionKeys
 import hivens.widget.api.ContributedServices
@@ -36,14 +37,14 @@ import kotlin.test.assertIs
 @OptIn(HostApi::class)
 class HistoryKeysTest {
 
-    private val home = ConfigId("home")
-    private val library = ConfigId("library")
-    private val pack = ConfigId("pack")
+    private val home = ScreenId("home")
+    private val library = ScreenId("library")
+    private val pack = ScreenId("pack")
 
     private val restarts = MutableStateFlow(InterfaceRestarts())
     private val packValue = PageValue("pack.page", String.serializer())
     private val packs = MutableStateFlow(setOf(packValue.json("a"), packValue.json("b")))
-    private val configs = MutableStateFlow(setOf(home, library, pack))
+    private val configs = MutableStateFlow<Set<ConfigId>>(setOf(home, library, pack).mapTo(HashSet()) { ConfigId(it.value) })
 
     private val app: WidgetScope = run {
         val sources = WidgetDataRegistry().apply {
@@ -60,11 +61,11 @@ class HistoryKeysTest {
     /** A level of the composition "main", as whoever draws it hands it what the document says of it. */
     private fun composition(): WidgetScope = app.child(ScopeLevel.Window).child(ScopeLevel.Composition).apply {
         provide(CompositionKeys.Name, CompositionName("main"))
-        provide(CompositionKeys.Start, home)
+        provide(CompositionKeys.Start, ConfigId(home.value))
         provideSource(CompositionKeys.Configs, flowSource(configs))
     }
 
-    private fun WidgetScope.shown(): ConfigId? = current(HistoryKeys.History)?.current?.config
+    private fun WidgetScope.shown(): ScreenId? = current(HistoryKeys.History)?.current?.screen
 
     @Test
     fun `a page shown moves the history, and back and forward walk it`() {
@@ -81,7 +82,7 @@ class HistoryKeysTest {
     @Test
     fun `a config the composition does not have is not shown`() {
         val main = composition()
-        main.findCommand(PagesKeys.Show)!!.run(Show(ConfigId("nowhere")))
+        main.findCommand(PagesKeys.Show)!!.run(Show(ScreenId("nowhere")))
         assertEquals(home, main.shown())
     }
 
@@ -98,7 +99,7 @@ class HistoryKeysTest {
         val main = composition()
         main.findCommand(PagesKeys.Show)!!.run(Show(library))
         main.findCommand(PagesKeys.Show)!!.run(Show(pack))
-        configs.value = setOf(home, library)
+        configs.value = setOf(ConfigId(home.value), ConfigId(library.value))
         assertEquals(library, main.shown())
         main.findCommand(HistoryKeys.Forward)!!.run(Unit)
         assertEquals(library, main.shown(), "nor is it ahead")
@@ -112,7 +113,7 @@ class HistoryKeysTest {
         main.findCommand(PagesKeys.Show)!!.run(Show(library, mapOf("nobody.answers" to packValue.json("x"))))
         main.findCommand(HistoryKeys.Back)!!.run(Unit)
         packs.value = setOf(packValue.json("a"))
-        assertEquals(listOf(home, pack), main.current(HistoryKeys.History)!!.entries.map { it.config })
+        assertEquals(listOf(home, pack), main.current(HistoryKeys.History)!!.entries.map { it.screen })
         assertEquals(packValue.json("a"), main.current(HistoryKeys.History)!!.current.opened["pack.page"], "the deleted pack's page is gone")
         main.findCommand(HistoryKeys.Forward)!!.run(Unit)
         assertEquals(library, main.shown(), "a value nobody answers for is never gone")

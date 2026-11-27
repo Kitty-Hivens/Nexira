@@ -13,7 +13,7 @@ import hivens.ui.layers.Layer
 import hivens.ui.layers.LayerHost
 import hivens.ui.layers.WindowLayers
 import hivens.history.api.History
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.pages.api.HistoryEntry
 import hivens.pages.api.Show
 import kotlin.test.Test
@@ -37,9 +37,9 @@ class ThumbButtonsTest {
         }
     }
 
-    private fun history() = Nav(History(LauncherConfigs.Library)).also { it.show(LauncherConfigs.pack("abc")) }
+    private fun history() = Nav(History(LauncherScreens.Library)).also { it.show(LauncherScreens.pack("abc")) }
 
-    private val pack = LauncherConfigs.pack("abc").let { HistoryEntry(it.config, it.values) }
+    private val pack = LauncherScreens.pack("abc").let { HistoryEntry(it.screen, it.values) }
 
     @Test
     fun `back closes what the window has open before it moves the history`() {
@@ -54,7 +54,7 @@ class ThumbButtonsTest {
 
         sheet.close()
         thumbBack(layers, nav.back)
-        assertEquals(HistoryEntry(LauncherConfigs.Library), nav.now.current, "with nothing open it is history back")
+        assertEquals(HistoryEntry(LauncherScreens.Library), nav.now.current, "with nothing open it is history back")
     }
 
     // Nothing a thumb press does reaches the window itself: at the root the history
@@ -62,14 +62,14 @@ class ThumbButtonsTest {
     @Test
     fun `back at the root moves nothing and is counted as a back at the root`() {
         val layers = WindowLayers()
-        val nav = Nav(History(LauncherConfigs.Home))
+        val nav = Nav(History(LauncherScreens.Home))
         thumbBack(layers, nav.back)
-        assertEquals(listOf(HistoryEntry(LauncherConfigs.Home)), nav.now.entries)
+        assertEquals(listOf(HistoryEntry(LauncherScreens.Home)), nav.now.entries)
         assertEquals(1, nav.now.backsAtRoot)
 
-        nav.show(LauncherConfigs.section(LauncherConfigs.Library))
+        nav.show(LauncherScreens.section(LauncherScreens.Library))
         thumbBack(layers, nav.back)
-        assertEquals(HistoryEntry(LauncherConfigs.Home), nav.now.current, "back from a rail section comes home")
+        assertEquals(HistoryEntry(LauncherScreens.Home), nav.now.current, "back from a rail section comes home")
         assertEquals(1, nav.now.backsAtRoot)
     }
 
@@ -90,7 +90,7 @@ class ThumbButtonsTest {
 
             nav.back()
             thumbForward(layers, nav.forward)
-            assertEquals(HistoryEntry(LauncherConfigs.Library), nav.now.current, "nor does forward")
+            assertEquals(HistoryEntry(LauncherScreens.Library), nav.now.current, "nor does forward")
 
             modal = false
             Snapshot.sendApplyNotifications()

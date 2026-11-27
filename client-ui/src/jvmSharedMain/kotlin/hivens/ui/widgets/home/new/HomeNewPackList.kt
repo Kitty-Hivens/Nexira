@@ -44,7 +44,7 @@ import hivens.packs.api.PackView
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.nexiraStrings
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.NxVerticalScrollbar
 import hivens.ui.nx.PlayGround
@@ -112,7 +112,7 @@ fun HomeNewPackList(instance: WidgetInstance) {
 
     // An empty library is where somebody starts, and this is the widget that says how.
     if (all.isEmpty()) {
-        EmptyPacksCta(onBrowse = { show(Show(LauncherConfigs.Browse)) })
+        EmptyPacksCta(onBrowse = { show(Show(LauncherScreens.Browse)) })
         return
     }
 
@@ -209,7 +209,7 @@ private fun PackRow(pack: PackView, columns: PackListColumns, appState: SessionS
             .clip(RoundedCornerShape(8.dp))
             .background(NxInk.main.copy(alpha = if (hovered) HOVER_ALPHA else 0f))
             .hoverable(interaction)
-            .clickable(interactionSource = interaction, indication = null) { show(LauncherConfigs.pack(pack.id)) }
+            .clickable(interactionSource = interaction, indication = null) { show(LauncherScreens.pack(pack.id)) }
             .padding(horizontal = 8.dp),
         verticalAlignment     = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp),

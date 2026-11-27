@@ -4,7 +4,7 @@ import hivens.core.api.interfaces.IPackRepository
 import hivens.core.update.PackUpdateStatus
 import hivens.core.update.PackUpdateStatusHub
 import hivens.i18n.api.Strings
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.notifications.Kind
 import hivens.ui.notifications.NotifAction
@@ -89,7 +89,7 @@ class PackUpdateDriver(
                     kind      = Kind.ActionRequired,
                     title     = s.text("notifPackUpdatePending", title, status.toVersion),
                     actions   = listOf(
-                        NotifAction("open-versions", s.text("notifActionOpenVersions")) { nav.open(LauncherConfigs.packVersions(id)) },
+                        NotifAction("open-versions", s.text("notifActionOpenVersions")) { nav.open(LauncherScreens.packVersions(id)) },
                     ),
                 )
             }
@@ -103,7 +103,7 @@ class PackUpdateDriver(
                 title     = s.text("notifPackUpdateFailed", title),
                 body      = status.reason.ifBlank { null },
                 actions   = listOf(
-                    NotifAction("open-versions", s.text("notifActionOpenVersions")) { nav.open(LauncherConfigs.packVersions(id)) },
+                    NotifAction("open-versions", s.text("notifActionOpenVersions")) { nav.open(LauncherScreens.packVersions(id)) },
                 ),
             )
         }

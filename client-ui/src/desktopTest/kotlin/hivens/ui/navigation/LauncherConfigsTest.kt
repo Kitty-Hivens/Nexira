@@ -19,18 +19,19 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import hivens.pages.api.ScreenId
 
 /** The launcher's own configs: each has a widget that draws it, a name in the trail, and is opened with what its page reads. */
 class LauncherConfigsTest {
 
     private val strings = NexiraStrings.shipped("en")
 
-    private fun Show.entry() = HistoryEntry(config, values)
+    private fun Show.entry() = HistoryEntry(screen, values)
 
     @Test
     fun `every config has its widget, and every screen widget its config`() {
         val screens = launcherAndControls.all().keys.map { it.value }.filter { it.startsWith("screen.") }.toSet()
-        assertEquals((LauncherConfigs.all + LauncherConfigs.Console).map { screenKind(it).value }.toSet(), screens)
+        assertEquals((LauncherScreens.all.map { it.asConfig() } + LauncherConfigs.Console).map { screenKind(it).value }.toSet(), screens)
     }
 
     @Test
@@ -42,56 +43,56 @@ class LauncherConfigsTest {
 
     @Test
     fun `no two configs share an id`() {
-        val ids = LauncherConfigs.all.map { it.value }
+        val ids = LauncherScreens.all.map { it.value }
         assertEquals(14, ids.toSet().size)
     }
 
     @Test
     fun `a screen widget is not offered in the palette`() {
-        LauncherConfigs.all.forEach { assertEquals(false, assertNotNull(launcherAndControls[screenKind(it)]).removable, it.value) }
+        LauncherScreens.all.forEach { assertEquals(false, assertNotNull(launcherAndControls[screenKind(it.asConfig())]).removable, it.value) }
     }
 
     @Test
     fun `a config nothing has to be looked up for names its crumb`() {
-        val named = LauncherConfigs.all - setOf(LauncherConfigs.Pack, LauncherConfigs.CataloguePack, LauncherConfigs.Project, LauncherConfigs.Build)
+        val named = LauncherScreens.all - setOf(LauncherScreens.Pack, LauncherScreens.CataloguePack, LauncherScreens.Project, LauncherScreens.Build)
         val labels = named.associateWith { assertNotNull(staticCrumbLabel(HistoryEntry(it), strings), it.value) }
         labels.forEach { (config, label) -> assertNotEquals("", label, config.value) }
         assertEquals(labels.size, labels.values.toSet().size, "two places are called the same: $labels")
-        assertEquals("1.2", staticCrumbLabel(LauncherConfigs.build(ProjectTarget.Catalogue("sodium"), "v1", "1.2").entry(), strings))
-        assertNull(staticCrumbLabel(LauncherConfigs.pack("a").entry(), strings))
-        assertNull(staticCrumbLabel(HistoryEntry(ConfigId("made")), strings))
+        assertEquals("1.2", staticCrumbLabel(LauncherScreens.build(ProjectTarget.Catalogue("sodium"), "v1", "1.2").entry(), strings))
+        assertNull(staticCrumbLabel(LauncherScreens.pack("a").entry(), strings))
+        assertNull(staticCrumbLabel(HistoryEntry(ScreenId("made")), strings))
     }
 
     @Test
     fun `the catalogue from inside a pack is a page of its own, called otherwise`() {
-        val into = LauncherConfigs.browseInto("a").entry()
-        assertNotEquals(HistoryEntry(LauncherConfigs.Browse).page, into.page)
-        assertNotEquals(staticCrumbLabel(HistoryEntry(LauncherConfigs.Browse), strings), staticCrumbLabel(into, strings))
+        val into = LauncherScreens.browseInto("a").entry()
+        assertNotEquals(HistoryEntry(LauncherScreens.Browse).page, into.page)
+        assertNotEquals(staticCrumbLabel(HistoryEntry(LauncherScreens.Browse), strings), staticCrumbLabel(into, strings))
         assertEquals("a", CataloguePages.Into.read(into.values))
     }
 
     @Test
     fun `what a page is opened with reads back`() {
-        assertEquals("a", PackPages.Pack.read(LauncherConfigs.pack("a").values))
-        assertEquals("a", PackPages.Pack.read(LauncherConfigs.packVersions("a").values))
-        assertEquals(CataloguePackRef("modrinth", "p"), CataloguePages.Pack.read(LauncherConfigs.cataloguePack("modrinth", "p").values))
+        assertEquals("a", PackPages.Pack.read(LauncherScreens.pack("a").values))
+        assertEquals("a", PackPages.Pack.read(LauncherScreens.packVersions("a").values))
+        assertEquals(CataloguePackRef("modrinth", "p"), CataloguePages.Pack.read(LauncherScreens.cataloguePack("modrinth", "p").values))
         val targets = listOf(
             ProjectTarget.Catalogue("sodium"),
             ProjectTarget.Catalogue("sodium", intoInstanceId = "a"),
             ProjectTarget.Installed("a", ProjectKind.Mod, "sodium.jar"),
         )
         targets.forEach { target ->
-            assertEquals<ProjectTarget?>(target, CataloguePages.Project.read(LauncherConfigs.project(target).values))
-            val build = LauncherConfigs.build(target, "v1", "1.2").values
+            assertEquals<ProjectTarget?>(target, CataloguePages.Project.read(LauncherScreens.project(target).values))
+            val build = LauncherScreens.build(target, "v1", "1.2").values
             assertEquals<ProjectTarget?>(target, CataloguePages.Project.read(build))
             assertEquals("v1", CataloguePages.Build.read(build)?.versionId)
         }
-        assertEquals(targets.size, targets.map { LauncherConfigs.project(it).entry().page }.toSet().size, "each target is a page of its own")
+        assertEquals(targets.size, targets.map { LauncherScreens.project(it).entry().page }.toSet().size, "each target is a page of its own")
     }
 
     @Test
     fun `a section stands over home`() {
-        val history = History(LauncherConfigs.Home).show(LauncherConfigs.pack("a")).show(LauncherConfigs.section(LauncherConfigs.Settings))
-        assertEquals(listOf(LauncherConfigs.Home, LauncherConfigs.Settings), history.entries.map { it.config })
+        val history = History(LauncherScreens.Home).show(LauncherScreens.pack("a")).show(LauncherScreens.section(LauncherScreens.Settings))
+        assertEquals(listOf(LauncherScreens.Home, LauncherScreens.Settings), history.entries.map { it.screen })
     }
 }

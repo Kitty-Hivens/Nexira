@@ -3,7 +3,7 @@ package hivens.history
 import hivens.pages.api.Show
 import hivens.widget.api.InterfaceRestarts
 import hivens.widget.model.CompositionName
-import hivens.widget.model.ConfigId
+import hivens.pages.api.ScreenId
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame
@@ -16,34 +16,34 @@ class HistoriesTest {
     private val histories = Histories()
 
     private val main = CompositionName("main")
-    private val home = ConfigId("home")
-    private val library = ConfigId("library")
-    private val pack = ConfigId("pack")
-    private val versions = ConfigId("pack.versions")
+    private val home = ScreenId("home")
+    private val library = ScreenId("library")
+    private val pack = ScreenId("pack")
+    private val versions = ScreenId("pack.versions")
 
     private fun main(restarts: InterfaceRestarts? = null) = histories.of(main, home, restarts)
 
-    private fun CompositionHistory.configs() = now.value.entries.map { it.config }
+    private fun CompositionHistory.screens() = now.value.entries.map { it.screen }
 
     @Test
     fun `a composition drawn again goes on from where it stood`() {
         main().show(Show(pack))
         assertSame(main(), main())
-        assertEquals(listOf(home, pack), main().configs())
+        assertEquals(listOf(home, pack), main().screens())
     }
 
     @Test
     fun `two compositions keep a history each`() {
-        val other = histories.of(CompositionName("console"), ConfigId("console"))
+        val other = histories.of(CompositionName("console"), ScreenId("console"))
         main().show(Show(library))
         assertNotSame(main(), other)
-        assertEquals(listOf(ConfigId("console")), other.configs())
+        assertEquals(listOf(ScreenId("console")), other.screens())
     }
 
     @Test
-    fun `a config the composition does not have is not shown`() {
+    fun `a screen the composition does not have is not shown`() {
         main().show(Show(library)) { it != library }
-        assertEquals(listOf(home), main().configs())
+        assertEquals(listOf(home), main().screens())
     }
 
     @Test
@@ -51,9 +51,9 @@ class HistoriesTest {
         main().show(Show(library))
         main().show(Show(pack))
         histories.afterCrash(again = false)
-        assertEquals(library, main().now.value.current.config)
+        assertEquals(library, main().now.value.current.screen)
         main().forward()
-        assertEquals(pack, main().now.value.current.config)
+        assertEquals(pack, main().now.value.current.screen)
     }
 
     @Test
@@ -62,11 +62,11 @@ class HistoriesTest {
         main().show(Show(pack))
         main().show(Show(versions))
         histories.afterCrash(again = false)
-        assertEquals(pack, main().now.value.current.config)
+        assertEquals(pack, main().now.value.current.screen)
         histories.afterCrash(again = true)
-        assertEquals(listOf(home), main().configs())
+        assertEquals(listOf(home), main().screens())
         main().forward()
-        assertEquals(library, main().now.value.current.config)
+        assertEquals(library, main().now.value.current.screen)
     }
 
     // One crash after another walks to the root instead of restarting on the same page until none is left.
@@ -74,7 +74,7 @@ class HistoriesTest {
     fun `at its root a history stays there, and no back is counted against it`() {
         main().show(Show(library))
         repeat(3) { histories.afterCrash(again = false) }
-        assertEquals(listOf(home), main().configs())
+        assertEquals(listOf(home), main().screens())
         assertEquals(0, main().now.value.backsAtRoot)
         assertTrue(main().now.value.canGoForward)
     }
@@ -84,8 +84,8 @@ class HistoriesTest {
         main().show(Show(library))
         main().show(Show(pack))
         val once = InterfaceRestarts(count = 1, again = false)
-        assertEquals(library, main(once).now.value.current.config)
-        assertEquals(library, main(once).now.value.current.config, "the same start over is not stepped back from twice")
-        assertEquals(listOf(home), main(InterfaceRestarts(count = 2, again = true)).configs())
+        assertEquals(library, main(once).now.value.current.screen)
+        assertEquals(library, main(once).now.value.current.screen, "the same start over is not stepped back from twice")
+        assertEquals(listOf(home), main(InterfaceRestarts(count = 2, again = true)).screens())
     }
 }

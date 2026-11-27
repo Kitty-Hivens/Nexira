@@ -1,6 +1,5 @@
 package hivens.pages.api
 
-import hivens.widget.model.ConfigId
 import hivens.widget.model.ScopeLevel
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
@@ -21,7 +20,7 @@ class PageValueTest {
 
     @Test
     fun `a value goes into an opening and is read from its entry`() {
-        val show = Show(ConfigId("project"), mapOf(name.of("Sodium"), target.of(Target("sodium", "pack"))))
+        val show = Show(ScreenId("project"), mapOf(name.of("Sodium"), target.of(Target("sodium", "pack"))))
         assertEquals("Sodium", name.read(show.values))
         assertEquals(Target("sodium", "pack"), target.read(show.values))
     }

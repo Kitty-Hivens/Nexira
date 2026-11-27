@@ -13,7 +13,7 @@ import hivens.catalogue.api.SearchFilter
 import hivens.catalogue.api.SourceView
 import hivens.catalogue.api.TagSearch
 import hivens.ui.feature.catalogue.project.Environment
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.pages.api.HistoryEntry
 import hivens.pages.api.Show
 import kotlinx.coroutines.CoroutineScope
@@ -143,7 +143,7 @@ class CatalogueSearchTest {
         assertTrue(c.view.value.unlocked.isEmpty())
     }
 
-    private val onProject = LauncherConfigs.project(ProjectTarget.Catalogue("sodium")).let { HistoryEntry(it.config, it.values) }
+    private val onProject = LauncherScreens.project(ProjectTarget.Catalogue("sodium")).let { HistoryEntry(it.screen, it.values) }
 
     /** The lists can take seconds, and the search waits on the shell's scope, not the page's. */
     @Test
@@ -154,7 +154,7 @@ class CatalogueSearchTest {
 
         searchFromTag(
             "mod", ProjectTag.Category("optimization"), packId = null,
-            known = { entry = HistoryEntry(LauncherConfigs.Library); tags },
+            known = { entry = HistoryEntry(LauncherScreens.Library); tags },
             current = { entry },
             show = { opened += it },
             search = { asked += it },
@@ -177,7 +177,7 @@ class CatalogueSearchTest {
             search = { asked += it },
         )
 
-        assertEquals(listOf(Show(LauncherConfigs.Browse)), opened)
+        assertEquals(listOf(Show(LauncherScreens.Browse)), opened)
         assertEquals(listOf(TagSearch("mod", setOf(SearchFilter(FilterField.Category, "optimization")), null)), asked)
     }
 }

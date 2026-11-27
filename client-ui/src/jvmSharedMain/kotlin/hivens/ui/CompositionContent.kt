@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import hivens.ui.layout.DocumentStore
+import hivens.ui.navigation.asConfig
 import hivens.ui.widgets.ChildLevel
 import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
@@ -24,7 +25,7 @@ fun CompositionContent(name: CompositionName, start: ConfigId) {
     ChildLevel(ScopeLevel.Composition) {
         ProvideCompositionFacts(name, document)
         val (history, _) = rememberCompositionHistory(start)
-        ProvideComposition(history.current.config) {
+        ProvideComposition(history.current.screen.asConfig()) {
             ConfigView(name, document, history, Modifier.fillMaxSize())
         }
     }

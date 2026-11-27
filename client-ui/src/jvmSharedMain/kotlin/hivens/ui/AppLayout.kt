@@ -19,6 +19,7 @@ import hivens.ui.editor.EditorSurfaceHost
 import hivens.ui.layout.DocumentStore
 import hivens.ui.host.CompositionWindows
 import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.*
 import hivens.ui.feature.catalogue.browse.LocalCatalogueSearch
@@ -59,6 +60,9 @@ import hivens.ui.theme.NxColor
 import org.koin.compose.koinInject
 import hivens.history.api.HistoryKeys
 import hivens.pages.api.PagesKeys
+import hivens.ui.navigation.asConfig
+import hivens.ui.navigation.asScreen
+import hivens.pages.api.ScreenId
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -90,16 +94,16 @@ fun AppLayout(
     // widget the palette draws reads the same answers as one on a surface. Everything
     // else a widget reads here, the history and the session among it, the level makes
     // for itself.
-    ProvideComposition(now.current.config) {
+    ProvideComposition(now.current.screen.asConfig()) {
     // The editor host wraps the WHOLE shell (rails included) so its decorators
     // reach rail widgets; it puts its own chrome back over the content pane from
     // what the centre region reports. The shell itself is the config's layout.
     EditorSurfaceHost(
         composition            = LauncherConfigs.Composition,
-        config                 = now.current.config,
+        config                 = now.current.screen.asConfig(),
         customization          = customization,
         onCustomizationChanged = onCustomizationChanged,
-        onOpen                 = { show(LauncherConfigs.section(it)) },
+        onOpen                 = { show(LauncherScreens.section(it.asScreen())) },
     ) {
         // Links that point at a project the launcher can draw stop going out to a
         // browser from here down, and a project's tags open the catalogue. Provided
@@ -162,7 +166,7 @@ internal fun ProvideComposition(config: ConfigId, content: @Composable () -> Uni
  */
 @Composable
 internal fun rememberCompositionHistory(start: ConfigId): Pair<History, (Show) -> Unit> {
-    val history = rememberScopedSource(HistoryKeys.History).valueOrNull() ?: remember(start) { History(start) }
+    val history = rememberScopedSource(HistoryKeys.History).valueOrNull() ?: remember(start) { History(start.asScreen()) }
     val command = rememberScopedCommand(PagesKeys.Show)
     val latest by rememberUpdatedState(command)
     val show: (Show) -> Unit = remember { { latest?.invoke(it) } }
@@ -208,7 +212,7 @@ fun AppSidebar(
     /** The left region, whose slots the rail's entries stand in. */
     instance: WidgetInstance,
     isAuthenticated: Boolean,
-    onSection: (ConfigId) -> Unit,
+    onSection: (ScreenId) -> Unit,
     onLogout: () -> Unit,
     modifier: Modifier = Modifier.width(64.dp).fillMaxHeight(),
 ) {
@@ -216,13 +220,13 @@ fun AppSidebar(
     val setConsoleVisible = rememberScopedCommand(Commands.SetConsoleVisible)
 
     // Puppet: sidebar navigation.
-    PuppetClick("nav.home")     { onSection(LauncherConfigs.Home) }
-    PuppetClick("nav.library")  { onSection(LauncherConfigs.Library) }
-    PuppetClick("nav.browse")   { onSection(LauncherConfigs.Browse) }
-    PuppetClick("nav.profile") { onSection(LauncherConfigs.Profile) }
-    PuppetClick("nav.wardrobe") { onSection(LauncherConfigs.Wardrobe) }
-    PuppetClick("nav.settings") { onSection(LauncherConfigs.Settings) }
-    PuppetClick("nav.about")    { onSection(LauncherConfigs.About) }
+    PuppetClick("nav.home")     { onSection(LauncherScreens.Home) }
+    PuppetClick("nav.library")  { onSection(LauncherScreens.Library) }
+    PuppetClick("nav.browse")   { onSection(LauncherScreens.Browse) }
+    PuppetClick("nav.profile") { onSection(LauncherScreens.Profile) }
+    PuppetClick("nav.wardrobe") { onSection(LauncherScreens.Wardrobe) }
+    PuppetClick("nav.settings") { onSection(LauncherScreens.Settings) }
+    PuppetClick("nav.about")    { onSection(LauncherScreens.About) }
     PuppetClick("nav.console")  { setConsoleVisible?.invoke(!consoleVisible) }
     if (isAuthenticated) {
         PuppetClick("nav.logout") { onLogout() }
@@ -232,7 +236,7 @@ fun AppSidebar(
     val configs = LocalDocument.current?.compositions?.get(LauncherConfigs.Composition)?.configs?.keys.orEmpty()
     val shipped = standard.compositions[LauncherConfigs.Composition]?.configs?.keys.orEmpty()
     (configs - shipped).forEach { id ->
-        key(id) { PuppetClick("nav.screen.${id.value}") { onSection(id) } }
+        key(id) { PuppetClick("nav.screen.${id.value}") { onSection(id.asScreen()) } }
     }
 
     NavigationRail(

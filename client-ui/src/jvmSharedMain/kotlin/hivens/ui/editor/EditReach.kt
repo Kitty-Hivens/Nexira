@@ -3,6 +3,7 @@ package hivens.ui.editor
 import hivens.i18n.api.Strings
 import hivens.ui.chrome.staticCrumbLabel
 import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
 import hivens.pages.api.HistoryEntry
@@ -11,6 +12,7 @@ import hivens.widget.model.NodeRoot
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.holdsOwn
 import hivens.widget.model.isSingleSlot
+import hivens.ui.navigation.asScreen
 
 /** Which configs an edit made in one place changes. */
 enum class EditReach {
@@ -42,11 +44,11 @@ fun Document.reachOf(path: NodePath, widget: WidgetInstance? = null): EditReach 
  */
 fun Document.configLabel(id: ConfigId, s: Strings): String {
     compositions[LauncherConfigs.Composition]?.configs?.get(id)?.title?.takeIf { it.isNotBlank() }?.let { return it }
-    return when (id) {
-        LauncherConfigs.Pack -> s.text("configPack")
-        LauncherConfigs.CataloguePack -> s.text("configCataloguePack")
-        LauncherConfigs.Project -> s.text("configProject")
-        LauncherConfigs.Build -> s.text("configBuild")
-        else -> staticCrumbLabel(HistoryEntry(id), s)?.takeIf { it.isNotBlank() } ?: id.value
+    return when (id.asScreen()) {
+        LauncherScreens.Pack -> s.text("configPack")
+        LauncherScreens.CataloguePack -> s.text("configCataloguePack")
+        LauncherScreens.Project -> s.text("configProject")
+        LauncherScreens.Build -> s.text("configBuild")
+        else -> staticCrumbLabel(HistoryEntry(id.asScreen()), s)?.takeIf { it.isNotBlank() } ?: id.value
     }
 }

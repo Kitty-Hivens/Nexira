@@ -57,7 +57,7 @@ import hivens.accounts.api.SessionState
 import hivens.ui.AppSidebar
 import hivens.ui.RightPanel
 import hivens.ui.chrome.HOST_IS_MAC
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.nx.NxIconButton
 import hivens.ui.chrome.LocalRightRailSheet
 import hivens.ui.chrome.LocalUseCustomChrome
@@ -250,7 +250,7 @@ fun ShellLeftRegion(instance: WidgetInstance) {
             AppSidebar(
                 instance        = instance,
                 isAuthenticated = appState is SessionState.SignedIn && signOut != null,
-                onSection       = { show(LauncherConfigs.section(it)) },
+                onSection       = { show(LauncherScreens.section(it)) },
                 onLogout        = signOut ?: {},
                 modifier        = Modifier.fillMaxSize().padding(start = edge.start, bottom = edge.bottom),
             )

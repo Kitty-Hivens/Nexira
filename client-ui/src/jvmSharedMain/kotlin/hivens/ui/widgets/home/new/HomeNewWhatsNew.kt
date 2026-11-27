@@ -20,7 +20,7 @@ import hivens.ui.components.LauncherUpdateState
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.nx.NxRow
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
@@ -97,7 +97,7 @@ fun HomeNewWhatsNew(instance: WidgetInstance) {
                     else -> NxIcon.Update
                 },
                 iconTint = NxColor.lead(),
-                onClick  = { show(LauncherConfigs.packVersions(pack.id)) },
+                onClick  = { show(LauncherScreens.packVersions(pack.id)) },
                 trailing = { Symbol(NxIcon.ChevronRight, null, tint = NxInk.quiet) },
             )
         }

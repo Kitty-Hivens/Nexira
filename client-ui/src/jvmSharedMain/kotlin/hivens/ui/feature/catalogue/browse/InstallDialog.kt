@@ -61,7 +61,7 @@ import hivens.packs.api.PackKeys
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.nx.InitialsAvatar
 import hivens.ui.nx.NxButton
 import hivens.ui.nx.NxButtonStyle
@@ -269,7 +269,7 @@ private fun rememberInstallDialogModel(subject: InstallSubject): InstallDialogMo
         install = { candidate -> into?.invoke(candidate.packId) },
         retry = { retry?.invoke() },
         createAndInstall = { name, mc, loader -> newPack?.invoke(NewPackRequest(name, mc, loader)) },
-        openPack = { id -> show?.invoke(LauncherConfigs.pack(id)) },
+        openPack = { id -> show?.invoke(LauncherScreens.pack(id)) },
     )
 }
 

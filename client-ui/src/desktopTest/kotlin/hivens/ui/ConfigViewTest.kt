@@ -45,6 +45,8 @@ import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import hivens.ui.navigation.asConfig
+import hivens.ui.navigation.asScreen
 
 /**
  * The config view draws a config at one place, so what the composition has once is the same node in every config: a
@@ -148,12 +150,12 @@ class ConfigViewTest {
 
     /** Draws the history from [a] through each of [moves], letting each swap finish. */
     private fun visit(vararg moves: History.() -> History) {
-        var history by mutableStateOf(History(a))
+        var history by mutableStateOf(History(a.asScreen()))
         onEventThread {
             val scene = ImageComposeScene(200, 200, Density(1f)) {
                 CompositionLocalProvider(LocalWidgetRegistry provides registry, LocalScope provides app) {
                     ChildLevel(ScopeLevel.Composition) {
-                        ProvideScoped(CompositionKeys.Config, history.current.config) {
+                        ProvideScoped(CompositionKeys.Config, history.current.screen.asConfig()) {
                             ConfigView(composition, document, history, Modifier.fillMaxSize())
                         }
                     }
@@ -179,20 +181,20 @@ class ConfigViewTest {
 
     @Test
     fun `a block two configs stand in a slot that holds no page is one node across them`() {
-        visit({ show(Show(b)) }, { back() })
+        visit({ show(Show(b.asScreen())) }, { back() })
         assertEquals(1, made["block"], "made once: $made")
     }
 
     @Test
     fun `a page's content is made for its page`() {
-        visit({ show(Show(b)) })
+        visit({ show(Show(b.asScreen())) })
         assertEquals(1, made["on-a"], "$made")
         assertEquals(1, made["on-b"], "$made")
     }
 
     @Test
     fun `a config that does not stand the block draws none, and one that does makes it again`() {
-        visit({ show(Show(c)) }, { show(Show(a)) })
+        visit({ show(Show(c.asScreen())) }, { show(Show(a.asScreen())) })
         assertEquals(2, made["block"], "$made")
     }
 
@@ -204,7 +206,7 @@ class ConfigViewTest {
 
     @Test
     fun `a widget shown on one config is drawn there only`() {
-        visit({ show(Show(b)) }, { back() })
+        visit({ show(Show(b.asScreen())) }, { back() })
         assertEquals(1, made["only-on-b"], "made on b and nowhere else: $made")
     }
 }

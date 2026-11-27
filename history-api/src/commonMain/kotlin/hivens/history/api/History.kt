@@ -2,7 +2,7 @@ package hivens.history.api
 
 import hivens.pages.api.HistoryEntry
 import hivens.pages.api.Show
-import hivens.widget.model.ConfigId
+import hivens.pages.api.ScreenId
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 
@@ -25,7 +25,7 @@ data class History(
         require(entries.isNotEmpty()) { "a history shows something" }
     }
 
-    constructor(root: ConfigId) : this(listOf(HistoryEntry(root)))
+    constructor(root: ScreenId) : this(listOf(HistoryEntry(root)))
 
     /** The entry shown. */
     val current: HistoryEntry get() = entries.last()
@@ -39,14 +39,14 @@ data class History(
 
     /** Shows what [show] asks for. Asked for the page shown already, with no [Show.over], nothing moves. */
     fun show(show: Show): History {
-        val target = HistoryEntry(show.config, show.values)
+        val target = HistoryEntry(show.screen, show.values)
         val under = show.over?.let(::cutTo) ?: entries
         if (under.last().page != target.page) return copy(entries = under + target, ahead = emptyList())
         return if (show.over == null) this else copy(entries = under, ahead = emptyList())
     }
 
-    private fun cutTo(config: ConfigId): List<HistoryEntry> {
-        val root = HistoryEntry(config)
+    private fun cutTo(screen: ScreenId): List<HistoryEntry> {
+        val root = HistoryEntry(screen)
         return entries.take(entries.indexOfFirst { it.page == root.page } + 1).ifEmpty { listOf(root) }
     }
 
@@ -79,7 +79,7 @@ data class History(
      * Drops every entry [keep] refuses, behind and ahead, for a place that stopped existing. Where none is left behind
      * the history starts over at [fallback]. Two entries of one page that come together become one.
      */
-    fun retain(fallback: ConfigId, keep: (HistoryEntry) -> Boolean): History {
+    fun retain(fallback: ScreenId, keep: (HistoryEntry) -> Boolean): History {
         if (reachable.all(keep)) return this
         val left = entries.filter(keep).ifEmpty { listOf(HistoryEntry(fallback)) }.oncePerPage()
         val next = (ahead.filter(keep) + left.last()).oncePerPage().dropLast(1)

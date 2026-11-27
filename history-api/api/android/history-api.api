@@ -20,7 +20,7 @@ public final class hivens/history/api/History {
 	public final fun getEntries ()Ljava/util/List;
 	public final fun getReachable ()Ljava/util/List;
 	public fun hashCode ()I
-	public final fun retain-Xdwnu-0 (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lhivens/history/api/History;
+	public final fun retain-sgvdcKI (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lhivens/history/api/History;
 	public final fun rewrite (Ljava/util/Map;)Lhivens/history/api/History;
 	public final fun show (Lhivens/pages/api/Show;)Lhivens/history/api/History;
 	public fun toString ()Ljava/lang/String;

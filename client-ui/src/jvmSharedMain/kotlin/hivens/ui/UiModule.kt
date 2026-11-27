@@ -50,6 +50,7 @@ import hivens.ui.identity.SkinLibrary
 import hivens.ui.identity.SkinManager
 import hivens.ui.layout.DocumentStore
 import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.navigation.MainWindowRequests
 import hivens.ui.navigation.NavRequests
 import hivens.ui.navigation.PackSettingsPage
@@ -714,11 +715,11 @@ internal fun uiDataRegistry(
     // What the composition's owner provides around every surface it draws, with the
     // sample in the sense above.
     declare(CompositionKeys.Name) { LauncherConfigs.Composition }
-    declare(CompositionKeys.Start) { LauncherConfigs.Home }
+    declare(CompositionKeys.Start) { LauncherScreens.Home }
     declare(CompositionKeys.Configs) { emptySet() }
-    declare(CompositionKeys.Config) { LauncherConfigs.Home }
+    declare(CompositionKeys.Config) { LauncherScreens.Home }
     // What the router provides for the entry each page is drawn for, and the launcher's own value of one.
-    declare(PageKeys.Entry) { HistoryEntry(LauncherConfigs.Home) }
+    declare(PageKeys.Entry) { HistoryEntry(LauncherScreens.Home) }
     registerFactory(PackSettingsPage.key) { page -> page.read(PackSettingsPage) }
     // What a page provides for its own widgets, on that page and nowhere else.
     declare(ProjectPageSource, ::sampleProjectPage)

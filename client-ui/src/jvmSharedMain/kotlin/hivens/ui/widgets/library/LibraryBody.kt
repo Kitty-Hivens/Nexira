@@ -24,7 +24,7 @@ import hivens.launcher.platform.PlatformPaths
 import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
 import hivens.ui.i18n.nexiraStrings
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.nx.NxButton
 import hivens.ui.components.DestructiveConfirmDialog
 import hivens.ui.platform.SystemActions
@@ -84,12 +84,12 @@ fun LibraryBody(instance: WidgetInstance) {
         LibraryEmpty(
             title    = p.emptyTitle.ifBlank { s.text("libraryEmptyTitle") },
             body     = p.emptyText.ifBlank { s.text("libraryEmptyBody") },
-            onBrowse = { show(Show(LauncherConfigs.Browse)) },
+            onBrowse = { show(Show(LauncherScreens.Browse)) },
         )
     } else {
         LibraryList(
             instances    = instances,
-            onOpenDetail = { show(LauncherConfigs.pack(it.id)) },
+            onOpenDetail = { show(LauncherScreens.pack(it.id)) },
             onOpenFolder = { SystemActions.openFolder(instanceDirOf(paths, it).toString()) },
             onDelete     = { pendingDelete = it },
         )

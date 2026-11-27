@@ -68,7 +68,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.nx.NxChoiceItem
 import hivens.ui.nx.NxChoiceMenu
 import hivens.ui.nx.NxIconButton
@@ -213,9 +213,9 @@ fun BrowseResultsWidget(instance: WidgetInstance) {
     // A result leaves Browse for its page: a catalogue pack's, or a project's, which
     // carries the target pack so the page can install into it.
     val openPack: (CatalogueCard) -> Unit = remember(show) {
-        { pack -> show(LauncherConfigs.cataloguePack(pack.origin, pack.id)) }
+        { pack -> show(LauncherScreens.cataloguePack(pack.origin, pack.id)) }
     }
-    val openProject: (ProjectTarget) -> Unit = remember(show) { { show(LauncherConfigs.project(it)) } }
+    val openProject: (ProjectTarget) -> Unit = remember(show) { { show(LauncherScreens.project(it)) } }
     val fade = Motion.fade
     // Each kind is its own list, so a change of kind crossfades one list into the
     // next instead of swapping the cards under the reader's eye. The list fading out
@@ -266,7 +266,7 @@ fun BrowseInstallingWidget(instance: WidgetInstance) {
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     NxTooltip(text = s.text("browseBackToPack")) {
-                        NxIconButton(icon = NxIcon.ArrowBack, contentDescription = s.text("browseBackToPack"), onClick = { show?.invoke(LauncherConfigs.pack(t.packId)) })
+                        NxIconButton(icon = NxIcon.ArrowBack, contentDescription = s.text("browseBackToPack"), onClick = { show?.invoke(LauncherScreens.pack(t.packId)) })
                     }
                     PackMark(t.packId, t.name, 48.dp)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {

@@ -13,7 +13,6 @@ import hivens.widget.api.WidgetScope
 import hivens.widget.api.current
 import hivens.widget.api.flowSource
 import hivens.widget.api.registerModuleKeys
-import hivens.widget.model.ConfigId
 import hivens.widget.model.ScopeLevel
 import kotlin.reflect.KClass
 import kotlin.test.assertNotSame
@@ -51,7 +50,7 @@ class PageValuesTest {
         return composition.pages.levelFor("page") { if (entry != null) provideSource(PageKeys.Entry, flowSource(entry)) }
     }
 
-    private fun opened(value: String) = HistoryEntry(ConfigId("project"), mapOf(title.of(value)))
+    private fun opened(value: String) = HistoryEntry(ScreenId("project"), mapOf(title.of(value)))
 
     @Test
     fun `a page reads what it was opened with, and follows it`() {
@@ -60,7 +59,7 @@ class PageValuesTest {
         assertEquals("Sodium", page.current(title.key))
         entry.value = opened("Lithium")
         assertEquals("Lithium", page.current(title.key))
-        entry.value = HistoryEntry(ConfigId("project"))
+        entry.value = HistoryEntry(ScreenId("project"))
         assertNull(page.current(title.key))
     }
 

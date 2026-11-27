@@ -17,7 +17,7 @@ import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.navigation.PackSettingsPage
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
@@ -54,7 +54,7 @@ class PagedSlotTest {
         PagedSlot(retention, pages, history, slotKey = "slot", own = own, content = content)
     }
 
-    private val pack = History(LauncherConfigs.Home).show(LauncherConfigs.pack("a"))
+    private val pack = History(LauncherScreens.Home).show(LauncherScreens.pack("a"))
     private val noted = pack.rewrite(mapOf(PackSettingsPage.of("Version")))
 
     /** Draws [content] for [start], then for what each of [moves] makes of it, and answers what was thrown. */
@@ -91,7 +91,7 @@ class PagedSlotTest {
     @Test
     fun `two entries of one page in a row do not take the window down`() {
         val drawn = ArrayList<HistoryEntry>()
-        val errors = route(noted, { rewrite(mapOf(PackSettingsPage.id to null)) }, { show(LauncherConfigs.packVersions("a")) }) { history ->
+        val errors = route(noted, { rewrite(mapOf(PackSettingsPage.id to null)) }, { show(LauncherScreens.packVersions("a")) }) { history ->
             Router(history) { entry ->
                 val visits by rememberSaveable { mutableStateOf(0) }
                 drawn += entry
@@ -99,7 +99,7 @@ class PagedSlotTest {
             }
         }
         assertEquals(emptyList(), errors)
-        assertEquals(LauncherConfigs.PackVersions, drawn.last().config)
+        assertEquals(LauncherScreens.PackVersions, drawn.last().screen)
     }
 
     /** An app level reading the page's entry and the pack page's note, for [inComposition]. */
@@ -128,7 +128,7 @@ class PagedSlotTest {
             CompositionLocalProvider(LocalScope provides app) {
                 ChildLevel(ScopeLevel.Composition) {
                     Router(history) { entry ->
-                        if (entry.config == LauncherConfigs.Pack) {
+                        if (entry.screen == LauncherScreens.Pack) {
                             seen += rememberScopedSource(PageKeys.Entry).valueOrNull() to rememberScopedSource(PackSettingsPage.key).valueOrNull()
                         }
                     }
@@ -150,7 +150,7 @@ class PagedSlotTest {
     fun `a page come back to reads what it noted as it left, from the first pass`() {
         val seen = reads(
             pack,
-            { rewrite(mapOf(PackSettingsPage.of("Version"))).show(LauncherConfigs.packVersions("a")) },
+            { rewrite(mapOf(PackSettingsPage.of("Version"))).show(LauncherScreens.packVersions("a")) },
             { back() },
         )
         assertEquals(null, seen.first().second)
@@ -163,7 +163,7 @@ class PagedSlotTest {
     @Test
     fun `content no entry holds as its own is one content and keeps its state across entries`() {
         val counts = ArrayList<Int>()
-        val errors = route(pack, { show(LauncherConfigs.packVersions("a")) }, { back() }) { history ->
+        val errors = route(pack, { show(LauncherScreens.packVersions("a")) }, { back() }) { history ->
             Router(history, own = { false }) { _ ->
                 var composed by remember { mutableStateOf(0) }
                 SideEffect { composed++ }
@@ -177,15 +177,15 @@ class PagedSlotTest {
     @Test
     fun `content that becomes an entry's own swaps onto that entry's page`() {
         val seen = ArrayList<Pair<HistoryEntry, Boolean>>()
-        val errors = route(pack, { show(LauncherConfigs.packVersions("a")) }) { history ->
+        val errors = route(pack, { show(LauncherScreens.packVersions("a")) }) { history ->
             inComposition {
-                Router(history, own = { it.config == LauncherConfigs.PackVersions }) { entry ->
+                Router(history, own = { it.screen == LauncherScreens.PackVersions }) { entry ->
                     seen += entry to (LocalScope.current?.level == ScopeLevel.Page)
                 }
             }
         }
         assertEquals(emptyList(), errors)
-        assertEquals(setOf(false), seen.filter { it.first.config == LauncherConfigs.Pack }.map { it.second }.toSet(), "shared content has no page")
-        assertEquals(setOf(true), seen.filter { it.first.config == LauncherConfigs.PackVersions }.map { it.second }.toSet(), "its own content is on its page")
+        assertEquals(setOf(false), seen.filter { it.first.screen == LauncherScreens.Pack }.map { it.second }.toSet(), "shared content has no page")
+        assertEquals(setOf(true), seen.filter { it.first.screen == LauncherScreens.PackVersions }.map { it.second }.toSet(), "its own content is on its page")
     }
 }

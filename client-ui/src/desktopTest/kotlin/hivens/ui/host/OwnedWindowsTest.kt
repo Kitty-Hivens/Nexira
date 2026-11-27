@@ -11,6 +11,7 @@ import androidx.compose.ui.unit.Density
 import hivens.ui.ProvideComposition
 import hivens.ui.layout.DocumentStore
 import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.widgets.ChildLevel
@@ -35,6 +36,7 @@ import kotlin.test.AfterTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
+import hivens.ui.navigation.asConfig
 
 /**
  * The windows a composition owns, as the widgets drawn in it see them: which are open, and the commands that open and
@@ -77,7 +79,7 @@ class OwnedWindowsTest {
                         listOf(first, second).forEach { seen ->
                             if (seen === second || drawn) {
                                 ChildLevel(ScopeLevel.Composition) {
-                                    ProvideComposition(LauncherConfigs.Home) {
+                                    ProvideComposition(LauncherScreens.Home.asConfig()) {
                                         seen.open = rememberScopedSource(CompositionKeys.Windows).valueOrNull()
                                         seen.show = rememberScopedCommand(CompositionKeys.ShowWindow)
                                         seen.close = rememberScopedCommand(CompositionKeys.CloseWindow)

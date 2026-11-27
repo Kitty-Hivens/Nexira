@@ -38,7 +38,7 @@ import hivens.ui.components.rememberPackDeleteBlock
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.navigation.NavRequests
 import hivens.ui.notifications.IndicationCenter
 import hivens.ui.nx.InitialsAvatar
@@ -238,7 +238,7 @@ internal fun PendingUpdateBadge(
     val pending = statuses[packId] as? PackUpdateView.Pending ?: return
     UpdateBadgePill(
         isRollback = pending.direction == PackUpdateView.Pending.OLDER,
-        onClick    = { nav.open(LauncherConfigs.packVersions(packId)) },
+        onClick    = { nav.open(LauncherScreens.packVersions(packId)) },
         modifier   = modifier,
         tone       = tone,
     )

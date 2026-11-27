@@ -25,7 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.nexiraStrings
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.nx.NxMetaChipTone
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
@@ -81,7 +81,7 @@ fun HomeNewContinue(instance: WidgetInstance) {
     val pack = quickLaunch.target
     val art = rememberPackArt(pack)
     val (hueA, hueB) = decorativePair(pack.id)
-    val openDetail = { show(LauncherConfigs.pack(pack.id)) }
+    val openDetail = { show(LauncherScreens.pack(pack.id)) }
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         // The name is the picture here, so it takes its size from the room it has:

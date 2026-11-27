@@ -19,7 +19,7 @@ import hivens.packs.api.PackKeys
 import hivens.packs.api.PackView
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.i18n.nexiraStrings
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
 import hivens.ui.press.OutlinedButton
@@ -120,7 +120,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
 
     if (all.isEmpty()) {
-        EmptyPacksCta(onBrowse = { show(Show(LauncherConfigs.Browse)) })
+        EmptyPacksCta(onBrowse = { show(Show(LauncherScreens.Browse)) })
         return
     }
 
@@ -151,7 +151,7 @@ fun HomeNewRecent(instance: WidgetInstance) {
                             PackTile(
                                 pack     = pack,
                                 appState = appState,
-                                onClick  = { show(LauncherConfigs.pack(pack.id)) },
+                                onClick  = { show(LauncherScreens.pack(pack.id)) },
                                 modifier = Modifier.width(tileWidth).aspectRatio(TILE_ASPECT),
                             )
                         }

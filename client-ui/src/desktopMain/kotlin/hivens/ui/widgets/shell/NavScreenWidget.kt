@@ -1,7 +1,7 @@
 package hivens.ui.widgets.shell
 
 import androidx.compose.runtime.Composable
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.screens.custom.ScreenIcons
 import hivens.widget.api.LocalDocument
 import hivens.widget.api.LocalSlotPath
@@ -15,6 +15,7 @@ import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
 import hivens.history.api.HistoryKeys
 import hivens.pages.api.PagesKeys
+import hivens.ui.navigation.asScreen
 
 @Serializable
 data class ScreenLinkProps(
@@ -44,7 +45,7 @@ fun NavScreenLink(instance: WidgetInstance) {
     NavSlot(
         icon        = ScreenIcons.of(screen.icon),
         outlineSwap = true,
-        active      = nav.current.config == config,
-        onClick     = { show(LauncherConfigs.section(config)) },
+        active      = nav.current.screen == config.asScreen(),
+        onClick     = { show(LauncherScreens.section(config.asScreen())) },
     )
 }

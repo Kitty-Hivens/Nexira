@@ -11,6 +11,7 @@ import hivens.pages.api.HistoryEntry
 import hivens.pages.api.PagesApi
 import hivens.pages.api.presentKey
 import hivens.pages.api.PagesKeys
+import hivens.pages.api.ScreenId
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.CompositionKeys
 import hivens.widget.api.HostApi
@@ -73,17 +74,17 @@ object HistoryKeysContribution : KeyContribution {
 
         keys.source(HistoryKeys.History, sample = { History(SAMPLE_ROOT) }) { composition ->
             val history = composition.history() ?: return@source flowSource(MutableStateFlow(History(composition.start() ?: SAMPLE_ROOT)))
-            // A config gone from the document leaves the history, back and forward both, so neither arrow opens a
+            // A screen gone from the document leaves the history, back and forward both, so neither arrow opens a
             // page about nothing.
             composition.find(CompositionKeys.Configs)?.state?.let { configs ->
-                composition.coroutineScope.launch { configs.collect { has -> history.retain { it.config in has } } }
+                composition.coroutineScope.launch { configs.collect { has -> history.retain { it.screen.value in has.ids() } } }
             }
             // So does a page opened with a value its module says is gone, a page of a pack deleted say.
             composition.coroutineScope.launch { composition.presentValues(history).collect { present -> history.retain { it.stillThere(present) } } }
             flowSource(history.now)
         }
         keys.command(PagesKeys.Show) { composition ->
-            command { show -> composition.history()?.show(show) { config -> composition.has(config) } }
+            command { show -> composition.history()?.show(show) { screen -> composition.has(screen) } }
         }
         keys.command(HistoryKeys.Back) { composition -> command { composition.history()?.back() } }
         keys.command(HistoryKeys.Forward) { composition -> command { composition.history()?.forward() } }
@@ -92,7 +93,7 @@ object HistoryKeysContribution : KeyContribution {
     }
 
     /** What the palette shows a history as, and where a composition with no start of its own starts. */
-    private val SAMPLE_ROOT = ConfigId("home")
+    private val SAMPLE_ROOT = ScreenId("home")
 }
 
 /** The history of the composition this level is, or null for one drawn without its name or start. */
@@ -102,10 +103,13 @@ private fun LevelContext.history(): CompositionHistory? {
     return hostServices.get<Histories>().of(name, root, find(InterfaceKeys.Restarts)?.state?.value)
 }
 
-private fun LevelContext.start(): ConfigId? = find(CompositionKeys.Start)?.state?.value
+// The screens are the composition's configs, by the same ids, until the pages module says which screens there are.
+private fun LevelContext.start(): ScreenId? = find(CompositionKeys.Start)?.state?.value?.let { ScreenId(it.value) }
 
-/** Whether the composition has [config], or true where nothing says which configs it has. */
-private fun LevelContext.has(config: ConfigId): Boolean = find(CompositionKeys.Configs)?.state?.value?.contains(config) ?: true
+/** Whether the composition has [screen], or true where nothing says which it has. */
+private fun LevelContext.has(screen: ScreenId): Boolean = find(CompositionKeys.Configs)?.state?.value?.let { screen.value in it.ids() } ?: true
+
+private fun Set<ConfigId>.ids(): Set<String> = mapTo(HashSet()) { it.value }
 
 /**
  * What still exists of every value the entries of [history] were opened with, by the value's id, for each value whose

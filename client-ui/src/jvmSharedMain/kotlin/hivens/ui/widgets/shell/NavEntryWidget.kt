@@ -29,7 +29,7 @@ import hivens.ui.icons.IconKey
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.layerTrigger
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.press.selectable
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
@@ -65,10 +65,10 @@ data class NavEntryProps(
 )
 
 private val LIBRARY_CONFIGS = setOf(
-    LauncherConfigs.Library, LauncherConfigs.Pack, LauncherConfigs.PackVersions, LauncherConfigs.Project, LauncherConfigs.Build,
+    LauncherScreens.Library, LauncherScreens.Pack, LauncherScreens.PackVersions, LauncherScreens.Project, LauncherScreens.Build,
 )
 
-private val SETTINGS_CONFIGS = setOf(LauncherConfigs.Settings, LauncherConfigs.Themes, LauncherConfigs.Background)
+private val SETTINGS_CONFIGS = setOf(LauncherScreens.Settings, LauncherScreens.Themes, LauncherScreens.Background)
 
 // The session is not a need of every entry: the sign-out entry draws nothing where no
 // accounts module is brought in, and the rest navigate all the same.
@@ -83,14 +83,14 @@ fun NavEntry(instance: WidgetInstance) {
     val p = instance.rememberProps<NavEntryProps>()
     val entry = rememberScopedSource(HistoryKeys.History).valueOrNull()?.current ?: return
     val show = rememberScopedCommand(PagesKeys.Show) ?: return
-    val config = entry.config
+    val config = entry.screen
 
     when (p.target) {
         NavTarget.Home -> NavSlot(
             icon         = NxIcon.Home,
             outlineSwap  = true,
-            active       = config == LauncherConfigs.Home,
-            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Home)) },
+            active       = config == LauncherScreens.Home,
+            onClick      = { show(LauncherScreens.section(LauncherScreens.Home)) },
         )
         NavTarget.Library -> NavSlot(
             icon         = NxIcon.Star,
@@ -99,39 +99,39 @@ fun NavEntry(instance: WidgetInstance) {
             // from a pack's content tab, so the rail went dark the moment a reader
             // followed a mod out of the pack they were standing in.
             active       = config in LIBRARY_CONFIGS,
-            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Library)) },
+            onClick      = { show(LauncherScreens.section(LauncherScreens.Library)) },
         )
         NavTarget.Browse -> NavSlot(
             icon         = NxIcon.Search,
             outlineSwap  = true,
             // Not from inside a pack: that browse is the pack's, and the catalogue's own is another page.
-            active       = config == LauncherConfigs.CataloguePack ||
-                (config == LauncherConfigs.Browse && CataloguePages.Into.id !in entry.opened),
-            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Browse)) },
+            active       = config == LauncherScreens.CataloguePack ||
+                (config == LauncherScreens.Browse && CataloguePages.Into.id !in entry.opened),
+            onClick      = { show(LauncherScreens.section(LauncherScreens.Browse)) },
         )
         NavTarget.Profile -> NavSlot(
             icon         = NxIcon.Person,
             outlineSwap  = true,
-            active       = config == LauncherConfigs.Profile,
-            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Profile)) },
+            active       = config == LauncherScreens.Profile,
+            onClick      = { show(LauncherScreens.section(LauncherScreens.Profile)) },
         )
         NavTarget.Wardrobe -> NavSlot(
             icon         = NxIcon.Palette,
             outlineSwap  = true,
-            active       = config == LauncherConfigs.Wardrobe,
-            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Wardrobe)) },
+            active       = config == LauncherScreens.Wardrobe,
+            onClick      = { show(LauncherScreens.section(LauncherScreens.Wardrobe)) },
         )
         NavTarget.Settings -> NavSlot(
             icon         = NxIcon.Settings,
             outlineSwap  = true,
             active       = config in SETTINGS_CONFIGS,
-            onClick      = { show(LauncherConfigs.section(LauncherConfigs.Settings)) },
+            onClick      = { show(LauncherScreens.section(LauncherScreens.Settings)) },
         )
         NavTarget.About -> NavSlot(
             icon         = NxIcon.Info,
             outlineSwap  = true,
-            active       = config == LauncherConfigs.About,
-            onClick      = { show(LauncherConfigs.section(LauncherConfigs.About)) },
+            active       = config == LauncherScreens.About,
+            onClick      = { show(LauncherScreens.section(LauncherScreens.About)) },
         )
         NavTarget.Console -> {
             val visible = rememberScopedSource(Sources.ConsoleVisible).valueOrNull() ?: return

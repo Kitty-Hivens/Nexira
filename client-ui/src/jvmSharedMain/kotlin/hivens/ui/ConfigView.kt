@@ -33,6 +33,7 @@ import hivens.widget.model.ScopeLevel
 import hivens.widget.model.contentAt
 import hivens.widget.model.heldOwnAnywhere
 import hivens.widget.model.holdsOwn
+import hivens.ui.navigation.asConfig
 
 /**
  * The config [history] shows of the composition [name] in [document], in the layout that fits the area it is drawn
@@ -52,7 +53,7 @@ internal fun ConfigView(name: CompositionName, document: Document, history: Hist
         val height = maxHeight.value
         val layoutOf = { config: ConfigId -> composition.configs[config]?.layoutFor(width, height)?.id }
         val pages = rememberConfigPages(document, history, layoutOf)
-        val config = history.current.config
+        val config = history.current.screen.asConfig()
         val layout = layoutOf(config) ?: return@BoxWithConstraints
         CompositionLocalProvider(LocalDocument provides document, LocalSingleSlotHost provides pages) {
             SlotRenderer(NodePath(name, NodeRoot.Layout(config, layout)), Modifier.fillMaxSize())
@@ -80,7 +81,7 @@ private fun rememberConfigPages(document: Document, history: History, layoutOf: 
                 slot(path, modifier)
             } else {
                 // The same slot under the root of the config an entry shows.
-                val at = { entry: HistoryEntry -> layouts(entry.config)?.let { path.copy(root = NodeRoot.Layout(entry.config, it)) } }
+                val at = { entry: HistoryEntry -> layouts(entry.screen.asConfig())?.let { path.copy(root = NodeRoot.Layout(entry.screen.asConfig(), it)) } }
                 val own = { entry: HistoryEntry -> at(entry)?.let(doc::holdsOwn) == true }
                 PagedSlot(retention, pages, shown, slotKey = path.nested.toString(), modifier, own = own) { entry ->
                     at(entry)?.let { slot(it, Modifier) }

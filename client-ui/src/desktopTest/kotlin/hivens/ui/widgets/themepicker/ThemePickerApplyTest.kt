@@ -17,6 +17,7 @@ import hivens.ui.FRAME_NANOS
 import hivens.ui.Standing
 import hivens.ui.i18n.ShippedLanguageProvider
 import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.onEventThread
 import hivens.ui.puppet.PuppetRegistry
 import hivens.ui.theme.NxThemed
@@ -58,6 +59,7 @@ import org.koin.dsl.module
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import hivens.history.api.HistoryKeys
+import hivens.ui.navigation.asConfig
 
 /**
  * Apply on the theme picker puts the choice in use and then leaves, in that order, and with nothing
@@ -150,7 +152,7 @@ class ThemePickerApplyTest {
      */
     private fun pickLeaveAndReturn(away: History.() -> History, returning: History.() -> History): List<String> {
         val world = World(answerApply = true)
-        var history by mutableStateOf(History(LauncherConfigs.Home).show(Show(LauncherConfigs.Themes)))
+        var history by mutableStateOf(History(LauncherScreens.Home).show(Show(LauncherScreens.Themes)))
         onEventThread {
             val scene = ImageComposeScene(900, 700, density = Density(1f)) {
                 world.Draw { ConfigView(LauncherConfigs.Composition, document, history) }
@@ -181,7 +183,7 @@ class ThemePickerApplyTest {
         // On to another screen and back: the picker never left the history, so its page did not.
         assertEquals(
             listOf("apply ${other.id}", "back"),
-            pickLeaveAndReturn(away = { show(Show(LauncherConfigs.About)) }, returning = { back() }),
+            pickLeaveAndReturn(away = { show(Show(LauncherScreens.About)) }, returning = { back() }),
         )
     }
 
@@ -190,7 +192,7 @@ class ThemePickerApplyTest {
         // The picker left the history, as a switch of tab leaves it, and was opened again: a new page.
         assertEquals(
             listOf("apply ${Themes.default.id}", "back"),
-            pickLeaveAndReturn(away = { show(LauncherConfigs.section(LauncherConfigs.About)) }, returning = { show(Show(LauncherConfigs.Themes)) }),
+            pickLeaveAndReturn(away = { show(LauncherScreens.section(LauncherScreens.About)) }, returning = { show(Show(LauncherScreens.Themes)) }),
         )
     }
 
@@ -206,12 +208,12 @@ class ThemePickerApplyTest {
             start = LauncherConfigs.Composition,
             compositions = mapOf(
                 LauncherConfigs.Composition to Composition(
-                    start = LauncherConfigs.Home,
+                    start = LauncherScreens.Home.asConfig(),
                     singles = mapOf(FRAME to WidgetInstance(FRAME, "frame", children = mapOf(BODY to SlotContent()))),
                     configs = mapOf(
-                        LauncherConfigs.Home to config(),
-                        LauncherConfigs.About to config(),
-                        LauncherConfigs.Themes to config(picker),
+                        LauncherScreens.Home.asConfig() to config(),
+                        LauncherScreens.About.asConfig() to config(),
+                        LauncherScreens.Themes.asConfig() to config(picker),
                     ),
                 ),
             ),

@@ -21,7 +21,7 @@ import hivens.themes.Themes
 import hivens.ui.editor.EditModeState
 import hivens.ui.editor.LocalEditMode
 import hivens.ui.i18n.ShippedLanguageProvider
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.onEventThread
 import hivens.ui.settle
 import hivens.ui.theme.NxThemed
@@ -153,7 +153,7 @@ class ScopedKeysTest {
         val fire = HashMap<String, (() -> Unit)?>()
         val fired = ArrayList<String>()
         draw {
-            listOf("a" to LauncherConfigs.Home, "b" to LauncherConfigs.Library).forEach { (name, config) ->
+            listOf("a" to LauncherScreens.Home, "b" to LauncherScreens.Library).forEach { (name, config) ->
                 ChildLevel(ScopeLevel.Window) {
                     ChildLevel(ScopeLevel.Composition) {
                         val back = rememberLatestCommand<Unit> { fired += name }
@@ -169,8 +169,8 @@ class ScopedKeysTest {
                 }
             }
         }
-        assertEquals(LauncherConfigs.Home, read["a"]?.current?.config)
-        assertEquals(LauncherConfigs.Library, read["b"]?.current?.config)
+        assertEquals(LauncherScreens.Home, read["a"]?.current?.screen)
+        assertEquals(LauncherScreens.Library, read["b"]?.current?.screen)
         assertNotNull(fire["a"]).invoke()
         assertEquals(listOf("a"), fired, "the other window's history was left alone")
         assertNotNull(fire["b"]).invoke()
@@ -179,7 +179,7 @@ class ScopedKeysTest {
 
     @Test
     fun `a composition key is missing outside the composition that provides it`() {
-        var outside: History? = History(LauncherConfigs.Home)
+        var outside: History? = History(LauncherScreens.Home)
         var show: ((Show) -> Unit)? = {}
         draw {
             ChildLevel(ScopeLevel.Window) {
@@ -216,7 +216,7 @@ class ScopedKeysTest {
         draw {
             ChildLevel(ScopeLevel.Composition) {
                 answers["composition"] = missingNeeds(needs)
-                ProvideScoped(HistoryKeys.History, History(LauncherConfigs.Home)) {
+                ProvideScoped(HistoryKeys.History, History(LauncherScreens.Home)) {
                     ChildLevel(ScopeLevel.Page) {
                         answers["page"] = missingNeeds(needs)
                         ProvideScoped(SourceKey<String>("test.page.owned", ScopeLevel.Page), "here") {

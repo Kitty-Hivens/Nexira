@@ -47,7 +47,7 @@ import hivens.accounts.api.SessionState
 import hivens.ui.components.rememberLaunchControl
 import hivens.ui.effects.pixelArtBackground
 import hivens.ui.i18n.nexiraStrings
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.nx.PlayGround
 import hivens.ui.nx.PlayLayout
 import hivens.ui.press.clickable
@@ -110,7 +110,7 @@ fun HomeNewSpines() {
                     pack     = pack,
                     open     = isOpen,
                     appState = appState,
-                    onOpenPage = { show(LauncherConfigs.pack(pack.id)) },
+                    onOpenPage = { show(LauncherScreens.pack(pack.id)) },
                     onChoose = { chosen = pack.id },
                     modifier = Modifier.width(width).fillMaxHeight(),
                 )

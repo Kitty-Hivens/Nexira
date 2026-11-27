@@ -2,15 +2,15 @@ public final class hivens/pages/api/HistoryEntry {
 	public static final field Companion Lhivens/pages/api/HistoryEntry$Companion;
 	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1-QOYOipY ()Ljava/lang/String;
+	public final fun component1-nQUo3n8 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/util/Map;
 	public final fun component3 ()Ljava/util/Map;
-	public final fun copy-H_cMhik (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)Lhivens/pages/api/HistoryEntry;
-	public static synthetic fun copy-H_cMhik$default (Lhivens/pages/api/HistoryEntry;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lhivens/pages/api/HistoryEntry;
+	public final fun copy-0Q08lus (Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;)Lhivens/pages/api/HistoryEntry;
+	public static synthetic fun copy-0Q08lus$default (Lhivens/pages/api/HistoryEntry;Ljava/lang/String;Ljava/util/Map;Ljava/util/Map;ILjava/lang/Object;)Lhivens/pages/api/HistoryEntry;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getConfig-QOYOipY ()Ljava/lang/String;
 	public final fun getOpened ()Ljava/util/Map;
 	public final fun getPage ()Ljava/lang/String;
+	public final fun getScreen-nQUo3n8 ()Ljava/lang/String;
 	public final fun getValues ()Ljava/util/Map;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;
@@ -69,18 +69,48 @@ public final class hivens/pages/api/PagesKeys {
 	public final fun getShow ()Lhivens/widget/model/CommandKey;
 }
 
+public final class hivens/pages/api/ScreenId {
+	public static final field Companion Lhivens/pages/api/ScreenId$Companion;
+	public static final synthetic fun box-impl (Ljava/lang/String;)Lhivens/pages/api/ScreenId;
+	public static fun constructor-impl (Ljava/lang/String;)Ljava/lang/String;
+	public fun equals (Ljava/lang/Object;)Z
+	public static fun equals-impl (Ljava/lang/String;Ljava/lang/Object;)Z
+	public static final fun equals-impl0 (Ljava/lang/String;Ljava/lang/String;)Z
+	public final fun getValue ()Ljava/lang/String;
+	public fun hashCode ()I
+	public static fun hashCode-impl (Ljava/lang/String;)I
+	public fun toString ()Ljava/lang/String;
+	public static fun toString-impl (Ljava/lang/String;)Ljava/lang/String;
+	public final synthetic fun unbox-impl ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/pages/api/ScreenId$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/pages/api/ScreenId$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun deserialize-7ggwdmM (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/String;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public final fun serialize-qGL7pSc (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/String;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/pages/api/ScreenId$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
 public final class hivens/pages/api/Show {
 	public static final field Companion Lhivens/pages/api/Show$Companion;
 	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILkotlin/jvm/internal/DefaultConstructorMarker;)V
 	public synthetic fun <init> (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
-	public final fun component1-QOYOipY ()Ljava/lang/String;
+	public final fun component1-nQUo3n8 ()Ljava/lang/String;
 	public final fun component2 ()Ljava/util/Map;
-	public final fun component3-Q6Ux6LU ()Ljava/lang/String;
-	public final fun copy-AUq-fzI (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)Lhivens/pages/api/Show;
-	public static synthetic fun copy-AUq-fzI$default (Lhivens/pages/api/Show;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)Lhivens/pages/api/Show;
+	public final fun component3-7NxczJ0 ()Ljava/lang/String;
+	public final fun copy-YqjSUEQ (Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;)Lhivens/pages/api/Show;
+	public static synthetic fun copy-YqjSUEQ$default (Lhivens/pages/api/Show;Ljava/lang/String;Ljava/util/Map;Ljava/lang/String;ILjava/lang/Object;)Lhivens/pages/api/Show;
 	public fun equals (Ljava/lang/Object;)Z
-	public final fun getConfig-QOYOipY ()Ljava/lang/String;
-	public final fun getOver-Q6Ux6LU ()Ljava/lang/String;
+	public final fun getOver-7NxczJ0 ()Ljava/lang/String;
+	public final fun getScreen-nQUo3n8 ()Ljava/lang/String;
 	public final fun getValues ()Ljava/util/Map;
 	public fun hashCode ()I
 	public fun toString ()Ljava/lang/String;

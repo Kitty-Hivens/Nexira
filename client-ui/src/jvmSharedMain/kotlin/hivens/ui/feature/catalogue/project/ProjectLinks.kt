@@ -8,7 +8,7 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.UriHandler
 import hivens.catalogue.api.ProjectTarget
 import hivens.launcher.sources.EngineSources
-import hivens.ui.navigation.LauncherConfigs
+import hivens.ui.navigation.LauncherScreens
 import hivens.ui.navigation.NavRequests
 import hivens.ui.render.openInBrowser
 import hivens.pages.api.Show
@@ -106,9 +106,9 @@ fun rememberLinkFollower(intoInstanceId: String? = null): (String) -> Unit {
 fun linkTarget(url: String, intoInstanceId: String?): Show? {
     val link = modrinthProjectLink(url) ?: return null
     return if (link.modpack) {
-        LauncherConfigs.cataloguePack(EngineSources.Modrinth.id, link.slug)
+        LauncherScreens.cataloguePack(EngineSources.Modrinth.id, link.slug)
     } else {
-        LauncherConfigs.project(ProjectTarget.Catalogue(link.slug, intoInstanceId))
+        LauncherScreens.project(ProjectTarget.Catalogue(link.slug, intoInstanceId))
     }
 }
 
