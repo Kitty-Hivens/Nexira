@@ -122,11 +122,12 @@ val LocalEmptySlotDecorator: ProvidableCompositionLocal<EmptySlotDecorator> =
     staticCompositionLocalOf { {} }
 
 // Rendered by SlotRenderer in place of a widget whose kind is absent from the
-// registry (renamed, removed, or a plugin not loaded). Default = nothing --
-// production keeps the slot clean while the instance's props / children stay on
-// disk (non-destructive). The editor swaps in an "unsupported widget" placeholder
-// so the user can see the orphan and remove it; the schema-bump prune reaps the
-// truly-dead ones. Kept editor-agnostic here; the implementation lives in :client-ui.
+// registry (renamed, removed, or a module not loaded). Default = nothing:
+// production keeps the slot clean while the instance's props and children stay in
+// the document, so the widget comes back with its module. The editor draws an
+// "unsupported widget" placeholder in the chrome every widget wears, so it can be
+// seen, moved and removed. Nothing removes one on its own. Kept editor-agnostic
+// here, the implementation lives in :client-ui.
 typealias UnknownWidgetDecorator = @Composable (path: NodePath, index: Int, instance: WidgetInstance) -> Unit
 
 val LocalUnknownWidgetDecorator: ProvidableCompositionLocal<UnknownWidgetDecorator> =

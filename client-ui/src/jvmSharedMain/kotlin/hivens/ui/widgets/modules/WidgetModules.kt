@@ -52,9 +52,8 @@ import kotlin.time.Duration.Companion.seconds
  * with it.
  *
  * Every module ever loaded is remembered with the widget kinds it brought, until
- * somebody forgets it. That is what keeps a module that is off, waiting, broken or gone
- * from losing its widgets to the schema-bump prune, which otherwise reads "not in
- * the registry" as "renamed away" and deletes them for good.
+ * somebody forgets it, so the list still names a module whose jar is gone. Its widgets
+ * stay in the document either way: nothing removes a widget for being unknown.
  */
 class WidgetModules(
     private val directory: Path,
@@ -223,9 +222,8 @@ class WidgetModules(
     }
 
     /**
-     * Forgets a module whose jar is gone, and with it the record that kept its
-     * widgets from the prune. The widgets themselves stay in the layout until the
-     * next schema bump reaps them or somebody removes them.
+     * Forgets a module whose jar is gone, its line in the list and its settings. Its
+     * widgets stay in the document until somebody removes them.
      */
     fun forget(id: String) {
         synchronized(lock) {

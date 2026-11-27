@@ -72,6 +72,7 @@ import hivens.config.Branding
 import hivens.ui.customization.CustomizationSettings
 import hivens.ui.editor.decoration.EditableWidgetChrome
 import hivens.ui.editor.decoration.EmptySlotPlaceholder
+import hivens.ui.editor.decoration.UnknownWidget
 import hivens.ui.editor.decoration.UnsupportedWidgetPlaceholder
 import hivens.ui.editor.dnd.DragController
 import hivens.ui.editor.dnd.DragPayload
@@ -129,11 +130,13 @@ import hivens.widget.api.SlotBoundsReporter
 import hivens.widget.api.SlotChromeModifier
 import hivens.widget.api.UnknownWidgetDecorator
 import hivens.widget.api.WidgetDecorator
+import hivens.widget.api.WidgetDescriptor
 import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
 import hivens.widget.model.FlowSpec
 import hivens.widget.model.NodePath
+import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import hivens.widget.model.contentAt
 import org.koin.compose.koinInject
@@ -333,10 +336,10 @@ fun EditorSurfaceHost(
         }
     }
 
-    val parentWidgetDecorator = LocalWidgetDecorator.current
-    val chromeDecorator: WidgetDecorator = remember(arranging, parentWidgetDecorator) {
-        if (!arranging) return@remember parentWidgetDecorator
-        { path, index, descriptor, instance, content ->
+    // One chrome for every widget the document holds, a kind the registry does not have included: that one is moved and
+    // removed like any other, and has no panel to open.
+    val chrome: @Composable (NodePath, Int, WidgetDescriptor, WidgetInstance, Boolean, @Composable () -> Unit) -> Unit = remember {
+        { path, index, descriptor, instance, configurable, content ->
             val slot = LocalDocument.current?.contentAt(path)
             val drop = dropTarget
             EditableWidgetChrome(
@@ -352,9 +355,11 @@ fun EditorSurfaceHost(
                 dropTarget   = drop?.first,
                 dropIndex    = drop?.second ?: -1,
                 onRemove     = { editor.remove(path, instance.instanceId) },
-                onEditProps  = {
-                    val key = WidgetKey(path, instance.instanceId)
-                    dock = if ((dock as? Dock.Props)?.key == key) Dock.Palette else Dock.Props(key)
+                onEditProps  = if (!configurable) null else {
+                    {
+                        val key = WidgetKey(path, instance.instanceId)
+                        dock = if ((dock as? Dock.Props)?.key == key) Dock.Palette else Dock.Props(key)
+                    }
                 },
                 onCommitDrop = { pointer ->
                     val target = registry.slotForPoint(pointer) ?: return@EditableWidgetChrome
@@ -370,12 +375,17 @@ fun EditorSurfaceHost(
             )
         }
     }
+    val parentWidgetDecorator = LocalWidgetDecorator.current
+    val chromeDecorator: WidgetDecorator = remember(arranging, parentWidgetDecorator) {
+        if (!arranging) return@remember parentWidgetDecorator
+        { path, index, descriptor, instance, content -> chrome(path, index, descriptor, instance, true, content) }
+    }
     val emptyDecorator: EmptySlotDecorator = remember(arranging) {
         if (arranging) { _ -> EmptySlotPlaceholder() } else { _ -> }
     }
     val unknownDecorator: UnknownWidgetDecorator = remember(arranging) {
         if (arranging) {
-            { path, _, instance -> UnsupportedWidgetPlaceholder(instance = instance, onRemove = { editor.remove(path, instance.instanceId) }) }
+            { path, index, instance -> chrome(path, index, UnknownWidget(instance.kind), instance, false) { UnsupportedWidgetPlaceholder(instance) } }
         } else {
             { _, _, _ -> }
         }

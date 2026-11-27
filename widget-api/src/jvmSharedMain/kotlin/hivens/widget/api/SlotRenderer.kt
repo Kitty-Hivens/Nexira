@@ -140,8 +140,8 @@ import hivens.widget.model.viewportMode
 // Each widget renders through LocalWidgetDecorator. Default decorator is
 // identity -- zero cost when no editor is mounted. A widget whose kind is
 // absent from the registry renders through LocalUnknownWidgetDecorator
-// instead (default nothing in production; the editor paints an "unsupported
-// widget" placeholder so the orphan is visible and removable), and keeps
+// instead (default nothing in production, the editor paints an "unsupported
+// widget" placeholder so the orphan is visible, movable and removable), and keeps
 // its on-disk props / children intact. A widget whose show condition does not
 // hold is not placed at all, and is drawn through LocalHiddenWidget only while
 // somebody is arranging (see shownOf).

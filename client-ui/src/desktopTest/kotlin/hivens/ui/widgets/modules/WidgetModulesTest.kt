@@ -101,7 +101,7 @@ class WidgetModulesTest {
         val m = modules()
         m.setEnabled("fixture", false)
         assertNull(m.registry[fixtureKind])
-        assertTrue(fixtureKind in m.knownKinds(), "its kinds stay known, so the prune keeps its widgets")
+        assertTrue(fixtureKind in m.knownKinds(), "its kinds stay known while it is off")
         assertTrue(m.state.value.entries.single() is WidgetModules.Entry.Off)
 
         m.setEnabled("fixture", true)
@@ -126,7 +126,7 @@ class WidgetModulesTest {
         assertTrue(fixtureKind in m.knownKinds())
 
         m.forget("fixture")
-        assertTrue(fixtureKind !in m.knownKinds(), "forgotten, its widgets may be reaped")
+        assertTrue(fixtureKind !in m.knownKinds(), "forgotten, its kinds are no longer known")
         assertEquals(emptyList(), m.state.value.entries)
     }
 

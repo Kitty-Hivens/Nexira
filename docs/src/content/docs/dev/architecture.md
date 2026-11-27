@@ -184,7 +184,7 @@ Extension happens through composition locals with identity defaults. The decorat
 
 A slot owns its own arrangement: column, row, grid, free canvas, or an addressed cube grid. A widget's content is wrapped in per-instance movable content, so toggling edit mode moves the subtree rather than disposing it, and the widget keeps its loaded state.
 
-A widget whose kind is absent from the registry keeps its stored props and children; it renders as nothing in production and as a visible placeholder in the editor. Orphans are only reaped after a schema bump.
+A widget whose kind is absent from the registry keeps its stored props and children, so it comes back as it was with its module. It renders as nothing in production, and in the editor as a placeholder in the same chrome as any widget, so it can be moved and removed. Nothing removes one on its own.
 
 ## Themes
 

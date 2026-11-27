@@ -152,7 +152,8 @@ fun EditableWidgetChrome(
     dropTarget: NodePath?,
     dropIndex: Int,
     onRemove: () -> Unit,
-    onEditProps: () -> Unit,
+    /** Opens the widget's panel, null for a widget that has none to open. */
+    onEditProps: (() -> Unit)?,
     onCommitDrop: (committedPointer: Offset) -> Unit,
     content: @Composable () -> Unit,
 ) {
@@ -895,7 +896,7 @@ fun EditableWidgetChrome(
                 path           = path,
                 instanceId     = instance.instanceId,
                 editor         = editor,
-                onConfigure    = { menuAnchor = null; onEditProps() },
+                onConfigure    = onEditProps?.let { open -> { menuAnchor = null; open() } },
                 onRemove       = { menuAnchor = null; onRemove() },
                 onForceRemove  = { menuAnchor = null; forceRemoveOpen = true },
                 onClose        = { menuAnchor = null },
@@ -945,13 +946,13 @@ private fun WidgetContextMenuContent(
     path: NodePath,
     instanceId: String,
     editor: DocumentEditor,
-    onConfigure: () -> Unit,
+    onConfigure: (() -> Unit)?,
     onRemove: () -> Unit,
     onForceRemove: () -> Unit,
     onClose: () -> Unit,
 ) {
     val s = nexiraStrings()
-    NxMenuItem(s.text("editorConfigure")) { onConfigure() }
+    if (onConfigure != null) NxMenuItem(s.text("editorConfigure")) { onConfigure() }
     // Only where something moves: in a slot that does not, a widget is already
     // where it stays, and the item would do nothing anybody could see.
     val slot = LocalDocument.current?.contentAt(path)

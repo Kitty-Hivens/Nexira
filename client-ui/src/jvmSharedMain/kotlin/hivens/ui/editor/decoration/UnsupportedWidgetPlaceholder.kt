@@ -14,31 +14,27 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
-import hivens.ui.press.IconButton
 import hivens.ui.theme.LocalMonoFamily
-import hivens.widget.model.WidgetInstance
-import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
+import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
+import hivens.widget.api.WidgetDescriptor
+import hivens.widget.model.WidgetInstance
+import hivens.widget.model.WidgetKind
 
-// Edit-mode stand-in for a widget whose kind is no longer in the registry
-// (renamed, removed, or a plugin not loaded this session). Production renders
-// nothing -- the instance keeps its props / children on disk untouched -- so
-// this is editor-only: it makes the orphan visible and offers a one-tap remove,
-// while the schema-bump prune reaps the genuinely dead ones automatically. The
-// raw kind id is shown verbatim (a technical identifier, not translatable) so a
-// reporter can say exactly which widget went missing.
+/**
+ * What the editor draws for a widget whose kind is not in the registry: renamed, removed, or brought by a module that
+ * is not loaded. Nobody else sees it, and the record keeps its props and children, so the widget comes back as it was
+ * when its module does. It stands in the same chrome as any widget, so it is moved and removed the same way. The kind is
+ * shown as it is stored, a technical id and not a word to translate, so a report can say which widget went missing.
+ */
 @Composable
-fun UnsupportedWidgetPlaceholder(
-    instance: WidgetInstance,
-    onRemove: () -> Unit,
-) {
+fun UnsupportedWidgetPlaceholder(instance: WidgetInstance) {
     val s = nexiraStrings()
     Row(
         modifier = Modifier
@@ -68,12 +64,17 @@ fun UnsupportedWidgetPlaceholder(
                 fontFamily = LocalMonoFamily.current,
             )
         }
-        IconButton(onClick = onRemove, modifier = Modifier.size(24.dp)) {
-            Symbol(NxIcon.Close,
-                contentDescription = s.text("editorDelete"),
-                tint = NxInk.quiet,
-                modifier = Modifier.size(16.dp),
-            )
-        }
     }
+}
+
+/**
+ * The declaration the editor's chrome is handed for a widget of a [kind] the registry does not have: nothing declared,
+ * no slots it could draw, and removable, since nothing this build knows depends on it.
+ */
+internal data class UnknownWidget(override val kind: WidgetKind) : WidgetDescriptor {
+    override val displayName: String get() = kind.value
+    override val removable: Boolean get() = true
+
+    @Composable
+    override fun Render(instance: WidgetInstance) = Unit
 }

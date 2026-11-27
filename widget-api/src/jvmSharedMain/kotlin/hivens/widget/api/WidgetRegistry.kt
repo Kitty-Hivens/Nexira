@@ -25,9 +25,8 @@ interface WidgetDescriptor {
 
     // Slot ids this widget exposes for nested sub-widgets. Empty for
     // leaves. Populated by the KSP processor from @Widget(slots = ...).
-    // Editor uses this to drive drop-target discovery inside container
-    // chromes; the layout-graph mutator uses it (indirectly, via the
-    // structural keys in WidgetInstance.children) to validate moves.
+    // The editor lays a container's press layer under what these slots
+    // hold, and the slot renderer draws each through the container's body.
     val slots: List<SlotId>
         get() = emptyList()
 
