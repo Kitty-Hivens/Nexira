@@ -5,6 +5,7 @@ import hivens.accounts.TwoFactorLaunchGate
 import hivens.config.Storage
 import hivens.core.activity.Activity
 import hivens.core.activity.ActivityRegistry
+import hivens.core.io.readUtf8
 import hivens.core.api.interfaces.IPackRepository
 import hivens.core.api.interfaces.ISettingsService
 import hivens.core.api.interfaces.ReadingLanguage
@@ -94,6 +95,7 @@ import hivens.ui.widgets.profile.ProfileSelectionSource
 import hivens.ui.widgets.state.WidgetStateFlushHook
 import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
+import hivens.ui.widgets.state.instanceIdsIn
 import hivens.widget.api.BringIn
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.CompositionKeys
@@ -137,7 +139,9 @@ import org.koin.core.module.dsl.onClose
 import org.koin.core.module.dsl.withOptions
 import org.koin.core.scope.Scope
 import org.koin.dsl.module
+import kotlinx.serialization.json.Json
 import org.slf4j.LoggerFactory
+import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration.Companion.seconds
@@ -476,12 +480,17 @@ fun uiCoreModule(
         val presets: PresetRepository = get()
         val documents: DocumentStore = get()
         val editor: DocumentEditor = get()
+        // The arrangement an older build saved stays on disk as it was, for that build to read, and so does the state
+        // of its widgets. Nothing writes that file now, so it is read once.
+        val olderFile = get<Path>().resolve(Storage.LAYOUT_GRAPH_FILE)
+        val json: Json = get()
+        val olderBuild by lazy { olderLayoutIds(olderFile, json) }
         WidgetStateGc(
             documents      = documents.document,
             writable       = { documents.writable },
             store          = get(),
             scope          = get(),
-            alsoReferenced = { editor.heldIds() + presets.referencedInstanceIds() },
+            alsoReferenced = { editor.heldIds() + presets.referencedInstanceIds() + olderBuild },
         )
     }
     single(createdAtStart = true) { WidgetStateFlushHook(get()) }
@@ -623,6 +632,14 @@ fun uiCoreModule(
             stringsProvider = { words.strings(NexiraStrings.NAMESPACE) },
         ).also { it.start() }
     }
+}
+
+/** The widgets the arrangement an older build saved at [file] names, none where there is no such file or it will not parse. */
+internal fun olderLayoutIds(file: Path, json: Json): Set<String> {
+    if (!Files.exists(file)) return emptySet()
+    return runCatching { instanceIdsIn(json.parseToJsonElement(readUtf8(file))) }
+        .onFailure { LoggerFactory.getLogger("WidgetStateGc").warn("Could not read the widgets of {}, their state is not kept", file, it) }
+        .getOrDefault(emptySet())
 }
 
 /**

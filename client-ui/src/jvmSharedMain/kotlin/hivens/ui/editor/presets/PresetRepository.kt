@@ -3,14 +3,12 @@ package hivens.ui.editor.presets
 import hivens.core.io.AtomicFiles
 import hivens.core.io.readUtf8
 import hivens.ui.customization.CustomizationSettings
+import hivens.ui.widgets.state.instanceIdsIn
 import hivens.widget.model.Document
 import hivens.widget.model.DocumentCodec
 import hivens.widget.model.DocumentRead
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -122,23 +120,12 @@ class PresetRepository(
             stream.filter { it.isRegularFile() && it.name.endsWith(".json") }.forEach { path ->
                 runCatching { json.decodeFromString<PresetEnvelope>(readUtf8(path)) }
                     .onSuccess { envelope ->
-                        envelope.graph?.let { collectInstanceIds(it, ids) }
-                        envelope.document?.let { collectInstanceIds(it, ids) }
+                        envelope.graph?.let { ids += instanceIdsIn(it) }
+                        envelope.document?.let { ids += instanceIdsIn(it) }
                     }
             }
         }
         return ids
-    }
-
-    private fun collectInstanceIds(element: JsonElement, into: MutableSet<String>) {
-        when (element) {
-            is JsonObject -> element.forEach { (key, value) ->
-                if (key == INSTANCE_ID_KEY && value is JsonPrimitive && value.isString) into += value.content
-                else collectInstanceIds(value, into)
-            }
-            is JsonArray -> element.forEach { collectInstanceIds(it, into) }
-            else -> Unit
-        }
     }
 
     fun delete(name: String): Boolean {
@@ -197,11 +184,6 @@ class PresetRepository(
      * path -- collisions among legacy files stay as they were, because their
      * distinguishing information was already lost when they were written.
      */
-    private companion object {
-        /** The wire name of [hivens.widget.model.WidgetInstance.instanceId]. */
-        const val INSTANCE_ID_KEY = "instance_id"
-    }
-
     private fun resolveExisting(name: String): Path {
         val current = pathFor(name)
         if (Files.exists(current)) return current
