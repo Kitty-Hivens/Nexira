@@ -14,8 +14,8 @@ import hivens.catalogue.api.SourceView
 import hivens.catalogue.api.TagSearch
 import hivens.ui.feature.catalogue.project.Environment
 import hivens.ui.navigation.LauncherConfigs
-import hivens.widget.model.HistoryEntry
-import hivens.widget.model.Show
+import hivens.pages.api.HistoryEntry
+import hivens.pages.api.Show
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow

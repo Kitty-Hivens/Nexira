@@ -1,0 +1,58 @@
+public final class hivens/history/api/History {
+	public static final field Companion Lhivens/history/api/History$Companion;
+	public synthetic fun <init> (Ljava/lang/String;Lkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public fun <init> (Ljava/util/List;Ljava/util/List;I)V
+	public synthetic fun <init> (Ljava/util/List;Ljava/util/List;IILkotlin/jvm/internal/DefaultConstructorMarker;)V
+	public final fun back ()Lhivens/history/api/History;
+	public final fun backTo (Lhivens/pages/api/HistoryEntry;)Lhivens/history/api/History;
+	public final fun component1 ()Ljava/util/List;
+	public final fun component2 ()Ljava/util/List;
+	public final fun component3 ()I
+	public final fun copy (Ljava/util/List;Ljava/util/List;I)Lhivens/history/api/History;
+	public static synthetic fun copy$default (Lhivens/history/api/History;Ljava/util/List;Ljava/util/List;IILjava/lang/Object;)Lhivens/history/api/History;
+	public fun equals (Ljava/lang/Object;)Z
+	public final fun forward ()Lhivens/history/api/History;
+	public final fun getAhead ()Ljava/util/List;
+	public final fun getBacksAtRoot ()I
+	public final fun getCanGoBack ()Z
+	public final fun getCanGoForward ()Z
+	public final fun getCurrent ()Lhivens/pages/api/HistoryEntry;
+	public final fun getEntries ()Ljava/util/List;
+	public final fun getReachable ()Ljava/util/List;
+	public fun hashCode ()I
+	public final fun retain-Xdwnu-0 (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lhivens/history/api/History;
+	public final fun rewrite (Ljava/util/Map;)Lhivens/history/api/History;
+	public final fun show (Lhivens/pages/api/Show;)Lhivens/history/api/History;
+	public fun toString ()Ljava/lang/String;
+}
+
+public final synthetic class hivens/history/api/History$$serializer : kotlinx/serialization/internal/GeneratedSerializer {
+	public static final field INSTANCE Lhivens/history/api/History$$serializer;
+	public final fun childSerializers ()[Lkotlinx/serialization/KSerializer;
+	public final fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Lhivens/history/api/History;
+	public synthetic fun deserialize (Lkotlinx/serialization/encoding/Decoder;)Ljava/lang/Object;
+	public final fun getDescriptor ()Lkotlinx/serialization/descriptors/SerialDescriptor;
+	public final fun serialize (Lkotlinx/serialization/encoding/Encoder;Lhivens/history/api/History;)V
+	public synthetic fun serialize (Lkotlinx/serialization/encoding/Encoder;Ljava/lang/Object;)V
+	public fun typeParametersSerializers ()[Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/history/api/History$Companion {
+	public final fun serializer ()Lkotlinx/serialization/KSerializer;
+}
+
+public final class hivens/history/api/HistoryApi {
+	public static final field ID Ljava/lang/String;
+	public static final field INSTANCE Lhivens/history/api/HistoryApi;
+	public final fun getVERSION ()Lhivens/widget/model/ApiVersion;
+}
+
+public final class hivens/history/api/HistoryKeys {
+	public static final field INSTANCE Lhivens/history/api/HistoryKeys;
+	public final fun getBack ()Lhivens/widget/model/CommandKey;
+	public final fun getBackTo ()Lhivens/widget/model/CommandKey;
+	public final fun getForward ()Lhivens/widget/model/CommandKey;
+	public final fun getHistory ()Lhivens/widget/model/SourceKey;
+	public final fun getRewrite ()Lhivens/widget/model/CommandKey;
+}
+

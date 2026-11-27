@@ -74,21 +74,10 @@ public final class hivens/widget/api/CompositeWidgetRegistry : hivens/widget/api
 public final class hivens/widget/api/CompositionKeys {
 	public static final field $stable I
 	public static final field INSTANCE Lhivens/widget/api/CompositionKeys;
-	public final fun getBack ()Lhivens/widget/model/CommandKey;
-	public final fun getBackTo ()Lhivens/widget/model/CommandKey;
 	public final fun getCloseWindow ()Lhivens/widget/model/CommandKey;
-	public final fun getForward ()Lhivens/widget/model/CommandKey;
-	public final fun getHistory ()Lhivens/widget/model/SourceKey;
-	public final fun getRewrite ()Lhivens/widget/model/CommandKey;
-	public final fun getShow ()Lhivens/widget/model/CommandKey;
+	public final fun getConfig ()Lhivens/widget/model/SourceKey;
 	public final fun getShowWindow ()Lhivens/widget/model/CommandKey;
 	public final fun getWindows ()Lhivens/widget/model/SourceKey;
-}
-
-public final class hivens/widget/api/CompositionKeysKt {
-	public static final fun pageValue (Lhivens/widget/api/ModuleKeys;Lhivens/widget/model/PageValue;Lkotlin/jvm/functions/Function0;)V
-	public static synthetic fun pageValue$default (Lhivens/widget/api/ModuleKeys;Lhivens/widget/model/PageValue;Lkotlin/jvm/functions/Function0;ILjava/lang/Object;)V
-	public static final fun read (Lhivens/widget/api/LevelContext;Lhivens/widget/model/PageValue;)Lhivens/widget/model/WidgetDataSource;
 }
 
 public final class hivens/widget/api/ContributedLevelServices : hivens/widget/api/LevelServices {
@@ -227,19 +216,18 @@ public final class hivens/widget/api/LevelServicesHost$DefaultImpls {
 }
 
 public final class hivens/widget/api/LocalsKt {
+	public static final fun getLocalDocument ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalEmptySlotDecorator ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalGridGeometry ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalHiddenWidget ()Landroidx/compose/runtime/ProvidableCompositionLocal;
-	public static final fun getLocalLayoutGraph ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalMapControls ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalMapPanOnPrimary ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalMisplacedWidget ()Landroidx/compose/runtime/ProvidableCompositionLocal;
-	public static final fun getLocalMountedSurfaces ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalPlacementBounds ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalPlacementReflow ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalPlacementSlotSizeDp ()Landroidx/compose/runtime/ProvidableCompositionLocal;
-	public static final fun getLocalRefusedMount ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalScope ()Landroidx/compose/runtime/ProvidableCompositionLocal;
+	public static final fun getLocalSingleSlotHost ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalSlotBoundsReporter ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalSlotBoundsWithdrawal ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 	public static final fun getLocalSlotChromeModifier ()Landroidx/compose/runtime/ProvidableCompositionLocal;
@@ -463,18 +451,12 @@ public final class hivens/widget/api/ModuleValues$Companion {
 	public final fun getNONE ()Lhivens/widget/api/ModuleValues;
 }
 
-public final class hivens/widget/api/PageKeys {
-	public static final field $stable I
-	public static final field INSTANCE Lhivens/widget/api/PageKeys;
-	public final fun getEntry ()Lhivens/widget/model/SourceKey;
-}
-
 public final class hivens/widget/api/PageLevels {
 	public static final field $stable I
 	public final fun getAlive ()Ljava/util/Set;
 	public final fun hold (Ljava/lang/String;)Lhivens/widget/api/PageLevels$Hold;
 	public final fun keep (Ljava/util/Set;)V
-	public final fun levelFor (Lhivens/widget/model/HistoryEntry;)Lhivens/widget/api/WidgetScope;
+	public final fun levelFor (Ljava/lang/String;Lhivens/widget/model/SourceKey;Ljava/lang/Object;)Lhivens/widget/api/WidgetScope;
 	public final fun levelFor (Ljava/lang/String;Lkotlin/jvm/functions/Function1;)Lhivens/widget/api/WidgetScope;
 	public static synthetic fun levelFor$default (Lhivens/widget/api/PageLevels;Ljava/lang/String;Lkotlin/jvm/functions/Function1;ILjava/lang/Object;)Lhivens/widget/api/WidgetScope;
 }
@@ -665,26 +647,10 @@ public final class hivens/widget/api/ShadowedKind {
 }
 
 public final class hivens/widget/api/SlotRendererKt {
-	public static final fun SlotRenderer-QuK5e7E (Ljava/lang/String;Ljava/lang/String;Landroidx/compose/ui/Modifier;FLandroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
+	public static final fun SlotRenderer-942rkJo (Lhivens/widget/model/NodePath;Landroidx/compose/ui/Modifier;FLandroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
 	public static final fun SlotRenderer-smahavU (Lhivens/widget/model/WidgetInstance;Ljava/lang/String;Landroidx/compose/ui/Modifier;FLandroidx/compose/foundation/layout/PaddingValues;Landroidx/compose/runtime/Composer;II)V
 	public static final fun childGap-lG28NQ4 (Landroidx/compose/ui/Modifier;FLandroidx/compose/foundation/gestures/Orientation;)Landroidx/compose/ui/Modifier;
 	public static final fun withoutLeadingGap-lG28NQ4 (Landroidx/compose/ui/Modifier;FLandroidx/compose/foundation/gestures/Orientation;)Landroidx/compose/ui/Modifier;
-}
-
-public final class hivens/widget/api/SurfaceFamilies {
-	public static final field $stable I
-	public fun <init> ()V
-	public final fun activeIn-ysGxHp4 (Ljava/lang/String;)Ljava/lang/String;
-	public final fun reset-fs_V8iQ (Ljava/lang/String;Ljava/lang/Object;)V
-	public final fun switch-lGFRH3s (Ljava/lang/String;Ljava/lang/String;Ljava/lang/Object;)V
-	public final fun switched ()Ljava/util/Map;
-}
-
-public final class hivens/widget/api/SurfaceFamilyKt {
-	public static final fun SurfaceFamilyHost-dQkwnnQ (Ljava/lang/String;Lkotlin/jvm/functions/Function3;Landroidx/compose/runtime/Composer;I)V
-	public static final fun activeFamilyOf-IOSq_pM (Ljava/lang/String;Landroidx/compose/runtime/Composer;I)Ljava/lang/String;
-	public static final fun getLocalFamilyOverrides ()Landroidx/compose/runtime/ProvidableCompositionLocal;
-	public static final fun getLocalSurfaceFamilies ()Landroidx/compose/runtime/ProvidableCompositionLocal;
 }
 
 public final class hivens/widget/api/TakenContribution {
@@ -801,9 +767,11 @@ public abstract interface class hivens/widget/api/WidgetDescriptor {
 	public fun getDefaultSurface ()Lhivens/widget/model/SurfaceSpec;
 	public abstract fun getDisplayName ()Ljava/lang/String;
 	public fun getDrawsOwnSurface ()Z
+	public fun getHands ()Ljava/util/List;
 	public fun getInjects ()Ljava/util/Set;
 	public abstract fun getKind-8SAbBEg ()Ljava/lang/String;
 	public fun getNeeds ()Ljava/util/List;
+	public fun getPages ()Ljava/util/List;
 	public fun getPropsSerializer ()Lkotlinx/serialization/KSerializer;
 	public fun getProvides ()Ljava/util/Set;
 	public abstract fun getRemovable ()Z
@@ -817,8 +785,10 @@ public final class hivens/widget/api/WidgetDescriptor$DefaultImpls {
 	public static fun getDefaultPropsJson (Lhivens/widget/api/WidgetDescriptor;)Lkotlinx/serialization/json/JsonObject;
 	public static fun getDefaultSurface (Lhivens/widget/api/WidgetDescriptor;)Lhivens/widget/model/SurfaceSpec;
 	public static fun getDrawsOwnSurface (Lhivens/widget/api/WidgetDescriptor;)Z
+	public static fun getHands (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/List;
 	public static fun getInjects (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/Set;
 	public static fun getNeeds (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/List;
+	public static fun getPages (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/List;
 	public static fun getPropsSerializer (Lhivens/widget/api/WidgetDescriptor;)Lkotlinx/serialization/KSerializer;
 	public static fun getProvides (Lhivens/widget/api/WidgetDescriptor;)Ljava/util/Set;
 	public static fun getShownWhen (Lhivens/widget/api/WidgetDescriptor;)Ljava/lang/String;
@@ -882,6 +852,7 @@ public final class hivens/widget/api/WidgetScopeHelpersKt {
 	public static final fun rememberScopedCommand (Lhivens/widget/model/CommandKey;Landroidx/compose/runtime/Composer;I)Lkotlin/jvm/functions/Function1;
 	public static final fun rememberScopedSource (Lhivens/widget/model/SourceKey;Landroidx/compose/runtime/Composer;I)Lhivens/widget/api/ScopedSource;
 	public static final fun shownHere (Lhivens/widget/api/WidgetDescriptor;Landroidx/compose/runtime/Composer;I)Z
+	public static final fun shownHere (Lhivens/widget/model/WidgetInstance;Landroidx/compose/runtime/Composer;I)Z
 	public static final fun valueOrNull (Lhivens/widget/api/ScopedSource;)Ljava/lang/Object;
 }
 

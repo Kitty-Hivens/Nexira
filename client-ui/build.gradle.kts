@@ -150,6 +150,8 @@ kotlin {
                 implementation(project(":client-launcher"))
                 implementation(project(":client-media"))
                 implementation(project(":widget-api"))
+                implementation(project(":pages-api"))
+                implementation(project(":history-api"))
                 // The packs module: its API is what the built-in widgets read, and the
                 // module itself is compiled in and handed to the host as a CompiledModule.
                 implementation(project(":packs-api"))

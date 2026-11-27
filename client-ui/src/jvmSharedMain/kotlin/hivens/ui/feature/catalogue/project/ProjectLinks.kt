@@ -11,7 +11,7 @@ import hivens.launcher.sources.EngineSources
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.navigation.NavRequests
 import hivens.ui.render.openInBrowser
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import org.koin.compose.koinInject
 
 /**

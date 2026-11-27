@@ -38,13 +38,13 @@ import hivens.ui.theme.LocalThemeReveal
 import hivens.ui.theme.Motion
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.ConfigId
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import hivens.widget.model.Widget
+import hivens.pages.api.PagesKeys
 
 // The switches that steer the nx colour provider, each a widget a layout places where the host
 // leaves a slot for it. Each is shown under NX_DRAWING_ID, so a slot does not place it while nx does
@@ -134,7 +134,7 @@ fun ThemeModeWidget() {
 @Widget(id = "theme.picker.link", displayName = "widget.theme.picker.link", enter = "none", shownWhen = NX_DRAWING_ID)
 @Composable
 fun ThemePickerLinkWidget() {
-    val show = rememberScopedCommand(CompositionKeys.Show)
+    val show = rememberScopedCommand(PagesKeys.Show)
     val s = strings(ColourNxControls.ID)
     val open: () -> Unit = { show?.invoke(Show(PICKER_CONFIG)) }
     PuppetClick("settings.openThemePicker") { open() }

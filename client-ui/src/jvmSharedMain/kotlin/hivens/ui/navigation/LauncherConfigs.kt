@@ -7,8 +7,8 @@ import hivens.catalogue.api.ProjectTarget
 import hivens.packs.api.PackPages
 import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
-import hivens.widget.model.PageValue
-import hivens.widget.model.Show
+import hivens.pages.api.PageValue
+import hivens.pages.api.Show
 import kotlinx.serialization.builtins.serializer
 
 /**

@@ -32,7 +32,7 @@ import hivens.ui.notifications.IndicationCenter.Companion.controlMode
 import hivens.ui.notifications.IndicationCenter.LaunchIndication
 import hivens.ui.nx.PlayTone
 import hivens.widget.api.rememberScopedCommand
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map

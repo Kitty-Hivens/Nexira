@@ -39,7 +39,7 @@ import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.ScopeLevel
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel

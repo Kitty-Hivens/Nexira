@@ -24,13 +24,13 @@ import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.nx.NxRow
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxInk
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import org.koin.compose.koinInject
+import hivens.pages.api.PagesKeys
 
 // What moved since you last looked: a new launcher build, and the packs that have a
 // build waiting or have just taken one. Each line goes where that thing is acted on,
@@ -52,7 +52,7 @@ import org.koin.compose.koinInject
 @Composable
 @Suppress("UNUSED_PARAMETER")
 fun HomeNewWhatsNew(instance: WidgetInstance) {
-    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val show = rememberScopedCommand(PagesKeys.Show) ?: return
     val packs = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     val s = nexiraStrings()
     val updateState: LauncherUpdateState = koinInject()

@@ -31,19 +31,20 @@ import hivens.ui.widgets.bgsettings.BgSettingsSurface
 import hivens.ui.widgets.profile.ProfileSurface
 import hivens.ui.widgets.themepicker.ThemePickerSurface
 import hivens.ui.widgets.wardrobe.WardrobeSurface
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.SettingsChange
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.ConfigId
-import hivens.widget.model.PageValue
-import hivens.widget.model.Show
+import hivens.pages.api.PageValue
+import hivens.pages.api.Show
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import hivens.widget.model.WidgetKind
 import org.koin.compose.koinInject
+import hivens.history.api.HistoryKeys
+import hivens.pages.api.PagesKeys
 
 // Each of the launcher's own screens as the widget its config holds, a container whose slots hold the widgets the
 // screen is made of, until the screens are made of widgets themselves. None is an argument's: what an opening sets is
@@ -54,10 +55,10 @@ import org.koin.compose.koinInject
 internal fun screenKind(config: ConfigId): WidgetKind = WidgetKind("screen.${config.value}")
 
 @Composable
-private fun rememberShow(): (Show) -> Unit = rememberScopedCommand(CompositionKeys.Show) ?: {}
+private fun rememberShow(): (Show) -> Unit = rememberScopedCommand(PagesKeys.Show) ?: {}
 
 @Composable
-private fun rememberBack(): () -> Unit = rememberScopedAction(CompositionKeys.Back) ?: {}
+private fun rememberBack(): () -> Unit = rememberScopedAction(HistoryKeys.Back) ?: {}
 
 @Composable
 private fun <T : Any> pageValue(value: PageValue<T>): T? = rememberScopedSource(value.key).valueOrNull()
@@ -136,7 +137,7 @@ fun PackScreenWidget() {
     val pack = pageValue(PackPages.Pack) ?: return
     val settings = pageValue(PackSettingsPage)
     val show = rememberShow()
-    val rewrite = rememberScopedCommand(CompositionKeys.Rewrite)
+    val rewrite = rememberScopedCommand(HistoryKeys.Rewrite)
     // Aims the window's browse at the pack, where a catalogue module answers it.
     val aim = rememberScopedCommand(CatalogueKeys.Aim)
     PackDetailScreen(

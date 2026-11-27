@@ -1,6 +1,6 @@
 package hivens.packs.api
 
-import hivens.widget.model.PageValue
+import hivens.pages.api.PageValue
 import kotlinx.serialization.builtins.serializer
 
 /** What an opening hands a page about a pack. Declared by the packs module, so read as missing where a document names none. */

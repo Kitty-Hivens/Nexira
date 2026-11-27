@@ -13,7 +13,7 @@ import hivens.ui.widgets.ChildLevel
 import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
 import hivens.widget.model.ScopeLevel
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import org.koin.compose.koinInject
 
 /**

@@ -22,14 +22,13 @@ import hivens.ui.navigation.PackSettingsPage
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.widget.api.LocalScope
-import hivens.widget.api.PageKeys
+import hivens.pages.api.PageKeys
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
-import hivens.widget.api.read
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
-import hivens.widget.model.History
-import hivens.widget.model.HistoryEntry
+import hivens.history.api.History
+import hivens.pages.api.HistoryEntry
 import hivens.widget.model.ScopeLevel
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.Dispatchers
@@ -37,6 +36,7 @@ import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import hivens.pages.api.read
 
 /**
  * A slot drawn on the pages of a composition's history: entries of one page differ by

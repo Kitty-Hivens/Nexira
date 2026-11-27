@@ -75,7 +75,6 @@ import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.layers.DismissOnBack
 import hivens.ui.surface.NxSurface
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.LocalDocument
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.rememberWidgetState
@@ -99,6 +98,7 @@ import hivens.ui.theme.NxColor
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.surface.defaultOpacity
 import kotlinx.serialization.json.intOrNull
+import hivens.pages.api.PagesKeys
 
 
 /**
@@ -224,7 +224,7 @@ fun ShellLeftRegion(instance: WidgetInstance) {
         return
     }
     val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
-    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val show = rememberScopedCommand(PagesKeys.Show) ?: return
     // Asks first, through the window's sign-out question.
     val signOut = rememberSignOutRequest()
     Row(Modifier.fillMaxHeight()) {

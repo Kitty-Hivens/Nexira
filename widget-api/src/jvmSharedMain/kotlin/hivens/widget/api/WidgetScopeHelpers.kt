@@ -251,7 +251,7 @@ fun WidgetDescriptor.shownHere(): Boolean {
 @Composable
 fun WidgetInstance.shownHere(): Boolean {
     if (!conditional) return true
-    val config = rememberScopedSource(CompositionKeys.History).valueOrNull()?.current?.config ?: return true
+    val config = rememberScopedSource(CompositionKeys.Config).valueOrNull() ?: return true
     return shownOn(config)
 }
 

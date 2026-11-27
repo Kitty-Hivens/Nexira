@@ -62,20 +62,20 @@ import hivens.ui.screens.library.lastPlayedLabel
 import hivens.ui.screens.library.rememberPackArt
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
 import hivens.widget.model.PropRange
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxMedia
+import hivens.pages.api.PagesKeys
 
 @Serializable
 data class RecentProps(
@@ -115,7 +115,7 @@ data class RecentProps(
 fun HomeNewRecent(instance: WidgetInstance) {
     val p = instance.rememberProps<RecentProps>()
     val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
-    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val show = rememberScopedCommand(PagesKeys.Show) ?: return
     val s = nexiraStrings()
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
 

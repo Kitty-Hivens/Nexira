@@ -34,7 +34,6 @@ import hivens.ui.press.selectable
 import hivens.ui.widgets.Commands
 import hivens.ui.widgets.Sources
 import hivens.ui.widgets.toWidgetColorOrNull
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -45,6 +44,8 @@ import kotlinx.serialization.Serializable
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import hivens.ui.theme.Status
+import hivens.history.api.HistoryKeys
+import hivens.pages.api.PagesKeys
 
 // One configurable nav-rail item. `target` selects what the item does --
 // a screen navigation, the console-window toggle, or logout. The whole
@@ -80,8 +81,8 @@ private val SETTINGS_CONFIGS = setOf(LauncherConfigs.Settings, LauncherConfigs.T
 @Composable
 fun NavEntry(instance: WidgetInstance) {
     val p = instance.rememberProps<NavEntryProps>()
-    val entry = rememberScopedSource(CompositionKeys.History).valueOrNull()?.current ?: return
-    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val entry = rememberScopedSource(HistoryKeys.History).valueOrNull()?.current ?: return
+    val show = rememberScopedCommand(PagesKeys.Show) ?: return
     val config = entry.config
 
     when (p.target) {

@@ -5,9 +5,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import hivens.widget.model.ConfigId
-import hivens.widget.model.History
-import hivens.widget.model.HistoryEntry
-import hivens.widget.model.Show
+import hivens.history.api.History
+import hivens.pages.api.HistoryEntry
+import hivens.pages.api.Show
 import kotlinx.serialization.json.JsonElement
 
 /**

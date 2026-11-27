@@ -22,7 +22,7 @@ import hivens.widget.api.ContributedServices
 import hivens.widget.api.KeyDeclaration
 import hivens.widget.api.KeyKind
 import hivens.widget.api.KeyOrigin
-import hivens.widget.api.PageKeys
+import hivens.pages.api.PageKeys
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.flowSource
 import hivens.widget.generated.GeneratedWidgetRegistry

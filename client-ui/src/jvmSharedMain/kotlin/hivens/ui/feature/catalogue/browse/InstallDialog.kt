@@ -75,7 +75,6 @@ import hivens.ui.nx.NxTooltip
 import hivens.ui.press.clickable
 import hivens.ui.puppet.PuppetClick
 import hivens.ui.screens.library.rememberPackArt
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
@@ -89,6 +88,7 @@ import hivens.ui.theme.NxInk
 import hivens.ui.theme.Status
 import hivens.ui.theme.decorativeColor
 import hivens.ui.theme.decorativePair
+import hivens.pages.api.PagesKeys
 
 /**
  * Where a catalogue project goes, asked when an install has no pack behind it.
@@ -251,7 +251,7 @@ private fun rememberInstallDialogModel(subject: InstallSubject): InstallDialogMo
     val newPack = rememberScopedCommand(CatalogueKeys.InstallNewPack)
     val retry = rememberScopedAction(CatalogueKeys.RetryChoice)
     // Resolved here, where the dialog is asked for, rather than on the layer it is drawn on.
-    val show = rememberScopedCommand(CompositionKeys.Show)
+    val show = rememberScopedCommand(PagesKeys.Show)
     val choice: InstallChoiceView? = rememberScopedSource(CatalogueKeys.InstallChoice).valueOrNull()?.takeIf { it.subject == subject }
 
     LaunchedEffect(subject, choose != null) { choose?.invoke(subject) }

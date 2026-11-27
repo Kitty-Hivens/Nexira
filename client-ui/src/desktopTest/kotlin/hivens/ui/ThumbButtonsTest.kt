@@ -14,7 +14,7 @@ import hivens.ui.layers.LayerHost
 import hivens.ui.layers.WindowLayers
 import hivens.ui.navigation.CompositionHistory
 import hivens.ui.navigation.LauncherConfigs
-import hivens.widget.model.HistoryEntry
+import hivens.pages.api.HistoryEntry
 import kotlin.test.Test
 import kotlin.test.assertEquals
 

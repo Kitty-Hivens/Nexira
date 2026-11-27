@@ -293,7 +293,7 @@ public final class hivens/packs/api/PackOperationView {
 public final class hivens/packs/api/PackPages {
 	public static final field INSTANCE Lhivens/packs/api/PackPages;
 	public static final field PACK_ID Ljava/lang/String;
-	public final fun getPack ()Lhivens/widget/model/PageValue;
+	public final fun getPack ()Lhivens/pages/api/PageValue;
 }
 
 public final class hivens/packs/api/PackSource {

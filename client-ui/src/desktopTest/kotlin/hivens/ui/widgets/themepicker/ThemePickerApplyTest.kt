@@ -23,7 +23,6 @@ import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
 import hivens.widget.api.CompositeWidgetRegistry
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.SlotRenderer
 import hivens.widget.api.WidgetDescriptor
 import hivens.widget.api.WidgetRegistry
@@ -42,10 +41,10 @@ import hivens.widget.model.Composition
 import hivens.widget.model.Config
 import hivens.widget.model.ConfigLayout
 import hivens.widget.model.Document
-import hivens.widget.model.History
+import hivens.history.api.History
 import hivens.widget.model.LayoutId
 import hivens.widget.model.ScopeLevel
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.StandardDocument
@@ -58,6 +57,7 @@ import org.koin.dsl.koinApplication
 import org.koin.dsl.module
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import hivens.history.api.HistoryKeys
 
 /**
  * Apply on the theme picker puts the choice in use and then leaves, in that order, and with nothing
@@ -86,7 +86,7 @@ class ThemePickerApplyTest {
         }
         val commands = WidgetCommandRegistry().apply {
             if (answerApply) register(ThemesKeys.Choose, command { id: String -> fired += "apply $id" })
-            declare(CompositionKeys.Back)
+            declare(HistoryKeys.Back)
         }
         val app: WidgetScope
 
@@ -109,7 +109,7 @@ class ThemePickerApplyTest {
                     ) {
                         ChildLevel(ScopeLevel.Composition) {
                             val back = rememberLatestCommand<Unit> { fired += "back" }
-                            ProvideScopedCommand(CompositionKeys.Back, back) { content() }
+                            ProvideScopedCommand(HistoryKeys.Back, back) { content() }
                         }
                     }
                 }

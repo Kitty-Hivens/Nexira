@@ -5,7 +5,7 @@ import hivens.ui.chrome.staticCrumbLabel
 import hivens.ui.navigation.LauncherConfigs
 import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
-import hivens.widget.model.HistoryEntry
+import hivens.pages.api.HistoryEntry
 import hivens.widget.model.NodePath
 import hivens.widget.model.NodeRoot
 import hivens.widget.model.WidgetInstance

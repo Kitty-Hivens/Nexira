@@ -1,6 +1,6 @@
 package hivens.catalogue.api
 
-import hivens.widget.model.PageValue
+import hivens.pages.api.PageValue
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 

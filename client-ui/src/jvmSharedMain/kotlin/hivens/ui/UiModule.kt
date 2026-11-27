@@ -105,7 +105,7 @@ import hivens.widget.api.HostFiles
 import hivens.widget.api.KeyContribution
 import hivens.widget.api.LevelServicesHost
 import hivens.widget.api.ModuleKeysResult
-import hivens.widget.api.PageKeys
+import hivens.pages.api.PageKeys
 import hivens.widget.api.SettingsStores
 import hivens.widget.api.TakenContributions
 import hivens.widget.api.TakenWords
@@ -119,11 +119,10 @@ import hivens.widget.api.command
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
 import hivens.widget.api.hostServices
-import hivens.widget.api.read
 import hivens.widget.api.registerModuleKeys
 import hivens.widget.model.Document
-import hivens.widget.model.History
-import hivens.widget.model.HistoryEntry
+import hivens.history.api.History
+import hivens.pages.api.HistoryEntry
 import hivens.widget.model.ScopeLevel
 import hivens.widget.model.StandardDocument
 import hivens.widget.model.WidgetDataSource
@@ -145,6 +144,9 @@ import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.coroutines.CoroutineContext
 import kotlin.time.Duration.Companion.seconds
+import hivens.history.api.HistoryKeys
+import hivens.pages.api.PagesKeys
+import hivens.pages.api.read
 
 /**
  * What each level of the scope tree makes for itself: one per level, closed with it,
@@ -705,7 +707,8 @@ internal fun uiDataRegistry(
     registerFactory(WindowKeys.Open, sample = { emptySet() }) { app -> flowSource(app.hostServices.get<CompositionWindows>().open) }
     // What the composition's owner provides around every surface it draws, with the
     // sample in the sense above.
-    declare(CompositionKeys.History) { History(LauncherConfigs.Home) }
+    declare(CompositionKeys.Config) { LauncherConfigs.Home }
+    declare(HistoryKeys.History) { History(LauncherConfigs.Home) }
     // What the router provides for the entry each page is drawn for, and the launcher's own value of one.
     declare(PageKeys.Entry) { HistoryEntry(LauncherConfigs.Home) }
     registerFactory(PackSettingsPage.key) { page -> page.read(PackSettingsPage) }
@@ -735,11 +738,11 @@ internal fun uiCommandRegistry(
     registerFactory(WindowKeys.Show) { app -> command(app.hostServices.get<CompositionWindows>()::show) }
     registerFactory(WindowKeys.Close) { app -> command(app.hostServices.get<CompositionWindows>()::close) }
     // What the composition's owner provides: its history.
-    declare(CompositionKeys.Show)
-    declare(CompositionKeys.Back)
-    declare(CompositionKeys.Forward)
-    declare(CompositionKeys.BackTo)
-    declare(CompositionKeys.Rewrite)
+    declare(PagesKeys.Show)
+    declare(HistoryKeys.Back)
+    declare(HistoryKeys.Forward)
+    declare(HistoryKeys.BackTo)
+    declare(HistoryKeys.Rewrite)
     // What the About page provides for its update panel.
     declare(OpenUpdateDialog)
     // What each window provides of the commands it takes.

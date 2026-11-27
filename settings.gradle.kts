@@ -177,6 +177,11 @@ include(":accounts")
 // Like the others, brought in only by a document that names it.
 include(":catalogue-api")
 include(":catalogue")
+// Pages and their history, which the kernel does not have: what is shown and with what
+// values, and the keys that open a page, then the stack that back and forward walk. An
+// interface with no pages brings in neither.
+include(":pages-api")
+include(":history-api")
 // The catalogue's sources, one module each: the Hivens mirror and Modrinth. Each brings
 // what it lists, a pack's page and its builds as a contribution of the catalogue API's
 // source contract, which a third party implements the same way.

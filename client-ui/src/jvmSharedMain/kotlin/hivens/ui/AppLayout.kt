@@ -46,13 +46,15 @@ import hivens.widget.api.valueOrNull
 import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
-import hivens.widget.model.History
-import hivens.widget.model.Show
+import hivens.history.api.History
+import hivens.pages.api.Show
 import hivens.widget.model.SlotId
 import hivens.widget.model.WidgetInstance
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.NxColor
 import org.koin.compose.koinInject
+import hivens.history.api.HistoryKeys
+import hivens.pages.api.PagesKeys
 
 // ─── Layout ──────────────────────────────────────────────────────────────────
 
@@ -138,12 +140,13 @@ internal fun ProvideComposition(history: CompositionHistory, show: (Show) -> Uni
     // The composition the launcher starts in has its window already.
     val owned = remember { CompositionWindows { it in document.compositions && it != document.start } }
     val openOwned by owned.open.collectAsState()
-    ProvideScoped(CompositionKeys.History, history.now) {
-    ProvideScopedCommand(CompositionKeys.Show, rememberLatestCommand(show)) {
-    ProvideScopedCommand(CompositionKeys.Back, rememberLatestCommand<Unit> { history.back() }) {
-    ProvideScopedCommand(CompositionKeys.Forward, rememberLatestCommand<Unit> { history.forward() }) {
-    ProvideScopedCommand(CompositionKeys.BackTo, rememberLatestCommand(history::backTo)) {
-    ProvideScopedCommand(CompositionKeys.Rewrite, rememberLatestCommand(history::rewrite)) {
+    ProvideScoped(CompositionKeys.Config, history.now.current.config) {
+    ProvideScoped(HistoryKeys.History, history.now) {
+    ProvideScopedCommand(PagesKeys.Show, rememberLatestCommand(show)) {
+    ProvideScopedCommand(HistoryKeys.Back, rememberLatestCommand<Unit> { history.back() }) {
+    ProvideScopedCommand(HistoryKeys.Forward, rememberLatestCommand<Unit> { history.forward() }) {
+    ProvideScopedCommand(HistoryKeys.BackTo, rememberLatestCommand(history::backTo)) {
+    ProvideScopedCommand(HistoryKeys.Rewrite, rememberLatestCommand(history::rewrite)) {
     ProvideScoped(CompositionKeys.Windows, openOwned) {
     ProvideScopedCommand(CompositionKeys.ShowWindow, rememberLatestCommand<CompositionName> { owned.show(it) }) {
     ProvideScopedCommand(CompositionKeys.CloseWindow, rememberLatestCommand(owned::close)) {
@@ -151,6 +154,7 @@ internal fun ProvideComposition(history: CompositionHistory, show: (Show) -> Uni
             content()
             OwnedWindows(document, owned)
         }
+    }
     }
     }
     }

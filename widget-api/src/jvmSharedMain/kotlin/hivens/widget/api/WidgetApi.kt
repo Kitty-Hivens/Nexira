@@ -45,9 +45,10 @@ package hivens.widget.api
  *    ([ModuleStrings.SHIPPED_LANGUAGES]), through the reader the loader uses for a jar's
  *    ([ModuleStrings.read]).
  *    A module compiled in brings widgets of its own ([CompiledModule.widgets]), and every
- *    composition answers the kernel's own keys for its history and moving it ([CompositionKeys]),
- *    whose entries are configs with the values their pages read ([PageKeys], [pageValue]). A level
- *    stands under its owner whatever the owner's kind ([WidgetScope.child]).
+ *    composition answers the kernel's own keys for the config it draws and the windows it owns
+ *    ([CompositionKeys]). Pages and their history are modules' APIs, not the kernel's. A level
+ *    stands under its owner whatever the owner's kind ([WidgetScope.child]), and a level answers
+ *    a key with the value it is asked for with ([PageLevels.levelFor]).
  *    A settings domain may answer the value a launcher's first start opens on
  *    ([SettingsDomain.firstRun]), which the host writes into the domain's file then.
  *    A widget's arrival is told whether the node itself names its character ([WidgetEntrance]),

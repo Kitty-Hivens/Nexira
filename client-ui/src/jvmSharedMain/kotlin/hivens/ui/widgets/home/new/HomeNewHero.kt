@@ -41,7 +41,6 @@ import androidx.compose.ui.zIndex
 import hivens.ui.theme.NxMedia
 import hivens.ui.theme.familyForText
 import hivens.ui.theme.decorativePair
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.model.PropLabel
@@ -49,6 +48,7 @@ import hivens.widget.model.PropRange
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.pages.api.PagesKeys
 
 @Serializable
 data class HeroProps(
@@ -83,7 +83,7 @@ data class HeroProps(
 @Composable
 fun HomeNewHero(instance: WidgetInstance) {
     val p = instance.rememberProps<HeroProps>()
-    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val show = rememberScopedCommand(PagesKeys.Show) ?: return
     val s = nexiraStrings()
     val quickLaunch = rememberQuickLaunchTarget(s.text("homeQuickButton")) ?: return
     val target = quickLaunch.target

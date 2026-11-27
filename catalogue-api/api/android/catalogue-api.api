@@ -391,10 +391,10 @@ public final class hivens/catalogue/api/CataloguePages {
 	public static final field INTO_ID Ljava/lang/String;
 	public static final field PACK_ID Ljava/lang/String;
 	public static final field PROJECT_ID Ljava/lang/String;
-	public final fun getBuild ()Lhivens/widget/model/PageValue;
-	public final fun getInto ()Lhivens/widget/model/PageValue;
-	public final fun getPack ()Lhivens/widget/model/PageValue;
-	public final fun getProject ()Lhivens/widget/model/PageValue;
+	public final fun getBuild ()Lhivens/pages/api/PageValue;
+	public final fun getInto ()Lhivens/pages/api/PageValue;
+	public final fun getPack ()Lhivens/pages/api/PageValue;
+	public final fun getProject ()Lhivens/pages/api/PageValue;
 }
 
 public final class hivens/catalogue/api/CatalogueTags {

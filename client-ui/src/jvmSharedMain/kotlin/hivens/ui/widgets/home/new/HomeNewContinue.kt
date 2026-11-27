@@ -38,13 +38,13 @@ import hivens.ui.feature.catalogue.project.loaderLabel
 import hivens.ui.theme.NxInk
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.model.PropLabel
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.pages.api.PagesKeys
 
 @Serializable
 data class ContinueProps(
@@ -75,7 +75,7 @@ data class ContinueProps(
 @Composable
 fun HomeNewContinue(instance: WidgetInstance) {
     val p = instance.rememberProps<ContinueProps>()
-    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val show = rememberScopedCommand(PagesKeys.Show) ?: return
     val s = nexiraStrings()
     val quickLaunch = rememberQuickLaunchTarget(s.text("homeQuickButton")) ?: return
     val pack = quickLaunch.target

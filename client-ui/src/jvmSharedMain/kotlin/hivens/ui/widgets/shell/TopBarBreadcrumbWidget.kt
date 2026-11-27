@@ -21,13 +21,13 @@ import hivens.ui.i18n.nexiraStrings
 import hivens.ui.icons.NxIcon
 import hivens.ui.icons.Symbol
 import hivens.ui.press.clickable
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import hivens.ui.theme.NxInk
+import hivens.history.api.HistoryKeys
 
 /**
  * Clickable breadcrumb of the current location (Modrinth-style). Back button +
@@ -42,10 +42,10 @@ import hivens.ui.theme.NxInk
 )
 @Composable
 fun TopBarBreadcrumbWidget() {
-    val nav = rememberScopedSource(CompositionKeys.History).valueOrNull() ?: return
-    val back = rememberScopedAction(CompositionKeys.Back) ?: return
-    val forward = rememberScopedAction(CompositionKeys.Forward) ?: return
-    val backTo = rememberScopedCommand(CompositionKeys.BackTo) ?: return
+    val nav = rememberScopedSource(HistoryKeys.History).valueOrNull() ?: return
+    val back = rememberScopedAction(HistoryKeys.Back) ?: return
+    val forward = rememberScopedAction(HistoryKeys.Forward) ?: return
+    val backTo = rememberScopedCommand(HistoryKeys.BackTo) ?: return
     val s = nexiraStrings()
     Row(verticalAlignment = Alignment.CenterVertically) {
         // Back / forward are always present so the breadcrumb never shifts; each

@@ -17,9 +17,9 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import hivens.ui.widgets.ChildLevel
 import hivens.ui.widgets.KoinLevelServicesHost
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetRegistry
+import hivens.widget.api.CompositionKeys
 import hivens.widget.api.ProvideScoped
 import hivens.widget.api.WidgetDataRegistry
 import hivens.widget.api.WidgetScope
@@ -32,10 +32,10 @@ import hivens.widget.model.Config
 import hivens.widget.model.ConfigId
 import hivens.widget.model.ConfigLayout
 import hivens.widget.model.Document
-import hivens.widget.model.History
+import hivens.history.api.History
 import hivens.widget.model.LayoutId
 import hivens.widget.model.ScopeLevel
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SlotId
 import hivens.widget.model.WidgetInstance
@@ -54,9 +54,9 @@ import kotlin.test.assertEquals
 @OptIn(ExperimentalComposeUiApi::class)
 class ConfigViewTest {
 
-    /** An app level the composition's level stands under, which is where the history is put. */
+    /** An app level the composition's level stands under, which is where the config drawn is put. */
     private val app: WidgetScope = koinApplication {
-        val data = WidgetDataRegistry().apply { declare(CompositionKeys.History) }
+        val data = WidgetDataRegistry().apply { declare(CompositionKeys.Config) }
         modules(module { single { WidgetScope.app(data, KoinLevelServicesHost.app(this), Dispatchers.Unconfined) } })
     }.koin.get()
 
@@ -153,7 +153,7 @@ class ConfigViewTest {
             val scene = ImageComposeScene(200, 200, Density(1f)) {
                 CompositionLocalProvider(LocalWidgetRegistry provides registry, LocalScope provides app) {
                     ChildLevel(ScopeLevel.Composition) {
-                        ProvideScoped(CompositionKeys.History, history) {
+                        ProvideScoped(CompositionKeys.Config, history.current.config) {
                             ConfigView(composition, document, history, Modifier.fillMaxSize())
                         }
                     }

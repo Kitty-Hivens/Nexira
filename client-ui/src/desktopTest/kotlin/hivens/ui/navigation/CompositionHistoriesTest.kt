@@ -1,7 +1,7 @@
 package hivens.ui.navigation
 
 import hivens.widget.model.CompositionName
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotSame

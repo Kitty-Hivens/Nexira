@@ -10,9 +10,9 @@ import hivens.ui.i18n.NexiraStrings
 import hivens.ui.screens.screenKind
 import hivens.ui.widgets.themepicker.launcherAndControls
 import hivens.widget.model.ConfigId
-import hivens.widget.model.History
-import hivens.widget.model.HistoryEntry
-import hivens.widget.model.Show
+import hivens.history.api.History
+import hivens.pages.api.HistoryEntry
+import hivens.pages.api.Show
 import hivens.widget.model.StandardDocument
 import kotlin.test.Test
 import kotlin.test.assertEquals

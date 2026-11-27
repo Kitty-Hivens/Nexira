@@ -1,9 +1,21 @@
-package hivens.widget.api
+package hivens.pages.api
 
+import hivens.widget.api.ContributedServices
+import hivens.widget.api.HostApi
+import hivens.widget.api.KeyContribution
+import hivens.widget.api.LevelServices
+import hivens.widget.api.LevelServicesHost
+import hivens.widget.api.ModuleKeys
+import hivens.widget.api.ModuleKeysResult
+import hivens.widget.api.WidgetCommandRegistry
+import hivens.widget.api.WidgetDataRegistry
+import hivens.widget.api.WidgetScope
+import hivens.widget.api.current
+import hivens.widget.api.flowSource
+import hivens.widget.api.registerModuleKeys
 import hivens.widget.model.ConfigId
-import hivens.widget.model.HistoryEntry
-import hivens.widget.model.PageValue
 import hivens.widget.model.ScopeLevel
+import kotlin.reflect.KClass
 import kotlin.test.assertNotSame
 import kotlin.test.assertSame
 import kotlin.test.assertTrue
@@ -16,6 +28,7 @@ import kotlin.test.assertIs
 import kotlin.test.assertNull
 
 /** What an opening hands a page, as the widgets of the page and the factories of its level read it. */
+@OptIn(HostApi::class)
 class PageValuesTest {
 
     private val title = PageValue("page.name", String.serializer())
@@ -34,7 +47,7 @@ class PageValuesTest {
     private fun page(entry: MutableStateFlow<HistoryEntry>?): WidgetScope {
         val commands = WidgetCommandRegistry()
         registerTitle(commands)
-        val composition = WidgetScope.app(sources, MemoryLevelServices.app(), Dispatchers.Unconfined, commands).child(ScopeLevel.Composition)
+        val composition = WidgetScope.app(sources, NoServices, Dispatchers.Unconfined, commands).child(ScopeLevel.Composition)
         return composition.pages.levelFor("page") { if (entry != null) provideSource(PageKeys.Entry, flowSource(entry)) }
     }
 
@@ -54,8 +67,7 @@ class PageValuesTest {
     @Test
     fun `a page drawn for no entry reads nothing and is not broken`() {
         val page = page(entry = null)
-        assertNull(page.find(title.key)?.state?.value)
-        assertEquals(true, page.answers(KeyDeclaration(title.id, ScopeLevel.Page, KeyKind.Source, KeyOrigin.Factory)))
+        assertNull(requireNotNull(page.find(title.key), { "the page's factory makes the value" }).state.value)
     }
 
     @Test
@@ -78,7 +90,7 @@ class PageValuesTest {
     @Test
     fun `a page level answers the entry it was last asked for with, and reads its values at once`() {
         registerTitle()
-        val pages = WidgetScope.app(sources, MemoryLevelServices.app(), Dispatchers.Default).child(ScopeLevel.Composition).pages
+        val pages = WidgetScope.app(sources, NoServices, Dispatchers.Default).child(ScopeLevel.Composition).pages
         val entry = opened("Sodium")
         val level = pages.levelFor(entry)
         assertEquals(entry, level.current(PageKeys.Entry))
@@ -94,7 +106,7 @@ class PageValuesTest {
     @Test
     fun `a page that left and is opened again answers its new entry`() {
         registerTitle()
-        val pages = WidgetScope.app(sources, MemoryLevelServices.app(), Dispatchers.Default).child(ScopeLevel.Composition).pages
+        val pages = WidgetScope.app(sources, NoServices, Dispatchers.Default).child(ScopeLevel.Composition).pages
         val entry = opened("Sodium")
         val first = pages.levelFor(entry.copy(values = mapOf(title.of("noted"))))
         pages.keep(emptySet())
@@ -103,4 +115,16 @@ class PageValuesTest {
         assertNotSame(first, again)
         assertEquals("Sodium", again.current(title.key))
     }
+}
+
+/** A level with no services behind it, for a tree that only answers keys. */
+private object NoServices : LevelServicesHost {
+    override val services: LevelServices = object : LevelServices {
+        override fun <T : Any> find(type: KClass<T>): T? = null
+        override fun <T : Any> get(type: KClass<T>): T = throw NoSuchElementException("no ${type.qualifiedName} here")
+    }
+
+    override fun child(level: ScopeLevel): LevelServicesHost = this
+
+    override fun close() = Unit
 }

@@ -36,9 +36,9 @@ import hivens.ui.host.launcherServices
 import hivens.widget.api.LocalScope
 import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
-import hivens.widget.model.History
+import hivens.history.api.History
 import hivens.widget.model.ScopeLevel
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay

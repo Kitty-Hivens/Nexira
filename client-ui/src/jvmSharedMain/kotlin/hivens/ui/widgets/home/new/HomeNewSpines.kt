@@ -59,11 +59,11 @@ import hivens.ui.theme.NxColor
 import hivens.ui.theme.NxMedia
 import hivens.ui.theme.decorativePair
 import hivens.ui.theme.familyForText
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
+import hivens.pages.api.PagesKeys
 
 // The library as spines on a shelf: every pack a strip the full height of the slot,
 // side by side, and one of them opened out to the rest of the width.
@@ -85,7 +85,7 @@ import hivens.widget.model.Widget
 @Composable
 fun HomeNewSpines() {
     val appState = rememberScopedSource(AccountKeys.Session).valueOrNull()
-    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val show = rememberScopedCommand(PagesKeys.Show) ?: return
     val all = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     val packs = remember(all) {
         all.sortedWith(RecentFirst)

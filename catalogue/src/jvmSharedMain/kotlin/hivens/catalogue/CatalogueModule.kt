@@ -53,7 +53,7 @@ import hivens.widget.api.find
 import hivens.widget.api.flowSource
 import hivens.widget.api.get
 import hivens.widget.api.hostService
-import hivens.widget.api.pageValue
+import hivens.pages.api.pageValue
 import hivens.widget.api.service
 import hivens.widget.model.ApiVersion
 import hivens.widget.model.ScopeLevel

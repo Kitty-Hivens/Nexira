@@ -45,6 +45,8 @@ kotlin {
         getByName("commonMain") {
             dependencies {
                 api(project(":widget-model"))
+                // What a project, a build or a pack page is opened with is a page value.
+                api(project(":pages-api"))
             }
         }
 

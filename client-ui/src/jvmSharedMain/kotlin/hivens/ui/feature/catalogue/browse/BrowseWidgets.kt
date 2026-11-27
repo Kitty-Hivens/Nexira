@@ -87,12 +87,12 @@ import hivens.ui.theme.Status
 import hivens.ui.widgets.RailBlock
 import hivens.ui.widgets.RailGroup
 import hivens.ui.widgets.RailLabel
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
+import hivens.pages.api.PagesKeys
 
 /**
  * Browse's widgets: the pack being installed into, the search box, the chosen
@@ -209,7 +209,7 @@ private fun SortPicker(current: BrowseSort, wordless: Boolean) {
 fun BrowseResultsWidget(instance: WidgetInstance) {
     val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
     val results = rememberScopedSource(CatalogueKeys.Results).valueOrNull() ?: return
-    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val show = rememberScopedCommand(PagesKeys.Show) ?: return
     // A result leaves Browse for its page: a catalogue pack's, or a project's, which
     // carries the target pack so the page can install into it.
     val openPack: (CatalogueCard) -> Unit = remember(show) {
@@ -252,7 +252,7 @@ fun BrowseResultsWidget(instance: WidgetInstance) {
 fun BrowseInstallingWidget(instance: WidgetInstance) {
     val browse = rememberScopedSource(CatalogueKeys.Browse).valueOrNull() ?: return
     val setTarget = rememberScopedCommand(CatalogueKeys.SetTarget)
-    val show = rememberScopedCommand(CompositionKeys.Show)
+    val show = rememberScopedCommand(PagesKeys.Show)
     val s = nexiraStrings()
     val target = browse.target
     PuppetClick("browse.target.none") { setTarget?.invoke(null) }

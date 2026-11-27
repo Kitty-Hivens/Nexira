@@ -19,12 +19,12 @@ import hivens.ui.puppet.PuppetClick
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import hivens.ui.theme.NxInk
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.Widget
+import hivens.history.api.HistoryKeys
 
 // The picker's title and Apply, on a panel of its own like the grid and the preview under it: the
 // title is text, and on the bare page it lay over whatever the wallpaper had there. Not removable,
@@ -48,7 +48,7 @@ fun ThemePickerHeaderWidget() {
     val selection = rememberScopedSource(ThemeSelectionSource).valueOrNull() ?: return
     val s = strings(ColourNxControls.ID)
     val apply = rememberScopedCommand(ThemesKeys.Choose)
-    val back = rememberScopedAction(CompositionKeys.Back)
+    val back = rememberScopedAction(HistoryKeys.Back)
     val applyAndLeave: () -> Unit = {
         if (apply != null) {
             apply(selection.or(active).id)

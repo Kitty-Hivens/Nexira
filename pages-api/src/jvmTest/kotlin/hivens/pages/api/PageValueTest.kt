@@ -1,5 +1,7 @@
-package hivens.widget.model
+package hivens.pages.api
 
+import hivens.widget.model.ConfigId
+import hivens.widget.model.ScopeLevel
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.serializer
 import kotlinx.serialization.json.JsonPrimitive

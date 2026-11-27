@@ -1,5 +1,8 @@
-package hivens.widget.model
+package hivens.history.api
 
+import hivens.pages.api.HistoryEntry
+import hivens.pages.api.Show
+import hivens.widget.model.ConfigId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonPrimitive

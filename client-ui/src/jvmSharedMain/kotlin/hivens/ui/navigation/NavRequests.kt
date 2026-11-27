@@ -1,6 +1,6 @@
 package hivens.ui.navigation
 
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow

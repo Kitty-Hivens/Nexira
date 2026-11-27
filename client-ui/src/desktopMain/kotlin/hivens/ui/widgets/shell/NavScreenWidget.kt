@@ -3,7 +3,6 @@ package hivens.ui.widgets.shell
 import androidx.compose.runtime.Composable
 import hivens.ui.navigation.LauncherConfigs
 import hivens.ui.screens.custom.ScreenIcons
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.LocalDocument
 import hivens.widget.api.LocalSlotPath
 import hivens.widget.api.rememberProps
@@ -14,6 +13,8 @@ import hivens.widget.model.ConfigId
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import kotlinx.serialization.Serializable
+import hivens.history.api.HistoryKeys
+import hivens.pages.api.PagesKeys
 
 @Serializable
 data class ScreenLinkProps(
@@ -38,8 +39,8 @@ fun NavScreenLink(instance: WidgetInstance) {
     val p = instance.rememberProps<ScreenLinkProps>()
     val config = ConfigId(p.screen)
     val screen = LocalDocument.current?.compositions?.get(LocalSlotPath.current.composition)?.configs?.get(config) ?: return
-    val nav = rememberScopedSource(CompositionKeys.History).valueOrNull() ?: return
-    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val nav = rememberScopedSource(HistoryKeys.History).valueOrNull() ?: return
+    val show = rememberScopedCommand(PagesKeys.Show) ?: return
     NavSlot(
         icon        = ScreenIcons.of(screen.icon),
         outlineSwap = true,

@@ -27,7 +27,6 @@ import hivens.ui.settle
 import hivens.ui.theme.NxThemed
 import hivens.ui.widgets.profile.ProfileSelection
 import hivens.ui.widgets.profile.ProfileSelectionSource
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.LocalMisplacedWidget
 import hivens.widget.api.LocalScope
 import hivens.widget.api.LocalWidgetCommandRegistry
@@ -49,9 +48,9 @@ import hivens.widget.api.rememberScopedAction
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
-import hivens.widget.model.History
+import hivens.history.api.History
 import hivens.widget.model.ScopeLevel
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import hivens.widget.model.SlotContent
 import hivens.widget.model.SourceKey
 import hivens.widget.model.WidgetInstance
@@ -70,6 +69,8 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNotSame
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import hivens.history.api.HistoryKeys
+import hivens.pages.api.PagesKeys
 
 /**
  * The surface contexts as sources and commands: each composition keeps its own,
@@ -82,13 +83,13 @@ class ScopedKeysTest {
     private val data = WidgetDataRegistry().apply {
         register(SourceKey<String>("test.app"), flowSource(MutableStateFlow("app")))
         registerFactory(ProfileSelectionSource) { flowSource(MutableStateFlow(ProfileSelection())) }
-        declare(CompositionKeys.History)
+        declare(HistoryKeys.History)
         declare(SourceKey<String>("test.page.owned", ScopeLevel.Page))
     }
 
     private val commands = WidgetCommandRegistry().apply {
-        declare(CompositionKeys.Back)
-        declare(CompositionKeys.Show)
+        declare(HistoryKeys.Back)
+        declare(PagesKeys.Show)
     }
 
     private val app: WidgetScope = koinApplication {
@@ -156,11 +157,11 @@ class ScopedKeysTest {
                 ChildLevel(ScopeLevel.Window) {
                     ChildLevel(ScopeLevel.Composition) {
                         val back = rememberLatestCommand<Unit> { fired += name }
-                        ProvideScoped(CompositionKeys.History, History(config)) {
-                            ProvideScopedCommand(CompositionKeys.Back, back) {
+                        ProvideScoped(HistoryKeys.History, History(config)) {
+                            ProvideScopedCommand(HistoryKeys.Back, back) {
                                 ChildLevel(ScopeLevel.Page) {
-                                    read[name] = rememberScopedSource(CompositionKeys.History).valueOrNull()
-                                    fire[name] = rememberScopedAction(CompositionKeys.Back)
+                                    read[name] = rememberScopedSource(HistoryKeys.History).valueOrNull()
+                                    fire[name] = rememberScopedAction(HistoryKeys.Back)
                                 }
                             }
                         }
@@ -183,8 +184,8 @@ class ScopedKeysTest {
         draw {
             ChildLevel(ScopeLevel.Window) {
                 ChildLevel(ScopeLevel.Composition) {
-                    outside = rememberScopedSource(CompositionKeys.History).valueOrNull()
-                    show = rememberScopedCommand(CompositionKeys.Show)
+                    outside = rememberScopedSource(HistoryKeys.History).valueOrNull()
+                    show = rememberScopedCommand(PagesKeys.Show)
                 }
             }
         }
@@ -215,11 +216,11 @@ class ScopedKeysTest {
         draw {
             ChildLevel(ScopeLevel.Composition) {
                 answers["composition"] = missingNeeds(needs)
-                ProvideScoped(CompositionKeys.History, History(LauncherConfigs.Home)) {
+                ProvideScoped(HistoryKeys.History, History(LauncherConfigs.Home)) {
                     ChildLevel(ScopeLevel.Page) {
                         answers["page"] = missingNeeds(needs)
                         ProvideScoped(SourceKey<String>("test.page.owned", ScopeLevel.Page), "here") {
-                            ProvideScopedCommand(CompositionKeys.Back, command<Unit> { }) {
+                            ProvideScopedCommand(HistoryKeys.Back, command<Unit> { }) {
                                 answers["provided"] = missingNeeds(needs)
                             }
                         }

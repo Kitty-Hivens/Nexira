@@ -19,8 +19,8 @@ import hivens.ui.feature.catalogue.project.Environment
 import hivens.ui.navigation.LauncherConfigs
 import hivens.widget.api.LocalScope
 import hivens.widget.api.rememberScopedCommand
-import hivens.widget.model.HistoryEntry
-import hivens.widget.model.Show
+import hivens.pages.api.HistoryEntry
+import hivens.pages.api.Show
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch

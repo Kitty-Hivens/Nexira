@@ -23,8 +23,9 @@ import hivens.widget.api.SlotRenderer
 import hivens.widget.model.CompositionName
 import hivens.widget.model.ConfigId
 import hivens.widget.model.Document
-import hivens.widget.model.History
-import hivens.widget.model.HistoryEntry
+import hivens.history.api.History
+import hivens.pages.api.HistoryEntry
+import hivens.pages.api.levelFor
 import hivens.widget.model.LayoutId
 import hivens.widget.model.NodePath
 import hivens.widget.model.NodeRoot

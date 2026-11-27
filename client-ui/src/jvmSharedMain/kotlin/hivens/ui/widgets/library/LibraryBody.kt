@@ -32,19 +32,19 @@ import hivens.ui.screens.library.PackCard
 import hivens.ui.surface.NxSurface
 import hivens.ui.surface.SurfaceKind
 import androidx.compose.foundation.layout.padding
-import hivens.widget.api.CompositionKeys
 import hivens.widget.api.rememberProps
 import hivens.widget.api.rememberScopedCommand
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
 import hivens.widget.model.PropLabel
-import hivens.widget.model.Show
+import hivens.pages.api.Show
 import hivens.widget.model.Widget
 import hivens.widget.model.WidgetInstance
 import java.nio.file.Path
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import hivens.ui.theme.NxInk
+import hivens.pages.api.PagesKeys
 
 @Serializable
 data class LibraryBodyProps(
@@ -71,7 +71,7 @@ data class LibraryBodyProps(
 @Composable
 fun LibraryBody(instance: WidgetInstance) {
     val p = instance.rememberProps<LibraryBodyProps>()
-    val show = rememberScopedCommand(CompositionKeys.Show) ?: return
+    val show = rememberScopedCommand(PagesKeys.Show) ?: return
     val instances = rememberScopedSource(PackKeys.Library).valueOrNull() ?: return
     // Runs on the app's level, not this composition: leaving the Library mid-delete
     // cancelled it halfway through the tree.

@@ -19,6 +19,8 @@ kotlin.sourceSets.named("jvmSharedMain") {
         implementation(project(":look:shape-api"))
         implementation(project(":look:manager-api"))
         implementation(project(":widget-api"))
+        implementation(project(":pages-api"))
+        implementation(project(":history-api"))
         implementation(project(":widget-model"))
         implementation(project(":nx-ui"))
         implementation(project(":i18n-api"))

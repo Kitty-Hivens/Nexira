@@ -17,7 +17,7 @@ import hivens.ui.navigation.LauncherConfigs
 import hivens.widget.api.LocalDocument
 import hivens.widget.api.rememberScopedSource
 import hivens.widget.api.valueOrNull
-import hivens.widget.model.HistoryEntry
+import hivens.pages.api.HistoryEntry
 import org.koin.compose.koinInject
 
 /**
