@@ -45,10 +45,9 @@ package hivens.widget.api
  *    ([ModuleStrings.SHIPPED_LANGUAGES]), through the reader the loader uses for a jar's
  *    ([ModuleStrings.read]).
  *    A module compiled in brings widgets of its own ([CompiledModule.widgets]), and every
- *    composition answers the kernel's own keys for the config it draws and the windows it owns
- *    ([CompositionKeys]). Pages and their history are modules' APIs, not the kernel's. A level
- *    stands under its owner whatever the owner's kind ([WidgetScope.child]), and a level answers
- *    a key with the value it is asked for with ([PageLevels.levelFor]).
+ *    composition answers the kernel's own keys for its history and moving it, whose entries are
+ *    configs with the values their pages read. A level stands under its owner whatever the
+ *    owner's kind ([WidgetScope.child]).
  *    A settings domain may answer the value a launcher's first start opens on
  *    ([SettingsDomain.firstRun]), which the host writes into the domain's file then.
  *    A widget's arrival is told whether the node itself names its character ([WidgetEntrance]),
@@ -57,9 +56,14 @@ package hivens.widget.api
  *    [CompiledModule.uses], [MANIFEST_REQUIRES], [MANIFEST_USES]), offers itself by its id where
  *    it states a version, and a jar publishes APIs of its own ([MANIFEST_PROVIDES]). What a module
  *    requires is brought in with it, where [MANIFEST_REQUIRES] named only what had to be carried.
+ * 4: pages and their history are not the kernel's. What is shown, the values a page reads and the
+ *    history's keys moved to the pages and history APIs (`hivens.pages.api`, `hivens.history.api`),
+ *    and a composition answers the config it draws ([CompositionKeys.Config]) and the windows it
+ *    owns. A level made per key answers a key with the value it was asked for with
+ *    ([PageLevels.levelFor]).
  */
 object WidgetApi {
-    const val VERSION: Int = 3
+    const val VERSION: Int = 4
 
     /** Jar manifest attribute carrying [VERSION]. */
     const val MANIFEST_VERSION = "Nexira-Widget-Api"

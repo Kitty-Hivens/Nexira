@@ -21,6 +21,9 @@ object CatalogueApi {
      *
      * The module builds stamp their manifests from the `nexira.catalogueApi` Gradle
      * property, which a test holds equal to this.
+     *
+     * 3.0: the values of [CataloguePages] are values of the pages API (`hivens.pages.api.PageValue`),
+     * which left the widget kernel.
      */
-    val VERSION: ApiVersion = ApiVersion(2, 0)
+    val VERSION: ApiVersion = ApiVersion(3, 0)
 }

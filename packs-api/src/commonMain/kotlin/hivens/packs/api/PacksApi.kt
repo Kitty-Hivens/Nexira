@@ -26,6 +26,9 @@ object PacksApi {
      * source's id exactly as a pack's record carries it (`Mirror`, `Local`), where 1.0 gave
      * the source's name in lower case (`mirror`). An install request is matched by that id
      * exactly, case included.
+     *
+     * 3.0: [PackPages.Pack] is a value of the pages API (`hivens.pages.api.PageValue`), which left
+     * the widget kernel.
      */
-    val VERSION: ApiVersion = ApiVersion(2, 0)
+    val VERSION: ApiVersion = ApiVersion(3, 0)
 }
