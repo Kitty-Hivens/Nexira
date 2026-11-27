@@ -53,9 +53,9 @@ import org.slf4j.LoggerFactory
 
 private val log = LoggerFactory.getLogger("PresetManagerPanel")
 
-// Modal preset manager. Reached via the "Presets" chip on the
-// edit-mode pill. Lists existing presets with Load / Delete / Export
-// per row, plus a "Save current as..." text field at top.
+// Modal preset manager. Reached through the "Presets" chip on the edit-mode pill.
+// Lists the saved presets with Apply, Export and Delete per row, and a "Save the
+// current interface as..." field at the top. A preset is the whole interface.
 @Composable
 fun PresetManagerPanel(
     visible: Boolean,
@@ -65,9 +65,6 @@ fun PresetManagerPanel(
     onDelete: suspend (PresetMeta) -> Unit,
     onExport: (PresetMeta) -> Unit,
     listProvider: () -> List<PresetMeta>,
-    /** Ids of the presets that ship, offered above the saved ones. */
-    builtIns: List<String> = emptyList(),
-    onApplyBuiltIn: (String) -> Unit = {},
 ) {
     if (!visible) return
 
@@ -208,23 +205,10 @@ fun PresetManagerPanel(
 
                 Spacer(Modifier.height(16.dp))
 
-                // One scrolling list for both kinds, so the ready-made ones never
-                // squeeze the saved ones out of the dialog or the other way round.
                 LazyColumn(
                     modifier            = Modifier.fillMaxWidth().weight(1f),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    if (builtIns.isNotEmpty()) {
-                        item(key = "built-in-header") { SectionLabel(s.text("editorPresetsBuiltIn")) }
-                        items(items = builtIns, key = { "built-in:$it" }) { id ->
-                            BuiltInRow(
-                                name        = s.text("bundledPresetName", id),
-                                description = s.text("bundledPresetDescription", id),
-                                onApply     = { onApplyBuiltIn(id) },
-                            )
-                        }
-                        item(key = "built-in-gap") { Spacer(Modifier.height(10.dp)) }
-                    }
                     item(key = "saved-header") { SectionLabel(s.text("editorPresetsSaved", presets.size)) }
                     if (presets.isEmpty()) {
                         item(key = "saved-empty") {
@@ -274,43 +258,6 @@ private fun SectionLabel(text: String) {
     )
 }
 
-/**
- * A preset that ships. Applied, never deleted or exported: it is part of the
- * launcher, and it changes only the surfaces it is about.
- */
-@Composable
-private fun BuiltInRow(name: String, description: String, onApply: () -> Unit) {
-    val s = nexiraStrings()
-    NxCard(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(10.dp)) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text       = name,
-                    style      = MaterialTheme.typography.bodyLarge,
-                    color      = NxInk.main,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines   = 1,
-                    overflow   = TextOverflow.Ellipsis,
-                )
-                if (description.isNotBlank()) {
-                    Text(
-                        text  = description,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = NxInk.quiet,
-                    )
-                }
-            }
-            Spacer(Modifier.width(8.dp))
-            NxButton(label = s.text("editorApply"), onClick = onApply, compact = true)
-        }
-    }
-}
-
 @Composable
 private fun PresetRow(
     meta: PresetMeta,
@@ -341,9 +288,17 @@ private fun PresetRow(
                     color      = NxInk.quiet,
                     fontFamily = LocalMonoFamily.current,
                 )
+                // Its arrangement is in a form nothing reads now, so it can be kept, sent on or deleted, not applied.
+                if (meta.older) {
+                    Text(
+                        text  = s.text("editorPresetOlder"),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = NxInk.quiet,
+                    )
+                }
             }
             Spacer(Modifier.width(8.dp))
-            NxButton(label = s.text("editorApply"), onClick = onLoad, compact = true)
+            NxButton(label = s.text("editorApply"), onClick = onLoad, enabled = !meta.older, compact = true)
             Spacer(Modifier.width(4.dp))
             IconButton(onClick = onExport, modifier = Modifier.size(36.dp)) {
                 Symbol(icon = NxIcon.Upload,

@@ -88,7 +88,7 @@ class DocumentEditorScreensTest {
     private fun editor(): Pair<DocumentEditor, DocumentStore> {
         val store = DocumentStore(dir.resolve("interface.json"), { standard })
         store.takeOwn()
-        val editor = DocumentEditor(store, scope) { "$it-${++minted}" }
+        val editor = DocumentEditor(store, scope, mint = { "$it-${++minted}" })
         editor.reportEditing(true)
         return editor to store
     }

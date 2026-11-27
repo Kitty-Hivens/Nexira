@@ -66,7 +66,7 @@ class DocumentEditorTest {
     private fun editor(document: Document = standard(clock), own: Boolean = true): Pair<DocumentEditor, DocumentStore> {
         val store = DocumentStore(dir.resolve("interface.json"), { document })
         if (own) store.takeOwn()
-        val editor = DocumentEditor(store, scope) { "${it}-${++minted}" }
+        val editor = DocumentEditor(store, scope, mint = { "${it}-${++minted}" })
         editor.reportEditing(true)
         return editor to store
     }

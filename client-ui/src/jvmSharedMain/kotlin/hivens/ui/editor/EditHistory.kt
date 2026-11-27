@@ -97,6 +97,9 @@ class EditHistory<T : Any>(private val limit: Int = LIMIT) {
         return next
     }
 
+    /** Every snapshot undo or redo can still reach. */
+    fun snapshots(): List<T> = past + future
+
     /** Drops everything, for an edit session that has ended and cannot be stepped back into. */
     fun clear() {
         past.clear()

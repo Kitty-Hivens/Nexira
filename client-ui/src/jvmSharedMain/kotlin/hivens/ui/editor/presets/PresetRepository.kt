@@ -3,16 +3,14 @@ package hivens.ui.editor.presets
 import hivens.core.io.AtomicFiles
 import hivens.core.io.readUtf8
 import hivens.ui.customization.CustomizationSettings
-import hivens.ui.layout.JsonMigrations
-import hivens.ui.layout.LayoutReconcile
-import hivens.widget.model.LayoutGraph
+import hivens.widget.model.Document
+import hivens.widget.model.DocumentCodec
+import hivens.widget.model.DocumentRead
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.encodeToJsonElement
-import kotlinx.serialization.json.jsonObject
 import org.slf4j.LoggerFactory
 import java.nio.file.Files
 import java.nio.file.Path
@@ -23,8 +21,8 @@ import kotlin.io.path.isRegularFile
 import kotlin.io.path.name
 
 // File-per-preset under <dataDir>/presets/<safe-name>-<digest>.json. Per-file
-// scheme makes share / import dead simple (just hand someone the file). Atomic
-// write via .tmp + ATOMIC_MOVE mirrors LayoutGraphRepository.persist.
+// scheme makes share / import dead simple (just hand someone the file), written
+// atomically through AtomicFiles.
 //
 // The filename is derived from the preset name but is NOT the preset name: the
 // sanitiser maps everything outside [A-Za-z0-9_-] to an underscore, so any two
@@ -46,15 +44,13 @@ class PresetRepository(
             stream
                 .filter { it.isRegularFile() && it.name.endsWith(".json") }
                 .map { path ->
-                    val stored = runCatching {
-                        json.decodeFromString<PresetEnvelope>(readUtf8(path)).name
-                    }.getOrNull()
+                    val stored = runCatching { json.decodeFromString<PresetEnvelope>(readUtf8(path)) }.getOrNull()
                     val mtime = runCatching { Files.getLastModifiedTime(path).toMillis() }
                         .getOrDefault(0L)
                     // Fall back to the file stem only when the envelope will not
-                    // parse -- a name is better than an empty row.
-                    val name = stored?.takeIf { it.isNotBlank() } ?: path.name.removeSuffix(".json")
-                    PresetMeta(name = name, createdAt = mtime, sourcePath = path)
+                    // parse: a name is better than an empty row.
+                    val name = stored?.name?.takeIf { it.isNotBlank() } ?: path.name.removeSuffix(".json")
+                    PresetMeta(name = name, createdAt = mtime, sourcePath = path, older = stored != null && stored.document == null)
                 }
                 .sorted(compareByDescending { it.createdAt })
                 .collect(Collectors.toList())
@@ -62,48 +58,29 @@ class PresetRepository(
     }
 
     /**
-     * Reads a preset and brings its graph up to the current shape.
-     *
-     * The same floor the layout file is held to applies here, and it used not to:
-     * the refusal to read a pre-surface-schema graph lived in the repository that
-     * owns the layout, while a preset went straight to the merge. Files from
-     * before that schema exist in people's preset directories right now, and
-     * applying one dropped every widget's plane on decode, silently, and then
-     * persisted the result as current. A preset this build cannot read faithfully
-     * is refused instead, and says so.
+     * Reads a preset, or null where there is none to apply: none by that name, one made before the interface was a
+     * document, one a newer build wrote, or a file that is not a preset. Each is logged, and the file is left as it is.
      */
     fun load(name: String): LoadedPreset? {
         val path = resolveExisting(name)
         if (!Files.exists(path)) return null
         return try {
             val envelope = json.decodeFromString<PresetEnvelope>(readUtf8(path))
-            if (envelope.schemaVersion > LayoutReconcile.CURRENT_SCHEMA) {
-                log.warn(
-                    "Preset '{}' is schema_version {} > supported {} -- written by a newer build. " +
-                        "Not applying it: what this build cannot name would be dropped on decode and " +
-                        "then written back as current.",
-                    name, envelope.schemaVersion, LayoutReconcile.CURRENT_SCHEMA,
-                )
+            val raw = envelope.document ?: run {
+                log.warn("Preset '{}' was made before the interface was a document, and nothing reads its arrangement now", name)
                 return null
             }
-            if (envelope.schemaVersion < LayoutReconcile.SURFACE_SCHEMA) {
-                log.warn(
-                    "Preset '{}' is schema_version {} and describes widget surfaces in a form " +
-                        "with no faithful reading here; not applying it. The file is left as it is.",
-                    name, envelope.schemaVersion,
-                )
-                return null
+            when (val read = DocumentCodec.read(json.encodeToString(JsonElement.serializer(), raw))) {
+                is DocumentRead.Whole -> LoadedPreset(envelope.name, read.document, envelope.customization)
+                is DocumentRead.Newer -> {
+                    log.warn("Preset '{}' was written by a newer build (schema {}), not applying it", name, read.schema)
+                    null
+                }
+                is DocumentRead.Broken -> {
+                    log.warn("Preset '{}' holds no document ({}), not applying it", name, read.reason)
+                    null
+                }
             }
-            val structural = JsonMigrations.apply(envelope.schemaVersion, envelope.graph)
-            LoadedPreset(
-                schemaVersion = envelope.schemaVersion,
-                name          = envelope.name,
-                // A saved arrangement is how things are arranged, not which modules the
-                // launcher brings in: a list one carried would keep or drop modules for
-                // whoever loaded it, with nothing on screen saying why.
-                graph         = json.decodeFromJsonElement(LayoutGraph.serializer(), structural).copy(modules = null),
-                customization = envelope.customization,
-            )
         } catch (e: Exception) {
             log.warn("Failed to load preset {}: {}", name, e.message)
             null
@@ -111,16 +88,14 @@ class PresetRepository(
     }
 
     /**
-     * Writes the current layout and look under [name], stamped with the schema
-     * this build writes, so a later one knows how far to carry it. Without the module
-     * list, which is the person's launcher's and not the arrangement's: see [load].
+     * Writes [document] and the look under [name]. Without the module list, which is the person's launcher's and not
+     * the arrangement's: applying a preset keeps the modules the launcher has.
      */
-    fun save(name: String, graph: LayoutGraph, customization: CustomizationSettings) {
+    fun save(name: String, document: Document, customization: CustomizationSettings) {
         val envelope = PresetEnvelope(
-            schemaVersion = LayoutReconcile.CURRENT_SCHEMA,
             name          = name,
             createdAt     = System.currentTimeMillis(),
-            graph         = json.encodeToJsonElement(LayoutGraph.serializer(), graph.copy(modules = null)).jsonObject,
+            document      = json.parseToJsonElement(DocumentCodec.write(document.copy(modules = emptyList()))),
             customization = customization,
         )
         // The hand-rolled tmp-then-rename this replaces published whole files but
@@ -134,19 +109,22 @@ class PresetRepository(
      *
      * The state collector keeps what these ids own. A preset brings its widgets back
      * under the ids it saved them with, and the state those widgets carry (a note's
-     * text, a checklist) lives beside the layout keyed by those ids, so pruning
-     * against the live graph alone emptied every one of them the moment another
-     * preset was loaded. Read from the raw graph rather than a decoded one, so a
-     * preset from an older schema keeps its widgets' state too. A file that will not
-     * parse contributes nothing.
+     * text, a checklist) lives beside the arrangement keyed by those ids, so pruning
+     * against the live document alone emptied every one of them the moment another
+     * preset was applied. Read from the raw file rather than a decoded document, so a
+     * preset of any age keeps its widgets' state too. A file that will not parse
+     * contributes nothing.
      */
     fun referencedInstanceIds(): Set<String> {
         if (!Files.exists(presetsDir)) return emptySet()
         val ids = HashSet<String>()
         Files.list(presetsDir).use { stream ->
             stream.filter { it.isRegularFile() && it.name.endsWith(".json") }.forEach { path ->
-                runCatching { json.decodeFromString<PresetEnvelope>(readUtf8(path)).graph }
-                    .onSuccess { collectInstanceIds(it, ids) }
+                runCatching { json.decodeFromString<PresetEnvelope>(readUtf8(path)) }
+                    .onSuccess { envelope ->
+                        envelope.graph?.let { collectInstanceIds(it, ids) }
+                        envelope.document?.let { collectInstanceIds(it, ids) }
+                    }
             }
         }
         return ids
@@ -178,9 +156,8 @@ class PresetRepository(
      * Copies a preset file somebody was handed into this profile's directory.
      *
      * Republished under this build's naming rather than copied byte for byte, so
-     * a name the old scheme could not keep apart lands on its own path. The graph
-     * is NOT migrated here: a file is stored as it arrived and carried forward
-     * when it is applied, which keeps one answer to "when does a preset migrate".
+     * a name the old scheme could not keep apart lands on its own path. The document
+     * is stored as it arrived and read when it is applied.
      */
     fun import(source: Path): String? {
         return try {

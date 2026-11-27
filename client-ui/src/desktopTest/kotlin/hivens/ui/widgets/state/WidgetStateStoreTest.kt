@@ -70,6 +70,19 @@ class WidgetStateStoreTest {
     }
 
     @Test
+    fun `a copy takes what the original holds, and never what the copy already has`() = runTest {
+        val store = WidgetStateStore(dir.resolve("ws.json"), json, backgroundScope)
+        store.store("a", obj("body" to "groceries"))
+        store.store("c", obj("body" to "its own"))
+        store.copy("a", "b")
+        store.copy("a", "c")
+        store.copy("missing", "d")
+        assertEquals(obj("body" to "groceries"), store.load("b"))
+        assertEquals(obj("body" to "its own"), store.load("c"))
+        assertNull(store.load("d"))
+    }
+
+    @Test
     fun `remove prunes one entry`() = runTest {
         val file = dir.resolve("ws.json")
         val store = WidgetStateStore(file, json, backgroundScope)

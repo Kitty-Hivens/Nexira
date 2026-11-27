@@ -1,48 +1,43 @@
 package hivens.ui.widgets.state
 
-import hivens.ui.layout.LayoutGraphRepository
-import hivens.widget.model.walkInstances
+import hivens.widget.model.Document
+import hivens.widget.model.widgets
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
- * Prunes orphaned per-instance state. Keyed reactively off the layout graph rather
- * than imperatively at the editor's remove/reset calls: those calls are async, and
- * -- more importantly -- instances also disappear BELOW the editor (load-time schema
- * migrations, the reconcile unknown-kind prune, duplicate-id fallback). Every one of
- * those re-emits the graph, so a single collector that retains state for the current
- * live instanceIds covers remove, resetSurface, resetAll, the startup sweep, and the
- * load-time prunes in one place.
+ * Prunes the state of widgets that are gone. Keyed off the document the launcher draws rather than off the editor's
+ * remove calls: widgets also go below the editor (a reset, going back to the standard interface, a document renamed on
+ * load), and every one of those changes the document, so one collector that keeps the state of the widgets it holds
+ * covers them all.
  *
- * Debounced: [LayoutGraphRepository.observe] re-emits per drag frame (geometry); the
- * orphan set only ever shrinks on a destroy, none of which is latency-sensitive.
- * Runs on the app scope so GC happens even when no surface hosting a stateful widget
- * is currently composed.
+ * Debounced: a drag changes the document on every frame, and what goes only ever shrinks on a removal, none of which
+ * is in a hurry. Runs on the app scope, so it sweeps whether or not anything stateful is drawn.
  *
- * Live is not the whole of what is kept. [alsoReferenced] names the ids something
- * else will bring back, the saved presets: loading one replaces the graph, and an id
- * the replacement does not carry is not gone for good if another preset still has it.
+ * What the document holds is not all that is kept. [alsoReferenced] names the widgets something can still bring back:
+ * an undo, a deleted screen put back, a saved preset.
  *
- * Nothing is pruned while the layout is read-only. The graph is then the bundled
- * default standing in for a file this build will not touch, and the state of every
- * widget in that file would be swept as orphaned: going back to the build that can
- * read it brought the arrangement back with every note and list empty.
+ * Nothing is pruned while the document is one this build does not write ([writable]). The standard document is then
+ * drawn in place of a file left as it is, and the state of every widget in that file would be swept as gone: going
+ * back to the build that reads it brought the arrangement back with every note and list empty.
  */
 @OptIn(FlowPreview::class)
 class WidgetStateGc(
-    repo: LayoutGraphRepository,
+    documents: StateFlow<Document>,
+    writable: () -> Boolean,
     store: WidgetStateStore,
     scope: CoroutineScope,
-    alsoReferenced: () -> Set<String> = { emptySet() },
+    alsoReferenced: suspend () -> Set<String> = { emptySet() },
 ) {
     init {
         scope.launch {
-            repo.observe().debounce(GC_DEBOUNCE_MS.milliseconds).collect { graph ->
-                if (repo.isReadOnly) return@collect
-                store.retain(graph.walkInstances().map { it.instanceId }.toSet() + alsoReferenced())
+            documents.debounce(GC_DEBOUNCE_MS.milliseconds).collect { document ->
+                if (!writable()) return@collect
+                store.retain(document.instanceIds() + alsoReferenced())
             }
         }
     }
@@ -51,3 +46,6 @@ class WidgetStateGc(
         const val GC_DEBOUNCE_MS = 1_000L
     }
 }
+
+/** Every widget's name in every composition of the document. */
+fun Document.instanceIds(): Set<String> = compositions.values.flatMapTo(HashSet()) { c -> c.widgets().map { it.instanceId } }

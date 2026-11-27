@@ -1,5 +1,12 @@
 package hivens.ui.editor
 
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import hivens.ui.platform.SystemActions
+import hivens.ui.editor.presets.PresetRepository
+import hivens.ui.editor.presets.PresetManagerPanel
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -191,6 +198,9 @@ fun EditorSurfaceHost(
     var dock by remember { mutableStateOf<Dock>(Dock.Palette) }
     var entryMenuAt by remember { mutableStateOf<Offset?>(null) }
     var modulesPanelOpen by remember { mutableStateOf(false) }
+    var presetsOpen by remember { mutableStateOf(false) }
+    val presetRepo: PresetRepository = koinInject()
+    val presetScope = rememberCoroutineScope()
     var resetScreenConfirm by remember { mutableStateOf(false) }
     var resetAllConfirm by remember { mutableStateOf(false) }
     var standardConfirm by remember { mutableStateOf(false) }
@@ -232,6 +242,7 @@ fun EditorSurfaceHost(
             resetAllConfirm = false
             standardConfirm = false
             modulesPanelOpen = false
+            presetsOpen = false
             focus.hovered = null
             focus.touched = null
         }
@@ -548,6 +559,23 @@ fun EditorSurfaceHost(
                         onDismiss = { standardConfirm = false },
                     )
                 }
+                PresetManagerPanel(
+                    visible       = arranging && presetsOpen,
+                    onDismiss     = { presetsOpen = false },
+                    onSaveCurrent = { name -> withContext(Dispatchers.IO) { presetRepo.save(name, store.document.value, customization) } },
+                    onLoad        = { meta ->
+                        presetScope.launch {
+                            val preset = withContext(Dispatchers.IO) { presetRepo.load(meta.name) } ?: return@launch
+                            editor.applyPreset(preset.document)
+                            onCustomizationChanged(preset.customization)
+                            presetsOpen = false
+                        }
+                    },
+                    onDelete      = { meta -> withContext(Dispatchers.IO) { presetRepo.delete(meta.name) } },
+                    // The folder it is in, in the file manager, to copy from: there is no save dialog to hand it to.
+                    onExport      = { meta -> SystemActions.openFolder(meta.sourcePath.parent.toString()) },
+                    listProvider  = { presetRepo.list() },
+                )
                 editor.consent.value?.let {
                     ConfirmDialog(
                         title     = s.text("editorExpertTitle"),
@@ -569,6 +597,7 @@ fun EditorSurfaceHost(
                 screenOpen         = dock == Dock.Screen,
                 onOpenScreen       = { dock = if (dock == Dock.Screen) Dock.Palette else Dock.Screen },
                 onOpenModules      = { modulesPanelOpen = !modulesPanelOpen },
+                onOpenPresets      = { presetsOpen = true },
                 onNewScreen        = {
                     // Numbered among the screens somebody made, so the first one is the first and not the fifteenth.
                     val shipped = standard.compositions[composition]?.configs?.keys.orEmpty()
@@ -658,6 +687,7 @@ private fun EditModePill(
     screenOpen: Boolean,
     onOpenScreen: () -> Unit,
     onOpenModules: () -> Unit,
+    onOpenPresets: () -> Unit,
     onNewScreen: () -> Unit,
     resetMenuOpen: Boolean,
     onResetMenu: (Boolean) -> Unit,
@@ -720,6 +750,8 @@ private fun EditModePill(
                     ToolChip(NxIcon.Add, s.text("editorNewScreen"), selected = false, onClick = onNewScreen, compact = compact)
                     Spacer(Modifier.width(4.dp))
                     ToolChip(NxIcon.Folder, s.text("modulesChip"), selected = false, onClick = onOpenModules, compact = compact)
+                    Spacer(Modifier.width(4.dp))
+                    ToolChip(NxIcon.Inventory2, s.text("editorPresetsTitle"), selected = false, onClick = onOpenPresets, compact = compact)
                     Spacer(Modifier.width(4.dp))
                     Box {
                         ToolChip(

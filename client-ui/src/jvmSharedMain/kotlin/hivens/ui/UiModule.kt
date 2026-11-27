@@ -498,13 +498,22 @@ fun uiCoreModule(
     single(createdAtStart = true) { LayoutGraphFlushHook(get()) }
 
     // Per-instance widget runtime state (rememberWidgetState): the store backs the
-    // WidgetStateHost local; the GC collector prunes orphans off the live layout
-    // graph; the flush hook lands the debounced write on quit. GC + flush hook are
-    // createdAtStart so they wire up before any stateful widget composes / before exit.
+    // WidgetStateHost local, the GC collector prunes the state of widgets the document
+    // no longer holds, and the flush hook lands the debounced write on quit. GC and the
+    // flush hook are createdAtStart so they wire up before any stateful widget composes
+    // and before exit.
     single { WidgetStateStore(get<Path>().resolve("widget-state.json"), get(), get()) }
     single(createdAtStart = true) {
         val presets: PresetRepository = get()
-        WidgetStateGc(repo = get(), store = get(), scope = get(), alsoReferenced = presets::referencedInstanceIds)
+        val documents: DocumentStore = get()
+        val editor: DocumentEditor = get()
+        WidgetStateGc(
+            documents      = documents.document,
+            writable       = { documents.writable },
+            store          = get(),
+            scope          = get(),
+            alsoReferenced = { editor.heldIds() + presets.referencedInstanceIds() },
+        )
     }
     single(createdAtStart = true) { WidgetStateFlushHook(get()) }
 
@@ -517,10 +526,12 @@ fun uiCoreModule(
     single {
         val appLevel: WidgetScope = get()
         val widgets: WidgetRegistry = get()
+        val state: WidgetStateStore = get()
         DocumentEditor(
             store     = get(),
             scope     = get(),
             admission = DocumentAdmission(appLevel::declarationOf, widgets::get, everyPage = setOf(PageKeys.Entry.id)),
+            copyState = state::copy,
         )
     }
     single { ShellSignals() }

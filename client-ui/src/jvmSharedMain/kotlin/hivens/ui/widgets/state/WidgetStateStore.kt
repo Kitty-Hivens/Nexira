@@ -107,7 +107,19 @@ class WidgetStateStore(
         writeRequests.tryEmit(Unit)
     }
 
-    /** Prunes state for instanceIds no longer present in the layout graph. */
+    /**
+     * Gives [to] what [from] holds, for a widget copied under a new name: a slot a screen takes as its own keeps the
+     * notes and lists of what it held. Nothing where [from] holds nothing or [to] already holds something of its own.
+     */
+    fun copy(from: String, to: String) {
+        val value = entries.value[from] ?: return
+        if (to in entries.value) return
+        entries.update { it + (to to value) }
+        dirty = true
+        writeRequests.tryEmit(Unit)
+    }
+
+    /** Prunes state for instanceIds no longer present in the document. */
     fun retain(liveIds: Set<String>) {
         _refused.update { ids -> ids.filterTo(HashSet()) { it in liveIds } }
         if (entries.value.keys.all { it in liveIds }) return

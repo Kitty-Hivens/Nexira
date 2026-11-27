@@ -81,7 +81,6 @@ import hivens.ui.widgets.modules.offeredContributionKinds
 import hivens.ui.widgets.services.MusicPlayerService
 import hivens.ui.widgets.services.MusicPlayerServiceImpl
 import hivens.ui.widgets.state.WidgetStateFlushHook
-import hivens.ui.widgets.state.WidgetStateGc
 import hivens.ui.widgets.state.WidgetStateStore
 import hivens.update.UpdateService
 import hivens.widget.api.SurfaceFamilies

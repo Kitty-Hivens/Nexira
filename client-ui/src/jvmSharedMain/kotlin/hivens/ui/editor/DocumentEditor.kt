@@ -44,6 +44,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import hivens.ui.widgets.state.instanceIds
 import org.slf4j.LoggerFactory
 import java.util.UUID
 
@@ -66,6 +67,8 @@ class DocumentEditor(
     private val admission: DocumentAdmission = DocumentAdmission.Open,
     /** A name no widget has yet. */
     private val mint: (String) -> String = { "${it.substringBefore('#')}#${UUID.randomUUID().toString().take(8)}" },
+    /** Gives a widget copied under a new name the state of the one it was copied from. */
+    private val copyState: (from: String, to: String) -> Unit = { _, _ -> },
 ) {
     // One thread, so the frames of a drag reach the store in the order they were made and a later frame is never
     // overwritten by an earlier one that won a race.
@@ -86,7 +89,11 @@ class DocumentEditor(
     val consent: State<PendingEdit?> get() = _consent
 
     /** An edit that waits for the document to be the person's own. */
-    class PendingEdit internal constructor(internal val key: String?, internal val transform: (Document) -> Document)
+    class PendingEdit internal constructor(
+        internal val key: String?,
+        internal val transform: (Document) -> Document,
+        internal val landed: ((before: Document, after: Document) -> Unit)?,
+    )
 
     private val _editing = mutableStateOf(false)
 
@@ -103,6 +110,21 @@ class DocumentEditor(
         }
     }
 
+    // The screens deleted this session, kept so their widgets keep their state while the screen can still be put back.
+    // Touched only on [writes].
+    private val deleted = HashMap<ConfigId, Config>()
+
+    /**
+     * The names of the widgets something here can still bring back: the documents undo and redo reach and the screens
+     * deleted this session. Their state is kept although the document drawn does not hold them.
+     */
+    suspend fun heldIds(): Set<String> = withContext(writes) {
+        val ids = HashSet<String>()
+        history.snapshots().forEach { ids += it.instanceIds() }
+        deleted.values.forEach { config -> config.layouts.forEach { layout -> ids += layout.root.instanceIds() } }
+        ids
+    }
+
     /** Returns once every write asked for before the call has landed. For a caller that reads back what it wrote. */
     internal suspend fun awaitWrites() {
         withContext(writes) {}
@@ -116,11 +138,12 @@ class DocumentEditor(
         scope.launch(writes) { apply(key, transform) }
     }
 
-    private fun apply(key: String?, transform: (Document) -> Document) {
+    /** Lands [transform], and once it has landed tells [landed] what the document was and became. */
+    private fun apply(key: String?, transform: (Document) -> Document, landed: ((Document, Document) -> Unit)? = null) {
         if (!store.own.value) {
             // Only the first one waits. What follows it while the question is open is dropped: the person has not
             // said yet that the document is theirs to change.
-            if (_consent.value == null && transform(store.document.value) != store.document.value) _consent.value = PendingEdit(key, transform)
+            if (_consent.value == null && transform(store.document.value) != store.document.value) _consent.value = PendingEdit(key, transform, landed)
             return
         }
         val before = store.document.value
@@ -128,6 +151,7 @@ class DocumentEditor(
         val after = store.document.value
         if (recording) history.record(key, before, after)
         publish()
+        if (before != after) landed?.invoke(before, after)
     }
 
     /** The person's word on [consent]: yes makes the document theirs and lands the waiting edit, no drops it. */
@@ -136,7 +160,7 @@ class DocumentEditor(
             val pending = _consent.value ?: return@launch
             _consent.value = null
             if (!yes || !store.takeOwn()) return@launch
-            apply(pending.key, pending.transform)
+            apply(pending.key, pending.transform, pending.landed)
         }
     }
 
@@ -326,8 +350,19 @@ class DocumentEditor(
     /** Steps the lattice a placement slot measures in. 0 is free placement. */
     fun nudgeGrid(path: NodePath, delta: Int) = edit("grid:$path") { it.edit(path) { c -> c.withGrid(c.grid + delta) } }
 
-    /** Makes the slot at [path], a slot of a widget the composition has once, this config's own. */
-    fun holdOwn(path: NodePath) = edit { it.holdOwn(path, mint) }
+    /**
+     * Makes the slot at [path], a slot of a widget the composition has once, this config's own. What it held is copied
+     * under new names, and each copy keeps the state of the widget it was copied from.
+     */
+    fun holdOwn(path: NodePath) {
+        scope.launch(writes) {
+            apply(null, { it.holdOwn(path, mint) }) { before, after ->
+                val shared = before.contentAt(path) ?: return@apply
+                val own = after.contentAt(path) ?: return@apply
+                copiedNames(shared, own).forEach { (from, to) -> copyState(from, to) }
+            }
+        }
+    }
 
     /** Gives the slot at [path] back to the record every config shares, dropping what this config held there. */
     fun shareOwn(path: NodePath) = edit { it.shareOwn(path) }
@@ -358,14 +393,22 @@ class DocumentEditor(
     fun deleteScreen(composition: CompositionName, id: ConfigId, onDeleted: (Config) -> Unit = {}) {
         scope.launch(writes) {
             val config = store.document.value.compositions[composition]?.configs?.get(id) ?: return@launch
-            apply(null) { d -> MadeScreens.removeLinks(d.withoutConfig(composition, id), composition, id) }
-            if (store.document.value.compositions[composition]?.configs?.containsKey(id) == false) onDeleted(config)
+            apply(null, { d -> MadeScreens.removeLinks(d.withoutConfig(composition, id), composition, id) })
+            if (store.document.value.compositions[composition]?.configs?.containsKey(id) == false) {
+                deleted[id] = config
+                onDeleted(config)
+            }
         }
     }
 
     /** Puts a deleted screen back as it stood, with a link on the rail. */
     fun restoreScreen(composition: CompositionName, id: ConfigId, config: Config) =
         edit { d -> MadeScreens.ensureLink(d.withConfig(composition, id, config), composition, id) }
+
+    // ── Presets ──────────────────────────────────────────────────────
+
+    /** Puts [preset] in place of the whole interface, keeping the modules the launcher has. One step, like any other. */
+    fun applyPreset(preset: Document) = edit { current -> preset.copy(modules = current.modules) }
 
     // ── Resets ───────────────────────────────────────────────────────
 
@@ -404,4 +447,19 @@ class DocumentEditor(
 
     /** What the slot at [path] holds now, for a caller deciding what to ask for. */
     fun contentAt(path: NodePath): SlotContent? = store.document.value.contentAt(path)
+}
+
+/** Each widget of [from] paired with the one standing in its place in [to], where the two go by different names. */
+internal fun copiedNames(from: SlotContent, to: SlotContent): List<Pair<String, String>> =
+    from.widgets.zip(to.widgets).flatMap { (a, b) ->
+        val here = if (a.kind == b.kind && a.instanceId != b.instanceId) listOf(a.instanceId to b.instanceId) else emptyList()
+        here + a.children.flatMap { (slot, held) -> b.children[slot]?.let { copiedNames(held, it) }.orEmpty() }
+    }
+
+/** Every widget's name in [this] content, what they hold included. */
+internal fun SlotContent.instanceIds(): Set<String> {
+    val ids = HashSet<String>()
+    fun walk(c: SlotContent) { c.widgets.forEach { ids += it.instanceId; it.children.values.forEach(::walk) } }
+    walk(this)
+    return ids
 }
