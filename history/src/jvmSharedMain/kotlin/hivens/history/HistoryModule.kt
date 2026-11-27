@@ -7,7 +7,9 @@ package hivens.history
 import hivens.history.api.History
 import hivens.history.api.HistoryApi
 import hivens.history.api.HistoryKeys
+import hivens.pages.api.HistoryEntry
 import hivens.pages.api.PagesApi
+import hivens.pages.api.presentKey
 import hivens.pages.api.PagesKeys
 import hivens.widget.api.CompiledModule
 import hivens.widget.api.CompositionKeys
@@ -27,7 +29,15 @@ import hivens.widget.model.ApiVersion
 import hivens.widget.model.ConfigId
 import hivens.widget.model.ScopeLevel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonElement
 
 /**
  * The history module as the application carries it: compiled in, and brought in by a document that names
@@ -68,6 +78,8 @@ object HistoryKeysContribution : KeyContribution {
             composition.find(CompositionKeys.Configs)?.state?.let { configs ->
                 composition.coroutineScope.launch { configs.collect { has -> history.retain { it.config in has } } }
             }
+            // So does a page opened with a value its module says is gone, a page of a pack deleted say.
+            composition.coroutineScope.launch { composition.presentValues(history).collect { present -> history.retain { it.stillThere(present) } } }
             flowSource(history.now)
         }
         keys.command(PagesKeys.Show) { composition ->
@@ -94,3 +106,21 @@ private fun LevelContext.start(): ConfigId? = find(CompositionKeys.Start)?.state
 
 /** Whether the composition has [config], or true where nothing says which configs it has. */
 private fun LevelContext.has(config: ConfigId): Boolean = find(CompositionKeys.Configs)?.state?.value?.contains(config) ?: true
+
+/**
+ * What still exists of every value the entries of [history] were opened with, by the value's id, for each value whose
+ * module answers [presentKey]. Follows the entries as they change, and the answers as they do.
+ */
+@OptIn(ExperimentalCoroutinesApi::class)
+private fun LevelContext.presentValues(history: CompositionHistory): Flow<Map<String, Set<JsonElement>>> =
+    history.now
+        .map { now -> now.reachable.flatMapTo(HashSet()) { it.opened.keys } }
+        .distinctUntilChanged()
+        .flatMapLatest { ids ->
+            val answered = ids.mapNotNull { id -> find(presentKey(id))?.state?.map { id to it } }
+            if (answered.isEmpty()) flowOf(emptyMap()) else combine(answered) { it.toMap() }
+        }
+
+/** Whether every value this entry was opened with that [present] answers for is among them. */
+private fun HistoryEntry.stillThere(present: Map<String, Set<JsonElement>>): Boolean =
+    opened.all { (id, value) -> present[id]?.contains(value) ?: true }

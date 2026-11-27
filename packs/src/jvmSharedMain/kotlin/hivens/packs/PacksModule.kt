@@ -118,6 +118,10 @@ object PackKeysContribution : KeyContribution {
         }
 
         keys.pageValue(PackPages.Pack)
+        // A pack's page is about a pack this launcher has: one deleted leaves the history with its page.
+        keys.source(PackPages.Pack.present, sample = { emptySet() }) { app ->
+            mapped(app.hostServices.get<IPackRepository>().observe(), app.coroutineScope) { all -> all.mapTo(HashSet()) { PackPages.Pack.json(it.id) } }
+        }
 
         keys.source(PackKeys.Library, sample = { emptyList() }) { app ->
             mapped(app.hostServices.get<IPackRepository>().observe(), app.coroutineScope) { all -> all.map { it.toPackView() } }

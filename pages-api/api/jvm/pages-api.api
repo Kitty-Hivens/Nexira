@@ -47,9 +47,15 @@ public final class hivens/pages/api/PageValue {
 	public fun <init> (Ljava/lang/String;Lkotlinx/serialization/KSerializer;)V
 	public final fun getId ()Ljava/lang/String;
 	public final fun getKey ()Lhivens/widget/model/SourceKey;
+	public final fun getPresent ()Lhivens/widget/model/SourceKey;
+	public final fun json (Ljava/lang/Object;)Lkotlinx/serialization/json/JsonElement;
 	public final fun of (Ljava/lang/Object;)Lkotlin/Pair;
 	public final fun read (Ljava/util/Map;)Ljava/lang/Object;
 	public fun toString ()Ljava/lang/String;
+}
+
+public final class hivens/pages/api/PageValueKt {
+	public static final fun presentKey (Ljava/lang/String;)Lhivens/widget/model/SourceKey;
 }
 
 public final class hivens/pages/api/PagesApi {

@@ -1,6 +1,7 @@
 package hivens.history
 
 import hivens.history.api.HistoryKeys
+import hivens.pages.api.PageValue
 import hivens.pages.api.PagesKeys
 import hivens.pages.api.Show
 import hivens.widget.api.CompositionKeys
@@ -22,6 +23,7 @@ import hivens.widget.model.ConfigId
 import hivens.widget.model.ScopeLevel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.serialization.builtins.serializer
 import kotlin.reflect.KClass
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -39,10 +41,16 @@ class HistoryKeysTest {
     private val pack = ConfigId("pack")
 
     private val restarts = MutableStateFlow(InterfaceRestarts())
+    private val packValue = PageValue("pack.page", String.serializer())
+    private val packs = MutableStateFlow(setOf(packValue.json("a"), packValue.json("b")))
     private val configs = MutableStateFlow(setOf(home, library, pack))
 
     private val app: WidgetScope = run {
-        val sources = WidgetDataRegistry().apply { register(InterfaceKeys.Restarts, flowSource(restarts)) }
+        val sources = WidgetDataRegistry().apply {
+            register(InterfaceKeys.Restarts, flowSource(restarts))
+            // As the module of the value answers which of its values are still there.
+            register(packValue.present, flowSource(packs))
+        }
         val commands = WidgetCommandRegistry()
         val services = ContributedServices()
         assertIs<ModuleKeysResult.Registered>(registerModuleKeys(HistoryModule.id, HistoryKeysContribution, sources, commands, services, trusted = true))
@@ -94,6 +102,20 @@ class HistoryKeysTest {
         assertEquals(library, main.shown())
         main.findCommand(HistoryKeys.Forward)!!.run(Unit)
         assertEquals(library, main.shown(), "nor is it ahead")
+    }
+
+    @Test
+    fun `a page opened with a value its module says is gone leaves the history, and one no module answers for stays`() {
+        val main = composition()
+        main.findCommand(PagesKeys.Show)!!.run(Show(pack, mapOf(packValue.of("a"))))
+        main.findCommand(PagesKeys.Show)!!.run(Show(pack, mapOf(packValue.of("b"))))
+        main.findCommand(PagesKeys.Show)!!.run(Show(library, mapOf("nobody.answers" to packValue.json("x"))))
+        main.findCommand(HistoryKeys.Back)!!.run(Unit)
+        packs.value = setOf(packValue.json("a"))
+        assertEquals(listOf(home, pack), main.current(HistoryKeys.History)!!.entries.map { it.config })
+        assertEquals(packValue.json("a"), main.current(HistoryKeys.History)!!.current.opened["pack.page"], "the deleted pack's page is gone")
+        main.findCommand(HistoryKeys.Forward)!!.run(Unit)
+        assertEquals(library, main.shown(), "a value nobody answers for is never gone")
     }
 
     @Test
